@@ -125,55 +125,7 @@ export default function Schedules() {
   };
 
   return (
-    <div className="flex gap-6 h-full">
-      {/* Left Sidebar */}
-      <div className="w-[280px] flex-shrink-0 space-y-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Colaborador
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">0 colaboradores disponíveis</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Colaborador</p>
-                <p className="text-xs text-muted-foreground">0 colaboradores disponíveis</p>
-              </div>
-            </div>
-            
-            <Select value={selectedCollaborator} onValueChange={setSelectedCollaborator}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos os colaboradores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os colaboradores</SelectItem>
-                <SelectItem value="carlos">Dr. Carlos</SelectItem>
-                <SelectItem value="ana">Dra. Ana</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-3 rounded-lg bg-muted/50 text-center">
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">Colaboradores</p>
-              </div>
-              <div className="p-3 rounded-lg bg-muted/50 text-center">
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">Cargos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 space-y-4 min-w-0">
+    <div className="space-y-4">
         {/* Search and Filters Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -351,7 +303,6 @@ export default function Schedules() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

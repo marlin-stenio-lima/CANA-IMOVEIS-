@@ -1,8 +1,8 @@
 import { 
   LayoutDashboard, 
   Users, 
-  Building2, 
-  HandshakeIcon, 
+  Kanban, 
+  MessageCircle, 
   CheckSquare, 
   Settings,
   LogOut
@@ -26,8 +26,8 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Contatos", url: "/contacts", icon: Users },
-  { title: "Empresas", url: "/companies", icon: Building2 },
-  { title: "Negócios", url: "/deals", icon: HandshakeIcon },
+  { title: "Kanban", url: "/kanban", icon: Kanban },
+  { title: "Conversas", url: "/conversations", icon: MessageCircle },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
 ];
 

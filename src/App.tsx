@@ -7,8 +7,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Contacts from "./pages/Contacts";
-import Companies from "./pages/Companies";
-import Deals from "./pages/Deals";
+import Kanban from "./pages/Kanban";
+import Conversations from "./pages/Conversations";
 import Tasks from "./pages/Tasks";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -27,8 +27,8 @@ const App = () => (
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/contacts" element={<Contacts />} />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/deals" element={<Deals />} />
+            <Route path="/kanban" element={<Kanban />} />
+            <Route path="/conversations" element={<Conversations />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

@@ -26,6 +26,13 @@ const initialLeads = [
   { id: 5, name: "Carlos Lima", phone: "(11) 99999-0005", source: "WhatsApp", stage: "fechado", value: 2000 },
 ];
 
+const sourceColors: Record<string, string> = {
+  "WhatsApp": "bg-green-100 text-green-700 border-green-200",
+  "Instagram": "bg-pink-100 text-pink-700 border-pink-200",
+  "Site": "bg-blue-100 text-blue-700 border-blue-200",
+  "Indicação": "bg-orange-100 text-orange-700 border-orange-200",
+};
+
 export default function LeadsList() {
   const [leads] = useState(initialLeads);
 
@@ -45,86 +52,85 @@ export default function LeadsList() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {stages.map((stage) => {
-          const stageLeads = getLeadsByStage(stage.id);
-          const stageTotal = getStageTotal(stage.id);
-          
-          return (
-            <div key={stage.id} className="space-y-3">
-              {/* Column Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${stage.color}`} />
-                  <h3 className="font-medium text-sm">{stage.name}</h3>
-                  <Badge variant="secondary" className="text-xs">
-                    {stageLeads.length}
-                  </Badge>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <Plus className="h-4 w-4" />
-                </Button>
+    <div className="flex gap-4 overflow-x-auto pb-4">
+      {stages.map((stage) => {
+        const stageLeads = getLeadsByStage(stage.id);
+        const stageTotal = getStageTotal(stage.id);
+        const conversionRate = leads.length > 0 ? Math.round((stageLeads.length / leads.length) * 100) : 0;
+        
+        return (
+          <div key={stage.id} className="flex-shrink-0 w-[280px] space-y-3">
+            {/* Column Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${stage.color}`} />
+                <span className="font-medium text-sm">{stage.name}</span>
+                <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 min-w-[20px] justify-center">
+                  {stageLeads.length}
+                </Badge>
               </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
-              {/* Stage Metrics */}
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div className="flex justify-between">
-                  <span>Estimado</span>
-                  <span>{formatCurrency(stageTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Conversão</span>
-                  <span>{stageLeads.length > 0 ? Math.round((stageLeads.length / leads.length) * 100) : 0}%</span>
-                </div>
+            {/* Stage Metrics */}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Estimado</span>
+                <span className="font-medium text-foreground">{formatCurrency(stageTotal)}</span>
               </div>
-              
-              {/* Cards Container */}
-              <div className="space-y-2 min-h-[200px] bg-muted/30 rounded-lg p-2">
-                {stageLeads.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-[180px] text-muted-foreground">
-                    <Users className="h-8 w-8 mb-2 opacity-50" />
-                    <p className="text-xs">Nenhum lead</p>
-                  </div>
-                ) : (
-                  stageLeads.map((lead) => (
-                    <Card key={lead.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                      <CardContent className="p-3">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <p className="font-medium text-sm">{lead.name}</p>
-                            <p className="text-xs text-muted-foreground">{lead.phone}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {lead.source}
-                            </Badge>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <MoreHorizontal className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>Editar</DropdownMenuItem>
-                              <DropdownMenuItem>Mover</DropdownMenuItem>
-                              <DropdownMenuItem>Converter para Cliente</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="mt-2 text-sm font-medium text-primary">
-                          {formatCurrency(lead.value)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Conversão</span>
+                <span className="font-medium text-foreground">{conversionRate}%</span>
               </div>
             </div>
-          );
-        })}
-      </div>
+            
+            {/* Cards Container */}
+            <div className="space-y-2 min-h-[400px]">
+              {stageLeads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[200px] bg-muted/30 rounded-lg text-muted-foreground">
+                  <Users className="h-8 w-8 mb-2 opacity-40" />
+                  <p className="text-xs">Nenhum lead</p>
+                </div>
+              ) : (
+                stageLeads.map((lead) => (
+                  <Card key={lead.id} className="cursor-pointer hover:shadow-md transition-all border bg-card">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between mb-1">
+                        <p className="font-medium text-sm text-foreground">{lead.name}</p>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem>Mover</DropdownMenuItem>
+                            <DropdownMenuItem>Converter para Cliente</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{lead.phone}</p>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs px-2 py-0.5 font-normal mb-2 ${sourceColors[lead.source] || ''}`}
+                      >
+                        {lead.source}
+                      </Badge>
+                      <div className="text-sm font-semibold text-primary">
+                        {formatCurrency(lead.value)}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

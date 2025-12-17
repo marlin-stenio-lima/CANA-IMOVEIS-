@@ -4,6 +4,7 @@ import {
   Kanban, 
   MessageCircle, 
   CheckSquare, 
+  Calendar,
   Settings,
   LogOut
 } from "lucide-react";
@@ -29,6 +30,7 @@ const menuItems = [
   { title: "Kanban", url: "/kanban", icon: Kanban },
   { title: "Conversas", url: "/conversations", icon: MessageCircle },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
+  { title: "Agendamentos", url: "/schedules", icon: Calendar },
 ];
 
 const settingsItems = [

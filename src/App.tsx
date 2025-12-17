@@ -10,6 +10,7 @@ import Contacts from "./pages/Contacts";
 import Kanban from "./pages/Kanban";
 import Conversations from "./pages/Conversations";
 import Tasks from "./pages/Tasks";
+import Schedules from "./pages/Schedules";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/conversations" element={<Conversations />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route path="/schedules" element={<Schedules />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

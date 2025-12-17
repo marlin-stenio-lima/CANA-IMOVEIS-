@@ -49,12 +49,12 @@ export default function Deals() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Pipeline de Negócios</h1>
+          <h1 className="text-3xl font-bold">Kanban</h1>
           <p className="text-muted-foreground">Acompanhe seus negócios em cada etapa</p>
         </div>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Novo Negócio
+          Novo Item
         </Button>
       </div>
 

@@ -9,7 +9,9 @@ import {
   LogOut
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import {
   Sidebar,
@@ -41,9 +43,21 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+  const { profile, signOut } = useAuth();
 
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  const getInitials = (name: string | null) => {
+    if (!name) return "U";
+    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -53,6 +67,23 @@ export function AppSidebar() {
             {collapsed ? "C" : "CRM"}
           </h1>
         </div>
+
+        {/* User Profile Section */}
+        {profile && !collapsed && (
+          <div className="px-4 py-2 mb-2">
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar-accent/50">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile.avatar_url || undefined} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {getInitials(profile.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{profile.full_name || "Usuário"}</p>
+              </div>
+            </div>
+          </div>
+        )}
         
         <SidebarGroup>
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
@@ -110,7 +141,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Sair">
+            <SidebarMenuButton tooltip="Sair" onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
               <span>Sair</span>
             </SidebarMenuButton>

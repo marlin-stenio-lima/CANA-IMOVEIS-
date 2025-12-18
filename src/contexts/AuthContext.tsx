@@ -70,32 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const generateSlug = (name: string): string => {
-    return name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      + "-" + Date.now().toString(36);
-  };
 
   const signUp = async (email: string, password: string, fullName: string, companyName: string) => {
     try {
-      // 1. Create company first
-      const slug = generateSlug(companyName);
-      const { data: companyData, error: companyError } = await supabase
-        .from("companies")
-        .insert({ name: companyName, slug })
-        .select("id")
-        .single();
-
-      if (companyError) {
-        console.error("Error creating company:", companyError);
-        return { error: new Error("Erro ao criar empresa: " + companyError.message) };
-      }
-
-      // 2. Sign up user with metadata
+      // Sign up user with metadata - trigger will create company, profile, and role
       const redirectUrl = `${window.location.origin}/`;
       const { error: signUpError } = await supabase.auth.signUp({
         email,
@@ -103,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            company_id: companyData.id,
+            company_name: companyName,
             full_name: fullName,
             is_owner: true
           }
@@ -111,8 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (signUpError) {
-        // Rollback: delete the company if signup failed
-        await supabase.from("companies").delete().eq("id", companyData.id);
         return { error: signUpError };
       }
 

@@ -1,107 +1,243 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Phone } from "lucide-react";
-
-const stages = [
-  { id: "novo", name: "Novo", color: "bg-primary" },
-  { id: "contato", name: "Contato", color: "bg-blue-500" },
-  { id: "agendamento", name: "Agendamento", color: "bg-yellow-500" },
-  { id: "consulta", name: "Consulta", color: "bg-purple-500" },
-  { id: "fechado", name: "Fechado", color: "bg-green-500" },
-];
-
-const initialItems = [
-  { id: 1, name: "Ana Carolina", phone: "(11) 99999-0001", source: "WhatsApp", value: 5500, stage: "novo" },
-  { id: 2, name: "Bruno Santos", phone: "(11) 99999-0002", source: "Instagram", value: 3200, stage: "novo" },
-  { id: 3, name: "Carla Mendes", phone: "(11) 99999-0003", source: "Site", value: 8000, stage: "contato" },
-  { id: 4, name: "Diego Oliveira", phone: "(11) 99999-0004", source: "Indicação", value: 12000, stage: "contato" },
-  { id: 5, name: "Elena Ferreira", phone: "(11) 99999-0005", source: "WhatsApp", value: 4500, stage: "agendamento" },
-  { id: 6, name: "Felipe Costa", phone: "(11) 99999-0006", source: "Instagram", value: 7800, stage: "consulta" },
-  { id: 7, name: "Gabriela Lima", phone: "(11) 99999-0007", source: "Site", value: 15000, stage: "fechado" },
-  { id: 8, name: "Henrique Alves", phone: "(11) 99999-0008", source: "Indicação", value: 9500, stage: "fechado" },
-];
-
-const sourceColors: Record<string, string> = {
-  WhatsApp: "bg-green-100 text-green-700",
-  Instagram: "bg-pink-100 text-pink-700",
-  Site: "bg-blue-100 text-blue-700",
-  Indicação: "bg-orange-100 text-orange-700",
-};
+import { Settings } from "lucide-react";
+import { usePipelines } from "@/hooks/usePipelines";
+import { usePipelineStages } from "@/hooks/usePipelineStages";
+import { useDeals } from "@/hooks/useDeals";
+import { useLossReasons } from "@/hooks/useLossReasons";
+import {
+  PipelineSelector,
+  PipelineConfigModal,
+  KanbanColumn,
+  LossReasonModal,
+  CreateDealModal,
+} from "@/components/kanban";
+import { toast } from "sonner";
 
 export default function Kanban() {
-  const [items] = useState(initialItems);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
+  const [lossModalOpen, setLossModalOpen] = useState(false);
+  const [createDealModalOpen, setCreateDealModalOpen] = useState(false);
+  const [selectedDealForLoss, setSelectedDealForLoss] = useState<string | null>(null);
+  const [initialStageForDeal, setInitialStageForDeal] = useState<string | undefined>(undefined);
 
-  const getItemsByStage = (stageId: string) => {
-    return items.filter(item => item.stage === stageId);
+  const {
+    pipelines,
+    isLoading: pipelinesLoading,
+    selectedPipeline,
+    setSelectedPipelineId,
+    createPipeline,
+    updatePipeline,
+  } = usePipelines();
+
+  const {
+    stages,
+    isLoading: stagesLoading,
+    createStage,
+    updateStage,
+    deleteStage,
+  } = usePipelineStages(selectedPipeline?.id || null);
+
+  const {
+    deals,
+    isLoading: dealsLoading,
+    createDeal,
+    moveDealToStage,
+    markAsWon,
+    markAsLost,
+    deleteDeal,
+  } = useDeals(selectedPipeline?.id || null);
+
+  const { lossReasons, createLossReason } = useLossReasons();
+
+  const getDealsByStage = (stageId: string) => {
+    return deals.filter((deal) => deal.stage_id === stageId);
   };
 
-  const getStageTotal = (stageId: string) => {
-    return getItemsByStage(stageId).reduce((acc, item) => acc + item.value, 0);
+  const handleCreateNewPipeline = () => {
+    setIsCreatingPipeline(true);
+    setConfigModalOpen(true);
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
+  const handleOpenConfig = () => {
+    setIsCreatingPipeline(false);
+    setConfigModalOpen(true);
   };
 
-  const getConversionRate = (stageId: string) => {
-    const stageIndex = stages.findIndex(s => s.id === stageId);
-    const baseRate = 100 - (stageIndex * 15);
-    return Math.max(baseRate, 25);
+  const handleSavePipeline = async (data: { name: string; description: string; is_default: boolean }) => {
+    if (isCreatingPipeline) {
+      await createPipeline.mutateAsync(data);
+    } else if (selectedPipeline) {
+      await updatePipeline.mutateAsync({ id: selectedPipeline.id, ...data });
+    }
+    if (isCreatingPipeline) {
+      setConfigModalOpen(false);
+    }
   };
+
+  const handleCreateStage = async (data: { name: string; color: string; target_days: number; is_won_stage: boolean; is_lost_stage: boolean }) => {
+    if (!selectedPipeline) return;
+    await createStage.mutateAsync({
+      ...data,
+      pipeline_id: selectedPipeline.id,
+      position: stages.length,
+    });
+  };
+
+  const handleAddDealToStage = (stageId: string) => {
+    setInitialStageForDeal(stageId);
+    setCreateDealModalOpen(true);
+  };
+
+  const handleCreateDeal = async (data: { title: string; description?: string; value?: number; stage_id?: string }) => {
+    if (!selectedPipeline) return;
+    await createDeal.mutateAsync({
+      ...data,
+      pipeline_id: selectedPipeline.id,
+    });
+  };
+
+  const handleMoveDeal = async (dealId: string, stageId: string) => {
+    await moveDealToStage.mutateAsync({ dealId, stageId });
+  };
+
+  const handleMarkAsWon = async (dealId: string) => {
+    await markAsWon.mutateAsync(dealId);
+  };
+
+  const handleMarkAsLost = (dealId: string) => {
+    setSelectedDealForLoss(dealId);
+    setLossModalOpen(true);
+  };
+
+  const handleConfirmLoss = async (lossReasonId: string) => {
+    if (selectedDealForLoss) {
+      await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lossReasonId });
+      setSelectedDealForLoss(null);
+    }
+  };
+
+  const handleDeleteDeal = async (dealId: string) => {
+    if (confirm("Tem certeza que deseja excluir este deal?")) {
+      await deleteDeal.mutateAsync(dealId);
+    }
+  };
+
+  const handleViewDeal = (dealId: string) => {
+    toast.info("Funcionalidade em desenvolvimento");
+  };
+
+  const handleEditDeal = (dealId: string) => {
+    toast.info("Funcionalidade em desenvolvimento");
+  };
+
+  const isLoading = pipelinesLoading || stagesLoading || dealsLoading;
+
+  // Show empty state if no pipelines exist
+  if (!pipelinesLoading && pipelines.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <h2 className="text-xl font-semibold">Nenhum pipeline encontrado</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          Crie seu primeiro pipeline para começar a gerenciar seus deals no Kanban.
+        </p>
+        <Button onClick={handleCreateNewPipeline}>
+          Criar Pipeline
+        </Button>
+        <PipelineConfigModal
+          open={configModalOpen}
+          onOpenChange={setConfigModalOpen}
+          pipeline={null}
+          stages={[]}
+          onSavePipeline={handleSavePipeline}
+          onCreateStage={handleCreateStage}
+          onUpdateStage={() => {}}
+          onDeleteStage={() => {}}
+          isCreating={true}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {stages.map((stage) => (
-        <div key={stage.id} className="flex-shrink-0 w-[280px] space-y-3">
-          {/* Column Header */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${stage.color}`} />
-                <h3 className="font-medium text-sm">{stage.name}</h3>
-                <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                  {getItemsByStage(stage.id).length}
-                </Badge>
-              </div>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>Estimado {formatCurrency(getStageTotal(stage.id))}</span>
-              <span>Conversão {getConversionRate(stage.id)}%</span>
-            </div>
-          </div>
-
-          {/* Cards */}
-          <div className="space-y-2 min-h-[400px]">
-            {getItemsByStage(stage.id).map((item) => (
-              <Card key={item.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="p-3 space-y-2">
-                  <p className="font-medium text-sm">{item.name}</p>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Phone className="h-3 w-3" />
-                    <span>{item.phone}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Badge className={`text-xs ${sourceColors[item.source]}`}>
-                      {item.source}
-                    </Badge>
-                    <span className="text-sm font-medium text-primary">
-                      {formatCurrency(item.value)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <PipelineSelector
+            pipelines={pipelines}
+            selectedPipeline={selectedPipeline}
+            onSelect={setSelectedPipelineId}
+            onCreateNew={handleCreateNewPipeline}
+            isLoading={pipelinesLoading}
+          />
+          <Button variant="ghost" size="icon" onClick={handleOpenConfig} disabled={!selectedPipeline}>
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
-      ))}
+      </div>
+
+      {/* Kanban Board */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-[400px]">
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      ) : stages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
+          <p className="text-muted-foreground">Este pipeline ainda não possui estágios.</p>
+          <Button variant="outline" onClick={handleOpenConfig}>
+            Configurar Estágios
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {stages.map((stage) => (
+            <KanbanColumn
+              key={stage.id}
+              stage={stage}
+              deals={getDealsByStage(stage.id)}
+              allStages={stages}
+              onAddDeal={() => handleAddDealToStage(stage.id)}
+              onViewDeal={handleViewDeal}
+              onEditDeal={handleEditDeal}
+              onMoveDeal={handleMoveDeal}
+              onMarkAsWon={handleMarkAsWon}
+              onMarkAsLost={handleMarkAsLost}
+              onDeleteDeal={handleDeleteDeal}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modals */}
+      <PipelineConfigModal
+        open={configModalOpen}
+        onOpenChange={setConfigModalOpen}
+        pipeline={isCreatingPipeline ? null : selectedPipeline}
+        stages={stages}
+        onSavePipeline={handleSavePipeline}
+        onCreateStage={handleCreateStage}
+        onUpdateStage={(id, data) => updateStage.mutate({ id, ...data })}
+        onDeleteStage={(id) => deleteStage.mutate(id)}
+        isCreating={isCreatingPipeline}
+      />
+
+      <LossReasonModal
+        open={lossModalOpen}
+        onOpenChange={setLossModalOpen}
+        lossReasons={lossReasons}
+        onConfirm={handleConfirmLoss}
+        onCreateReason={(name) => createLossReason.mutate(name)}
+      />
+
+      <CreateDealModal
+        open={createDealModalOpen}
+        onOpenChange={setCreateDealModalOpen}
+        stages={stages}
+        initialStageId={initialStageForDeal}
+        onSubmit={handleCreateDeal}
+      />
     </div>
   );
 }

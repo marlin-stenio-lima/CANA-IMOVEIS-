@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,40 +6,98 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const { user, isLoading: authLoading, signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Form states
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupCompany, setSignupCompany] = useState("");
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate("/dashboard");
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulação - será substituído pela autenticação real
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(loginEmail, loginPassword);
+    
+    setIsLoading(false);
+    
+    if (error) {
       toast({
-        title: "Login realizado!",
-        description: "Bem-vindo ao CRM.",
+        title: "Erro ao entrar",
+        description: error.message === "Invalid login credentials" 
+          ? "Email ou senha incorretos" 
+          : error.message,
+        variant: "destructive",
       });
-      navigate("/dashboard");
-    }, 1000);
+      return;
+    }
+    
+    toast({
+      title: "Login realizado!",
+      description: "Bem-vindo ao CRM.",
+    });
+    navigate("/dashboard");
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulação - será substituído pela autenticação real
-    setTimeout(() => {
+    if (signupPassword.length < 6) {
       setIsLoading(false);
       toast({
-        title: "Conta criada!",
-        description: "Sua conta foi criada com sucesso.",
+        title: "Senha muito curta",
+        description: "A senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive",
       });
-      navigate("/dashboard");
-    }, 1000);
+      return;
+    }
+    
+    const { error } = await signUp(signupEmail, signupPassword, signupName, signupCompany);
+    
+    setIsLoading(false);
+    
+    if (error) {
+      let message = error.message;
+      if (message.includes("already registered")) {
+        message = "Este email já está cadastrado.";
+      }
+      toast({
+        title: "Erro ao criar conta",
+        description: message,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Conta criada!",
+      description: "Verifique seu email para confirmar o cadastro.",
+    });
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
@@ -63,7 +121,9 @@ export default function Auth() {
                     id="login-email" 
                     type="email" 
                     placeholder="seu@email.com" 
-                    required 
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -72,7 +132,9 @@ export default function Auth() {
                     id="login-password" 
                     type="password" 
                     placeholder="••••••••" 
-                    required 
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
@@ -89,7 +151,9 @@ export default function Auth() {
                     id="signup-name" 
                     type="text" 
                     placeholder="Seu nome" 
-                    required 
+                    required
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -98,7 +162,9 @@ export default function Auth() {
                     id="signup-email" 
                     type="email" 
                     placeholder="seu@email.com" 
-                    required 
+                    required
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -107,7 +173,10 @@ export default function Auth() {
                     id="signup-password" 
                     type="password" 
                     placeholder="••••••••" 
-                    required 
+                    required
+                    minLength={6}
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -116,7 +185,9 @@ export default function Auth() {
                     id="signup-company" 
                     type="text" 
                     placeholder="Sua empresa" 
-                    required 
+                    required
+                    value={signupCompany}
+                    onChange={(e) => setSignupCompany(e.target.value)}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>

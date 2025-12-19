@@ -108,7 +108,7 @@ export default function PublicProperty() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to={`/site/${slug}`} className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+          <Link to={`/${slug}`} className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Link>

@@ -35,9 +35,9 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Contatos", url: "/contacts", icon: Users },
-  { title: "Kanban", url: "/kanban", icon: Kanban, badge: "5" },
-  { title: "Conversas", url: "/conversations", icon: MessageCircle, badge: "12" },
-  { title: "Tarefas", url: "/tasks", icon: CheckSquare, badge: "3" },
+  { title: "Kanban", url: "/kanban", icon: Kanban },
+  { title: "Conversas", url: "/conversations", icon: MessageCircle },
+  { title: "Tarefas", url: "/tasks", icon: CheckSquare },
   { title: "Agendamentos", url: "/schedules", icon: Calendar },
 ];
 
@@ -134,11 +134,6 @@ export function AppSidebar() {
                     >
                       <item.icon className="h-5 w-5 shrink-0" />
                       <span className="flex-1">{item.title}</span>
-                      {item.badge && !collapsed && (
-                        <Badge variant="secondary" className="h-5 min-w-5 flex items-center justify-center text-xs">
-                          {item.badge}
-                        </Badge>
-                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

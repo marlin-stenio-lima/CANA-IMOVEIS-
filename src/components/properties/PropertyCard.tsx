@@ -1,4 +1,5 @@
 import { Property } from '@/hooks/useProperties';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,8 @@ import {
   Eye, 
   Pencil, 
   Trash2,
-  Star
+  Star,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +47,7 @@ const transactionLabels: Record<Property['transaction_type'], string> = {
 };
 
 export function PropertyCard({ property, onEdit, onDelete, onView }: PropertyCardProps) {
+  const { settings } = useSiteSettings();
   const coverImage = property.images?.find(img => img.is_cover) || property.images?.[0];
   
   const formatPrice = (price: number) => {
@@ -55,6 +58,9 @@ export function PropertyCard({ property, onEdit, onDelete, onView }: PropertyCar
     }).format(price);
   };
 
+  const portalUrl = settings?.slug && property.is_published 
+    ? `${window.location.origin}/site/${settings.slug}/imovel/${property.id}`
+    : null;
   return (
     <Card className="overflow-hidden group hover:shadow-lg transition-all duration-300">
       <div className="relative aspect-video overflow-hidden">
@@ -140,6 +146,13 @@ export function PropertyCard({ property, onEdit, onDelete, onView }: PropertyCar
           </span>
 
           <div className="flex gap-1">
+            {portalUrl && (
+              <Button variant="ghost" size="icon" asChild title="Ver no Portal">
+                <a href={portalUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            )}
             {onView && (
               <Button variant="ghost" size="icon" onClick={() => onView(property)}>
                 <Eye className="h-4 w-4" />

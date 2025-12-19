@@ -49,14 +49,42 @@ export default function PublicSite() {
     );
   }
 
+  const transactionLabels: Record<string, string> = {
+    venda: 'Venda',
+    aluguel: 'Aluguel',
+    temporada: 'Temporada',
+  };
+
+  const typeLabels: Record<string, string> = {
+    apartamento: 'Apartamento',
+    casa: 'Casa',
+    comercial: 'Comercial',
+    terreno: 'Terreno',
+    rural: 'Rural',
+    cobertura: 'Cobertura',
+    kitnet: 'Kitnet',
+    sala_comercial: 'Sala Comercial',
+    galpao: 'Galpão',
+    fazenda: 'Fazenda',
+  };
+
   const PropertyCard = ({ property }: { property: Property }) => {
     const cover = property.images?.find(i => i.is_cover) || property.images?.[0];
     return (
       <Link to={`/site/${slug}/imovel/${property.id}`}>
-        <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+        <Card className="overflow-hidden hover:shadow-lg transition-shadow group">
           <div className="aspect-video relative overflow-hidden">
-            {cover ? <img src={cover.url} alt={property.title} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">Sem imagem</div>}
-            {property.is_featured && <Badge className="absolute top-2 left-2 bg-yellow-500">Destaque</Badge>}
+            {cover ? <img src={cover.url} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">Sem imagem</div>}
+            <div className="absolute top-2 left-2 flex gap-1">
+              {property.is_featured && <Badge className="bg-yellow-500 text-white">Destaque</Badge>}
+              <Badge variant="secondary">{typeLabels[property.property_type] || property.property_type}</Badge>
+            </div>
+            <Badge 
+              className="absolute top-2 right-2 text-white" 
+              style={{ backgroundColor: settings.primary_color }}
+            >
+              {transactionLabels[property.transaction_type]}
+            </Badge>
           </div>
           <CardContent className="p-4">
             <h3 className="font-semibold line-clamp-1">{property.title}</h3>
@@ -117,6 +145,18 @@ export default function PublicSite() {
           </div>
         </div>
       </section>
+
+      {/* About Section */}
+      {settings.about_text && (
+        <section className="py-12 border-b">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h3 className="text-2xl font-bold mb-4">Sobre Nós</h3>
+              <p className="text-muted-foreground whitespace-pre-line">{settings.about_text}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Properties */}
       <section className="py-12">

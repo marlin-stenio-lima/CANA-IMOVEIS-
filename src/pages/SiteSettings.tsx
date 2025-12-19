@@ -123,22 +123,43 @@ export default function SiteSettingsPage() {
             Configure seu portal imobiliário público
           </p>
         </div>
-        
-        {siteUrl && settings?.is_published && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={copyUrl}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar URL
-            </Button>
-            <Button variant="outline" asChild>
-              <a href={siteUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Ver Site
-              </a>
-            </Button>
-          </div>
-        )}
       </div>
+
+      {/* Portal Link Card */}
+      <Card className={settings?.is_published ? 'border-green-500/50 bg-green-500/5' : 'border-yellow-500/50 bg-yellow-500/5'}>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <div className={`h-2 w-2 rounded-full ${settings?.is_published ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <span className="font-medium">{settings?.is_published ? 'Site Publicado' : 'Site Não Publicado'}</span>
+              </div>
+              {siteUrl ? (
+                <p className="text-sm text-muted-foreground break-all">{siteUrl}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Configure o slug para gerar a URL do seu portal</p>
+              )}
+            </div>
+            {siteUrl && (
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={copyUrl}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar URL
+                </Button>
+                <Button size="sm" asChild>
+                  <a href={siteUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Ver Site
+                  </a>
+                </Button>
+              </div>
+            )}
+          </div>
+          {!settings?.is_published && siteUrl && (
+            <p className="text-xs text-yellow-600 mt-2">Ative "Publicar Site" abaixo para que seus clientes possam acessar o portal.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">

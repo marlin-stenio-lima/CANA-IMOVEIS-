@@ -1,1 +1,4 @@
 project_id = "ahvaqriovmsxixgilkxa"
+
+[functions.property-inquiry]
+verify_jwt = false

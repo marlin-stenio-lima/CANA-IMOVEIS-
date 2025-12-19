@@ -470,6 +470,278 @@ export type Database = {
           },
         ]
       }
+      properties: {
+        Row: {
+          address: string | null
+          area_built: number | null
+          area_total: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          features: string[] | null
+          id: string
+          is_featured: boolean | null
+          is_published: boolean | null
+          latitude: number | null
+          longitude: number | null
+          neighborhood: string | null
+          parking_spots: number | null
+          price: number
+          property_type: Database["public"]["Enums"]["property_type"]
+          state: string | null
+          status: Database["public"]["Enums"]["property_status"]
+          title: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          area_built?: number | null
+          area_total?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood?: string | null
+          parking_spots?: number | null
+          price?: number
+          property_type?: Database["public"]["Enums"]["property_type"]
+          state?: string | null
+          status?: Database["public"]["Enums"]["property_status"]
+          title: string
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          area_built?: number | null
+          area_total?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          neighborhood?: string | null
+          parking_spots?: number | null
+          price?: number
+          property_type?: Database["public"]["Enums"]["property_type"]
+          state?: string | null
+          status?: Database["public"]["Enums"]["property_status"]
+          title?: string
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_images: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_cover: boolean | null
+          position: number | null
+          property_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_cover?: boolean | null
+          position?: number | null
+          property_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_cover?: boolean | null
+          position?: number | null
+          property_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_images_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_inquiries: {
+        Row: {
+          company_id: string
+          contact_id: string | null
+          created_at: string | null
+          deal_id: string | null
+          email: string
+          id: string
+          message: string | null
+          name: string
+          phone: string
+          property_id: string
+          status: Database["public"]["Enums"]["inquiry_status"] | null
+        }
+        Insert: {
+          company_id: string
+          contact_id?: string | null
+          created_at?: string | null
+          deal_id?: string | null
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          phone: string
+          property_id: string
+          status?: Database["public"]["Enums"]["inquiry_status"] | null
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string | null
+          created_at?: string | null
+          deal_id?: string | null
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string
+          property_id?: string
+          status?: Database["public"]["Enums"]["inquiry_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_inquiries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_inquiries_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_inquiries_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_inquiries_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_settings: {
+        Row: {
+          about_text: string | null
+          address: string | null
+          company_id: string
+          created_at: string | null
+          email: string | null
+          facebook_url: string | null
+          id: string
+          instagram_url: string | null
+          is_published: boolean | null
+          logo_url: string | null
+          phone: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          site_name: string | null
+          slug: string
+          updated_at: string | null
+          whatsapp: string | null
+          youtube_url: string | null
+        }
+        Insert: {
+          about_text?: string | null
+          address?: string | null
+          company_id: string
+          created_at?: string | null
+          email?: string | null
+          facebook_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          is_published?: boolean | null
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          site_name?: string | null
+          slug: string
+          updated_at?: string | null
+          whatsapp?: string | null
+          youtube_url?: string | null
+        }
+        Update: {
+          about_text?: string | null
+          address?: string | null
+          company_id?: string
+          created_at?: string | null
+          email?: string | null
+          facebook_url?: string | null
+          id?: string
+          instagram_url?: string | null
+          is_published?: boolean | null
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          site_name?: string | null
+          slug?: string
+          updated_at?: string | null
+          whatsapp?: string | null
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -625,7 +897,26 @@ export type Database = {
         | "negotiation"
         | "won"
         | "lost"
+      inquiry_status: "novo" | "contatado" | "convertido" | "descartado"
+      property_status:
+        | "disponivel"
+        | "vendido"
+        | "alugado"
+        | "reservado"
+        | "inativo"
+      property_type:
+        | "apartamento"
+        | "casa"
+        | "comercial"
+        | "terreno"
+        | "rural"
+        | "cobertura"
+        | "kitnet"
+        | "sala_comercial"
+        | "galpao"
+        | "fazenda"
       task_status: "pending" | "in_progress" | "completed" | "cancelled"
+      transaction_type: "venda" | "aluguel" | "temporada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -771,7 +1062,28 @@ export const Constants = {
         "won",
         "lost",
       ],
+      inquiry_status: ["novo", "contatado", "convertido", "descartado"],
+      property_status: [
+        "disponivel",
+        "vendido",
+        "alugado",
+        "reservado",
+        "inativo",
+      ],
+      property_type: [
+        "apartamento",
+        "casa",
+        "comercial",
+        "terreno",
+        "rural",
+        "cobertura",
+        "kitnet",
+        "sala_comercial",
+        "galpao",
+        "fazenda",
+      ],
       task_status: ["pending", "in_progress", "completed", "cancelled"],
+      transaction_type: ["venda", "aluguel", "temporada"],
     },
   },
 } as const

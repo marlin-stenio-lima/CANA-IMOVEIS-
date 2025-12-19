@@ -14,6 +14,11 @@ import Conversations from "./pages/Conversations";
 import Tasks from "./pages/Tasks";
 import Schedules from "./pages/Schedules";
 import Settings from "./pages/Settings";
+import Properties from "./pages/Properties";
+import SiteSettings from "./pages/SiteSettings";
+import Leads from "./pages/Leads";
+import PublicSite from "./pages/public/PublicSite";
+import PublicProperty from "./pages/public/PublicProperty";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +33,9 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Public Portal Routes */}
+            <Route path="/site/:slug" element={<PublicSite />} />
+            <Route path="/site/:slug/imovel/:propertyId" element={<PublicProperty />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -40,6 +48,9 @@ const App = () => (
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/schedules" element={<Schedules />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/properties" element={<Properties />} />
+              <Route path="/site-settings" element={<SiteSettings />} />
+              <Route path="/leads" element={<Leads />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

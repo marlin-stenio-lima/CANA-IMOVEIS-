@@ -7,7 +7,10 @@ import {
   Calendar,
   Settings,
   LogOut,
-  Zap
+  Zap,
+  Building2,
+  Globe,
+  UserCheck
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -36,6 +39,12 @@ const menuItems = [
   { title: "Conversas", url: "/conversations", icon: MessageCircle, badge: "12" },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare, badge: "3" },
   { title: "Agendamentos", url: "/schedules", icon: Calendar },
+];
+
+const portalItems = [
+  { title: "Imóveis", url: "/properties", icon: Building2 },
+  { title: "Leads Portal", url: "/leads", icon: UserCheck },
+  { title: "Config. Site", url: "/site-settings", icon: Globe },
 ];
 
 const settingsItems = [
@@ -130,6 +139,37 @@ export function AppSidebar() {
                           {item.badge}
                         </Badge>
                       )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <Separator className="mx-4 w-auto my-2" />
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4">
+            Portal Imobiliário
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="px-2">
+              {portalItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                    className="group transition-all duration-200"
+                  >
+                    <NavLink 
+                      to={item.url} 
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
+                    >
+                      <item.icon className="h-5 w-5 shrink-0" />
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

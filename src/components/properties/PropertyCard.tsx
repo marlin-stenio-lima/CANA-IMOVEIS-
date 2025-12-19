@@ -59,7 +59,7 @@ export function PropertyCard({ property, onEdit, onDelete, onView }: PropertyCar
   };
 
   const portalUrl = settings?.slug && property.is_published 
-    ? `${window.location.origin}/site/${settings.slug}/imovel/${property.id}`
+    ? `${window.location.origin}/${settings.slug}/imovel/${property.id}`
     : null;
   return (
     <Card className="overflow-hidden group hover:shadow-lg transition-all duration-300">

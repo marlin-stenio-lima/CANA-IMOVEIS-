@@ -71,7 +71,7 @@ export default function PublicSite() {
   const PropertyCard = ({ property }: { property: Property }) => {
     const cover = property.images?.find(i => i.is_cover) || property.images?.[0];
     return (
-      <Link to={`/site/${slug}/imovel/${property.id}`}>
+      <Link to={`/${slug}/imovel/${property.id}`}>
         <Card className="overflow-hidden hover:shadow-lg transition-shadow group">
           <div className="aspect-video relative overflow-hidden">
             {cover ? <img src={cover.url} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> : <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">Sem imagem</div>}

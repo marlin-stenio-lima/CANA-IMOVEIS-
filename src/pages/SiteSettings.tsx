@@ -89,7 +89,7 @@ export default function SiteSettingsPage() {
   };
 
   const siteUrl = settings?.slug 
-    ? `${window.location.origin}/site/${settings.slug}`
+    ? `${window.location.origin}/${settings.slug}`
     : null;
 
   const copyUrl = () => {
@@ -198,7 +198,7 @@ export default function SiteSettingsPage() {
                     <FormControl>
                       <div className="flex items-center">
                         <span className="text-sm text-muted-foreground mr-2">
-                          {window.location.origin}/site/
+                          {window.location.origin}/
                         </span>
                         <Input placeholder="minha-imobiliaria" {...field} />
                       </div>

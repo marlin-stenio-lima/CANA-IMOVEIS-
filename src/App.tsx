@@ -33,9 +33,9 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            {/* Public Portal Routes */}
-            <Route path="/site/:slug" element={<PublicSite />} />
-            <Route path="/site/:slug/imovel/:propertyId" element={<PublicProperty />} />
+            {/* Public Portal Routes - simplified URLs */}
+            <Route path="/:slug/imovel/:propertyId" element={<PublicProperty />} />
+            <Route path="/:slug" element={<PublicSite />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />

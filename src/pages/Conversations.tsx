@@ -1,313 +1,285 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Star, 
-  Phone, 
-  Calendar, 
-  Pin, 
-  Mail, 
-  Trash2, 
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  Star,
+  Phone,
+  Calendar,
+  Pin,
+  Mail,
+  Trash2,
   Send,
   Smile,
   X,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react";
 
-// Mock data
-const conversations = [
-  { id: 1, name: "João Silva", avatar: "", lastMessage: "Olá, gostaria de saber mais sobre...", time: "10:30", unread: 2, starred: true },
-  { id: 2, name: "Maria Santos", avatar: "", lastMessage: "Obrigada pelo atendimento!", time: "09:45", unread: 0, starred: false },
-  { id: 3, name: "Pedro Oliveira", avatar: "", lastMessage: "Qual o valor do serviço?", time: "Ontem", unread: 1, starred: true },
-  { id: 4, name: "Ana Costa", avatar: "", lastMessage: "Podemos agendar para amanhã?", time: "Ontem", unread: 0, starred: false },
-  { id: 5, name: "Carlos Lima", avatar: "", lastMessage: "Perfeito, combinado!", time: "18/01", unread: 0, starred: false },
-];
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  custom_fields: any;
+}
 
-const messages = [
-  { id: 1, sender: "contact", content: "Olá, tudo bem?", time: "10:00", isAuto: false },
-  { id: 2, sender: "user", content: "Olá! Tudo ótimo, como posso ajudar?", time: "10:02", isAuto: false },
-  { id: 3, sender: "contact", content: "Gostaria de saber mais sobre seus serviços", time: "10:05", isAuto: false },
-  { id: 4, sender: "user", content: "Claro! Temos várias opções disponíveis. Você está interessado em qual área específica?", time: "10:08", isAuto: false },
-  { id: 5, sender: "contact", content: "Estou procurando algo para minha empresa", time: "10:15", isAuto: false },
-  { id: 6, sender: "user", content: "Perfeito! Vou enviar nosso catálogo de serviços corporativos.", time: "10:18", isAuto: true },
-];
+interface Conversation {
+  id: string;
+  contact_id: string;
+  last_message: string;
+  last_message_at: string;
+  unread_count: number;
+  contact: Contact;
+}
 
-const contactDetails = {
-  name: "João Silva",
-  nickname: "João",
-  phone: "+55 11 99999-0001",
-  email: "joao@email.com",
-  birthday: "15/03/1990",
-  tags: ["WhatsApp", "Lead Quente", "Interesse Alto"],
-  owner: "Você",
-  followers: ["Maria", "Pedro"],
-};
+interface Message {
+  id: string;
+  conversation_id: string;
+  sender_type: 'user' | 'contact' | 'ai';
+  content: string;
+  created_at: string;
+}
 
 export default function Conversations() {
-  const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
-  const [showDetails, setShowDetails] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread" | "starred">("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
-  const filteredConversations = conversations.filter(conv => {
-    if (filter === "unread") return conv.unread > 0;
-    if (filter === "starred") return conv.starred;
-    return true;
-  });
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch Conversations
+  useEffect(() => {
+    const fetchConversations = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*, contact:contacts(*)')
+        .order('last_message_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        toast.error("Erro ao carregar conversas");
+      } else {
+        setConversations(data as any);
+      }
+      setIsLoading(false);
+    };
+
+    fetchConversations();
+
+    // Subscribe to new conversations or updates
+    const channel = supabase
+      .channel('public:conversations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
+        fetchConversations(); // Reload list on change (simple approach)
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel) };
+  }, []);
+
+  // Fetch Messages for Selected
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedConversation.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        toast.error("Erro ao carregar mensagens");
+      } else {
+        setMessages(data as any);
+      }
+    };
+
+    fetchMessages();
+
+    // Real-time Messages
+    const channel = supabase
+      .channel(`chat:${selectedConversation.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${selectedConversation.id}`
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new as Message]);
+        // update last message in conversation list
+        setConversations(prev => prev.map(c =>
+          c.id === selectedConversation.id
+            ? { ...c, last_message: (payload.new as any).content, last_message_at: (payload.new as any).created_at }
+            : c
+        ));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel) };
+  }, [selectedConversation]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedConversation) return;
+
+    setIsSending(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-outbound', {
+        body: {
+          conversation_id: selectedConversation.id,
+          message: messageInput
+        }
+      });
+
+      if (error) throw error;
+
+      setMessageInput("");
+    } catch (error) {
+      console.error('Error sending:', error);
+      toast.error("Erro ao enviar mensagem");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const getInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+    return name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "?";
   };
 
   return (
     <div className="flex h-[calc(100vh-120px)] bg-background rounded-lg border overflow-hidden">
-      {/* Left Column - Conversation List */}
+      {/* Left Column - List */}
       <div className="w-80 border-r flex flex-col">
         <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg mb-3">Caixa de Entrada</h2>
-          <div className="flex gap-2">
-            <Button 
-              variant={filter === "all" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilter("all")}
-            >
-              Todos
-            </Button>
-            <Button 
-              variant={filter === "unread" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilter("unread")}
-            >
-              Não lidos
-            </Button>
-            <Button 
-              variant={filter === "starred" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilter("starred")}
-            >
-              <Star className="h-3 w-3" />
-            </Button>
-          </div>
+          <h2 className="font-semibold text-lg">Caixa de Entrada</h2>
         </div>
-        
         <ScrollArea className="flex-1">
-          {filteredConversations.map((conv) => (
+          {conversations.map(conv => (
             <div
               key={conv.id}
-              className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors border-b ${
-                selectedConversation.id === conv.id ? "bg-muted" : ""
-              }`}
+              className={`p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedConversation?.id === conv.id ? "bg-muted" : ""}`}
               onClick={() => setSelectedConversation(conv)}
             >
               <div className="flex items-start gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={conv.avatar} />
-                  <AvatarFallback>{getInitials(conv.name)}</AvatarFallback>
+                <Avatar>
+                  <AvatarFallback>{getInitials(conv.contact?.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm truncate">{conv.name}</span>
-                    <span className="text-xs text-muted-foreground">{conv.time}</span>
+                  <div className="flex justify-between">
+                    <span className="font-medium truncate">{conv.contact?.name || "Desconhecido"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(conv.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-1">
-                    {conv.lastMessage}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {conv.starred && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
-                  {conv.unread > 0 && (
-                    <Badge className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                      {conv.unread}
-                    </Badge>
-                  )}
+                  <p className="text-xs text-muted-foreground truncate">{conv.last_message}</p>
                 </div>
               </div>
             </div>
           ))}
+          {conversations.length === 0 && !isLoading && (
+            <div className="p-4 text-center text-muted-foreground text-sm">Nenhuma conversa encontrada</div>
+          )}
         </ScrollArea>
       </div>
 
-      {/* Center Column - Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
-        <div className="p-4 border-b flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-medium">{selectedConversation.name}</h3>
-              <span className="text-xs text-muted-foreground">Online</span>
+      {/* Center - Chat */}
+      <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900">
+        {selectedConversation ? (
+          <>
+            <div className="p-4 border-b bg-background flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback>{getInitials(selectedConversation.contact?.name)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">{selectedConversation.contact?.name}</h3>
+                  <span className="text-xs text-muted-foreground">{selectedConversation.contact?.phone}</span>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowDetails(!showDetails)}>
+                <MessageCircle className="h-5 w-5" />
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-              <Smile className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Calendar className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Pin className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Mail className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => setShowDetails(!showDetails)}
-            >
-              <MessageCircle className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
 
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            <div className="text-center">
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                Hoje
-              </span>
-            </div>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    msg.sender === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
-                  <p className="text-sm">{msg.content}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs ${msg.sender === "user" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                      {msg.time}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
+              {messages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.sender_type === 'contact' ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[70%] rounded-lg p-3 ${msg.sender_type === 'contact'
+                      ? 'bg-white border text-foreground'
+                      : msg.sender_type === 'ai'
+                        ? 'bg-purple-100 border-purple-200 text-purple-900' // Distinct AI color
+                        : 'bg-primary text-primary-foreground'
+                    }`}>
+                    <p className="text-sm">{msg.content}</p>
+                    <span className="text-[10px] opacity-70 block mt-1 text-right">
+                      {new Date(msg.created_at).toLocaleTimeString()}
+                      {msg.sender_type === 'ai' && " (IA)"}
                     </span>
-                    {msg.isAuto && (
-                      <Badge variant="outline" className="text-xs h-4 px-1">
-                        Automático
-                      </Badge>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+              ))}
+            </div>
 
-        {/* Message Input */}
-        <div className="p-4 border-t">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-              <Smile className="h-5 w-5" />
-            </Button>
-            <Input
-              placeholder="Digite sua mensagem..."
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              className="flex-1"
-              onKeyPress={(e) => e.key === "Enter" && messageInput.trim() && setMessageInput("")}
-            />
-            <Button size="icon" disabled={!messageInput.trim()}>
-              <Send className="h-4 w-4" />
-            </Button>
+            <div className="p-4 bg-background border-t flex gap-2">
+              <Input
+                placeholder="Digite sua mensagem..."
+                value={messageInput}
+                onChange={e => setMessageInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              />
+              <Button onClick={handleSendMessage} disabled={isSending}>
+                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            Selecione uma conversa ao lado
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Right Column - Contact Details */}
-      {showDetails && (
-        <div className="w-80 border-l flex flex-col">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold">Detalhes do contato</h3>
-            <Button variant="ghost" size="icon" onClick={() => setShowDetails(false)}>
-              <X className="h-4 w-4" />
-            </Button>
+      {/* Right - Details */}
+      {showDetails && selectedConversation && (
+        <div className="w-80 border-l bg-background p-4">
+          <div className="text-center mb-6">
+            <Avatar className="h-20 w-20 mx-auto mb-2">
+              <AvatarFallback className="text-xl">{getInitials(selectedConversation.contact?.name)}</AvatarFallback>
+            </Avatar>
+            <h3 className="font-semibold">{selectedConversation.contact?.name}</h3>
+            <p className="text-sm text-muted-foreground">{selectedConversation.contact?.email}</p>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-6">
-              {/* Contact Avatar & Name */}
-              <div className="text-center">
-                <Avatar className="h-20 w-20 mx-auto mb-3">
-                  <AvatarFallback className="text-xl">
-                    {getInitials(contactDetails.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <h4 className="font-semibold">{contactDetails.name}</h4>
+          <Separator className="my-4" />
+
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm">Dados do Lead</h4>
+            {selectedConversation.contact?.custom_fields && Object.entries(selectedConversation.contact.custom_fields).map(([key, val]) => (
+              <div key={key}>
+                <label className="text-xs text-muted-foreground capitalize">{key}</label>
+                <p className="text-sm">{String(val)}</p>
               </div>
-
-              <Separator />
-
-              {/* Owner & Followers */}
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Proprietário</span>
-                  <span>{contactDetails.owner}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Seguidores</span>
-                  <span>{contactDetails.followers.join(", ")}</span>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Tags */}
-              <div className="space-y-2">
-                <span className="text-sm text-muted-foreground">Etiquetas</span>
-                <div className="flex flex-wrap gap-2">
-                  {contactDetails.tags.map((tag, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Contact Info */}
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-muted-foreground">Nome</label>
-                  <Input value={contactDetails.name} readOnly className="mt-1" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Apelido</label>
-                  <Input value={contactDetails.nickname} readOnly className="mt-1" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Telefone</label>
-                  <Input value={contactDetails.phone} readOnly className="mt-1" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">E-mail</label>
-                  <Input value={contactDetails.email} readOnly className="mt-1" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Data de nascimento</label>
-                  <Input value={contactDetails.birthday} readOnly className="mt-1" />
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
+            ))}
+            {!selectedConversation.contact?.custom_fields && <p className="text-sm text-muted-foreground">Sem dados extras</p>}
+          </div>
         </div>
       )}
     </div>

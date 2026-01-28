@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -5,9 +7,66 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Building2, User, Bell, Shield } from "lucide-react";
+import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { IntegrationManager } from "@/components/settings/IntegrationManager";
+import { TeamManager } from "@/components/settings/TeamManager";
 
 export default function Settings() {
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'open' | 'close' | 'connecting' | 'unknown'>('unknown');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const checkConnection = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-manager', {
+        body: { action: 'status' }
+      });
+      if (error) throw error;
+      setConnectionStatus(data?.instance?.state || 'close');
+    } catch (error) {
+      console.error(error);
+      setConnectionStatus('unknown');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateQrCode = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-manager', {
+        body: { action: 'connect' }
+      });
+      if (error) throw error;
+
+      if (data?.base64) {
+        setQrCode(data.base64);
+      } else if (data?.instance?.state === 'open') {
+        setConnectionStatus('open');
+        toast.success("Já está conectado!");
+      }
+    } catch (error) {
+      toast.error("Erro ao gerar QR Code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check status on mount if tab is active (simplified)
+  }, []);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab") || "integrations";
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -15,25 +74,39 @@ export default function Settings() {
         <p className="text-muted-foreground">Gerencie as configurações do sistema</p>
       </div>
 
-      <Tabs defaultValue="company" className="space-y-4">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="company" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Empresa
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Perfil
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notificações
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Segurança
-          </TabsTrigger>
+          <TabsTrigger value="company" className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
+          <TabsTrigger value="profile" className="flex items-center gap-2"><User className="h-4 w-4" /> Perfil</TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-2"><Users className="h-4 w-4" /> Minha Equipe</TabsTrigger>
+          <TabsTrigger value="integrations" className="flex items-center gap-2"><Smartphone className="h-4 w-4" /> Integrações</TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notificações</TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="integrations">
+          <Card>
+            <CardHeader>
+              <CardTitle>WhatsApp Multi-Contas</CardTitle>
+              <CardDescription>Gerencie as conexões de WhatsApp para cada corretor da equipe.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <IntegrationManager />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gerenciamento de Equipe</CardTitle>
+              <CardDescription>Adicione, remova e gerencie permissões dos corretores.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TeamManager />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="company">
           <Card>

@@ -1,16 +1,17 @@
-import { 
-  LayoutDashboard, 
-  Users, 
-  Kanban, 
-  MessageCircle, 
-  CheckSquare, 
+import {
+  LayoutDashboard,
+  Users,
+  Kanban,
+  MessageCircle,
+  CheckSquare,
   Calendar,
   Settings,
   LogOut,
   Zap,
   Building2,
   Globe,
-  UserCheck
+  UserCheck,
+  Smartphone
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -39,6 +40,7 @@ const menuItems = [
   { title: "Conversas", url: "/conversations", icon: MessageCircle },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
   { title: "Agendamentos", url: "/schedules", icon: Calendar },
+  { title: "WhatsApp", url: "/settings?tab=integrations", icon: Smartphone },
 ];
 
 const portalItems = [
@@ -112,7 +114,7 @@ export function AppSidebar() {
             </div>
           </div>
         )}
-        
+
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4">
             Menu Principal
@@ -121,14 +123,14 @@ export function AppSidebar() {
             <SidebarMenu className="px-2">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className="group transition-all duration-200"
                   >
-                    <NavLink 
-                      to={item.url} 
+                    <NavLink
+                      to={item.url}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
                     >
@@ -152,14 +154,14 @@ export function AppSidebar() {
             <SidebarMenu className="px-2">
               {portalItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className="group transition-all duration-200"
                   >
-                    <NavLink 
-                      to={item.url} 
+                    <NavLink
+                      to={item.url}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
                     >
@@ -183,14 +185,14 @@ export function AppSidebar() {
             <SidebarMenu className="px-2">
               {settingsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className="group transition-all duration-200"
                   >
-                    <NavLink 
-                      to={item.url} 
+                    <NavLink
+                      to={item.url}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-sm"
                     >
@@ -208,8 +210,8 @@ export function AppSidebar() {
       <SidebarFooter className="border-t bg-sidebar p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              tooltip="Sair" 
+            <SidebarMenuButton
+              tooltip="Sair"
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 text-destructive transition-all duration-200"
             >

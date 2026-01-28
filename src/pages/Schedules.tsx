@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -21,72 +32,76 @@ import {
   Users,
   Briefcase,
   Info,
+  Loader2
 } from "lucide-react";
-import { addDays, format, startOfWeek, isSameDay } from "date-fns";
+import { addDays, format, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 type ViewType = "day" | "week";
 
 interface Appointment {
-  id: number;
+  id: string;
   title: string;
-  client: string;
-  collaborator: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
+  contact_id: string;
+  start_time: string;
+  end_time: string;
   status: "scheduled" | "completed" | "cancelled";
+  contact?: { name: string };
 }
-
-const statusConfig = {
-  scheduled: { label: "Agendado", color: "bg-blue-500" },
-  completed: { label: "Realizado", color: "bg-green-500" },
-  cancelled: { label: "Cancelado", color: "bg-orange-500" },
-};
-
-const mockAppointments: Appointment[] = [
-  {
-    id: 1,
-    title: "Consulta inicial",
-    client: "João Silva",
-    collaborator: "Dr. Carlos",
-    date: new Date(),
-    startTime: "09:00",
-    endTime: "10:00",
-    status: "scheduled",
-  },
-  {
-    id: 2,
-    title: "Retorno",
-    client: "Maria Santos",
-    collaborator: "Dra. Ana",
-    date: addDays(new Date(), 1),
-    startTime: "14:00",
-    endTime: "15:00",
-    status: "completed",
-  },
-];
-
-const hours = Array.from({ length: 24 }, (_, i) => 
-  `${i.toString().padStart(2, "0")}:00`
-);
 
 export default function Schedules() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCollaborator, setSelectedCollaborator] = useState("all");
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // New Appointment State
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newAppt, setNewAppt] = useState({ title: "", date: "", time: "09:00", duration: 60 });
+  const [isCreating, setIsCreating] = useState(false);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Fetch Appointments
+  const fetchAppointments = async () => {
+    setIsLoading(true);
+    // Naive fetch all for MVP (should filter by date range)
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*, contact:contacts(name)')
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      console.error("Error fetching appointments:", error);
+      toast.error("Erro ao carregar agenda");
+    } else {
+      setAppointments(data as any);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+
+    const channel = supabase
+      .channel('public:appointments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        fetchAppointments();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel) };
+  }, []);
+
   const filteredAppointments = useMemo(() => {
-    return mockAppointments.filter(apt => {
+    return appointments.filter(apt => {
+      const clientName = apt.contact?.name || "Desconhecido";
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         if (
-          !apt.client.toLowerCase().includes(search) &&
-          !apt.collaborator.toLowerCase().includes(search) &&
+          !clientName.toLowerCase().includes(search) &&
           !apt.title.toLowerCase().includes(search)
         ) {
           return false;
@@ -94,215 +109,176 @@ export default function Schedules() {
       }
       return true;
     });
-  }, [searchTerm]);
+  }, [searchTerm, appointments]);
 
-  const appointmentCount = filteredAppointments.filter(apt => 
-    weekDays.some(day => isSameDay(day, apt.date))
+  const appointmentCount = filteredAppointments.filter(apt =>
+    weekDays.some(day => isSameDay(day, parseISO(apt.start_time)))
   ).length;
 
   const navigateWeek = (direction: number) => {
     setCurrentDate(prev => addDays(prev, direction * 7));
   };
 
-  const goToToday = () => {
-    setCurrentDate(new Date());
+  const getAppointmentsForSlot = (day: Date, hourString: string) => {
+    // hourString is "09:00"
+    return filteredAppointments.filter(apt => {
+      const aptDate = parseISO(apt.start_time);
+      const aptHour = format(aptDate, "HH:00");
+      return isSameDay(aptDate, day) && aptHour === hourString;
+    });
   };
 
-  const goToThisWeek = () => {
-    setCurrentDate(new Date());
+  const handleCreateAppointment = async () => {
+    if (!newAppt.title || !newAppt.date) {
+      toast.error("Preencha título e data");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const startDateTime = `${newAppt.date}T${newAppt.time}:00`;
+      // Simple end time calc
+      const startDate = new Date(startDateTime);
+      const endDate = new Date(startDate.getTime() + newAppt.duration * 60000);
+
+      // Needs a company_id - hardcoded fallback or fetch context
+      // This is a UI simplified creation
+      const { error } = await supabase.from('appointments').insert({
+        company_id: '00000000-0000-0000-0000-000000000000', // Warning: Needs real ID or trigger
+        // In real app, we get from Auth context
+        title: newAppt.title,
+        start_time: startDateTime,
+        end_time: endDate.toISOString(),
+        status: 'scheduled'
+      });
+
+      if (error) throw error;
+      toast.success("Agendamento criado!");
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao criar agendamento (verifique company_id)");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const getAppointmentsForSlot = (day: Date, hour: string) => {
-    return filteredAppointments.filter(apt => 
-      isSameDay(apt.date, day) && apt.startTime === hour
-    );
-  };
-
-  const formatWeekRange = () => {
-    const start = format(weekDays[0], "dd/MM");
-    const end = format(weekDays[6], "dd/MM");
-    return `${start} - ${end}`;
+  const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, "0")}:00`);
+  const statusConfig = {
+    scheduled: { label: "Agendado", color: "bg-blue-500" },
+    completed: { label: "Realizado", color: "bg-green-500" },
+    cancelled: { label: "Cancelado", color: "bg-orange-500" },
   };
 
   return (
     <div className="space-y-4">
-        {/* Search and Filters Card */}
-        <Card>
-          <CardHeader className="pb-2">
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Search className="h-5 w-5 text-muted-foreground" />
               <div>
-                <CardTitle className="text-base font-medium">Busca e Filtros</CardTitle>
-                <p className="text-xs text-muted-foreground">Encontre agendamentos rapidamente</p>
+                <CardTitle className="text-base font-medium">Agenda</CardTitle>
+                <p className="text-xs text-muted-foreground">Gerencie seus compromissos</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por cliente, colaborador ou observações..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Bookmark className="h-4 w-4" />
-                Visões salvas
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Save className="h-4 w-4" />
-                Salvar visão
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter className="h-4 w-4" />
-                Filtros Avançados
-              </Button>
-              <Button size="sm" className="gap-2 ml-auto">
-                <Plus className="h-4 w-4" />
-                Novo Agendamento
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={goToToday}
-              >
-                Hoje
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="sm"
-                onClick={goToThisWeek}
-              >
-                Esta semana
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Calendar */}
-        <Card className="flex-1">
-          <CardContent className="p-4 space-y-4">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigateWeek(-1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigateWeek(1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium ml-2">
-                  📅 {formatWeekRange()}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {appointmentCount} agenda
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <div className="flex items-center border rounded-md">
-                  <Button
-                    variant={view === "day" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="rounded-r-none"
-                    onClick={() => setView("day")}
-                  >
-                    Dia
-                  </Button>
-                  <Button
-                    variant={view === "week" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="rounded-l-none"
-                    onClick={() => setView("week")}
-                  >
-                    Semana
-                  </Button>
-                </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
                 <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Novo Agendamento
+                  <Plus className="h-4 w-4" /> Novo Agendamento
                 </Button>
-              </div>
-            </div>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Novo Compromisso</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Título</Label>
+                    <Input
+                      value={newAppt.title}
+                      onChange={e => setNewAppt({ ...newAppt, title: e.target.value })}
+                      placeholder="Ex: Reunião inicial"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Data</Label>
+                      <Input
+                        type="date"
+                        value={newAppt.date}
+                        onChange={e => setNewAppt({ ...newAppt, date: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Hora</Label>
+                      <Input
+                        type="time"
+                        value={newAppt.time}
+                        onChange={e => setNewAppt({ ...newAppt, time: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleCreateAppointment} disabled={isCreating}>
+                    {isCreating ? "Salvando..." : "Agendar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-            {/* Status Legend */}
-            <div className="flex items-center gap-6 text-sm">
-              {Object.entries(statusConfig).map(([key, config]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${config.color}`} />
-                  <span className="text-muted-foreground">{config.label}</span>
+          {/* Calendar Grid */}
+          <div className="border rounded-lg overflow-hidden bg-background">
+            {/* Header */}
+            <div className="grid grid-cols-8 bg-muted/30 border-b">
+              <div className="p-3 text-center border-r"><span className="text-xs">Horário</span></div>
+              {weekDays.map((day, index) => (
+                <div key={index} className="p-3 text-center border-r last:border-r-0">
+                  <p className="font-medium text-sm">{format(day, "EEE", { locale: ptBR })}</p>
+                  <p className="text-xs text-muted-foreground">{format(day, "dd/MM")}</p>
                 </div>
               ))}
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Info className="h-4 w-4" />
-                <span>Clique para criar compromisso</span>
-              </div>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="border rounded-lg overflow-hidden">
-              {/* Header Row */}
-              <div className="grid grid-cols-8 bg-muted/30 border-b">
-                <div className="p-3 text-center border-r">
-                  <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    🕐 Horário
-                  </span>
+            {/* Time Slots */}
+            <div className="max-h-[500px] overflow-y-auto">
+              {hours.slice(6, 20).map((hour) => ( // Showing 06:00 to 20:00 for compactness
+                <div key={hour} className="grid grid-cols-8 border-b last:border-b-0 min-h-[50px]">
+                  <div className="p-2 text-center border-r bg-muted/10 text-xs text-muted-foreground flex items-center justify-center">
+                    {hour}
+                  </div>
+                  {weekDays.map((day, dayIndex) => {
+                    const slots = getAppointmentsForSlot(day, hour);
+                    return (
+                      <div key={dayIndex} className="p-1 border-r last:border-r-0 relative group hover:bg-muted/5">
+                        {slots.map(apt => (
+                          <div key={apt.id} className={`p-1 rounded text-[10px] text-white overflow-hidden mb-1 ${statusConfig[apt.status]?.color || 'bg-gray-500'}`}>
+                            <p className="font-bold truncate">{apt.title}</p>
+                            <p className="truncate">{apt.contact?.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
-                {weekDays.map((day, index) => (
-                  <div key={index} className="p-3 text-center border-r last:border-r-0">
-                    <p className="font-medium text-sm">
-                      {format(day, "EEE", { locale: ptBR })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(day, "dd/MM")}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Time Slots */}
-              <div className="max-h-[500px] overflow-y-auto">
-                {hours.slice(0, 12).map((hour) => (
-                  <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
-                    <div className="p-2 text-center border-r bg-muted/10">
-                      <span className="text-xs text-muted-foreground">{hour}</span>
-                    </div>
-                    {weekDays.map((day, dayIndex) => {
-                      const appointments = getAppointmentsForSlot(day, hour);
-                      const isToday = isSameDay(day, new Date());
-                      
-                      return (
-                        <div
-                          key={dayIndex}
-                          className={`p-1 border-r last:border-r-0 min-h-[60px] cursor-pointer hover:bg-muted/20 transition-colors ${
-                            isToday ? "bg-primary/5" : ""
-                          }`}
-                        >
-                          {appointments.map((apt) => (
-                            <div
-                              key={apt.id}
-                              className={`p-1.5 rounded text-xs text-white ${statusConfig[apt.status].color}`}
-                            >
-                              <p className="font-medium truncate">{apt.title}</p>
-                              <p className="truncate opacity-90">{apt.client}</p>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

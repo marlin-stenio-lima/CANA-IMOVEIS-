@@ -1,4 +1,16 @@
-project_id = "ahvaqriovmsxixgilkxa"
+project_id = "ymyyeehwyogcjwpfzyoz"
 
 [functions.property-inquiry]
 verify_jwt = false
+
+[functions.webhook-whatsapp]
+verify_jwt = false
+
+[functions.evolution-manager]
+verify_jwt = true
+
+[functions.ai-agent]
+verify_jwt = true
+
+[functions.send-outbound]
+verify_jwt = true

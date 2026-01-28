@@ -49,37 +49,37 @@ Deno.serve(async (req) => {
             const data = await res.json()
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
-    }
+
 
         if (action === 'status') {
-        const res = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, { headers })
-        const data = await res.json()
-        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+            const res = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, { headers })
+            const data = await res.json()
+            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+
+        if (action === 'connect') {
+            const res = await fetch(`${evolutionUrl}/instance/connect/${instanceName}`, { headers })
+            const data = await res.json()
+            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+
+        // Fetch user info (picture/number)
+        if (action === 'info') {
+            const res = await fetch(`${evolutionUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ number: instanceName }) // Often needs just instance context, but let's try
+            })
+            // Evolution v2 might vary on this endpoint, basic status is enough for now
+        }
+
+        throw new Error('Invalid action')
+
+    } catch (error) {
+        console.error('Manager Error:', error)
+        return new Response(
+            JSON.stringify({ error: error.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
     }
-
-    if (action === 'connect') {
-        const res = await fetch(`${evolutionUrl}/instance/connect/${instanceName}`, { headers })
-        const data = await res.json()
-        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-    }
-
-    // Fetch user info (picture/number)
-    if (action === 'info') {
-        const res = await fetch(`${evolutionUrl}/chat/fetchProfilePictureUrl/${instanceName}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ number: instanceName }) // Often needs just instance context, but let's try
-        })
-        // Evolution v2 might vary on this endpoint, basic status is enough for now
-    }
-
-    throw new Error('Invalid action')
-
-} catch (error) {
-    console.error('Manager Error:', error)
-    return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-}
 })

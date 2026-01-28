@@ -31,6 +31,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
     const [role, setRole] = useState("agent");
 
     const fetchTeam = async () => {
@@ -45,6 +46,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
     const resetForm = () => {
         setName("");
         setEmail("");
+        setPhone("");
         setRole("agent");
         setEditingId(null);
     };
@@ -58,6 +60,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
         setEditingId(member.id);
         setName(member.name);
         setEmail(member.email || "");
+        setPhone(member.phone || "");
         setRole(member.role);
         setIsOpen(true);
     };
@@ -71,7 +74,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
             // Update existing
             const { error } = await supabase
                 .from('team_members')
-                .update({ name, email, role: role as any })
+                .update({ name, email, phone, role: role as any })
                 .eq('id', editingId);
 
             if (error) {
@@ -85,18 +88,33 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
             }
         } else {
             // Create new
-            const { error } = await supabase.from('team_members').insert({
+            const { data: newMember, error } = await supabase.from('team_members').insert({
                 name,
                 email,
+                phone,
                 role: role as any,
                 company_id: '00000000-0000-0000-0000-000000000000', // Placeholder
-            });
+            }).select().single();
 
             if (error) {
-                console.error(error);
-                toast.error("Erro ao adicionar membro");
+                console.error("Supabase Error:", error);
+                toast.error(`Erro: ${error.message || "Falha ao adicionar membro"}`);
             } else {
                 toast.success("Membro adicionado!");
+
+                // Automatic Instance Creation if Phone is present
+                if (phone && newMember) {
+                    const instanceName = `crm_${newMember.id.split('-')[0]}`;
+                    const { error: instanceError } = await supabase.from('instances').insert({
+                        name: instanceName,
+                        assigned_to: newMember.id,
+                        company_id: '00000000-0000-0000-0000-000000000000',
+                        status: 'closed' // Ready to connect
+                    });
+                    if (instanceError) console.error("Auto-instance error:", instanceError);
+                    else toast.success("Instância de WhatsApp pré-criada!");
+                }
+
                 setIsOpen(false);
                 fetchTeam();
                 if (onUpdate) onUpdate();
@@ -143,13 +161,17 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                                 <Input placeholder="email@exemplo.com" value={email} onChange={e => setEmail(e.target.value)} />
                             </div>
                             <div className="space-y-2">
+                                <label className="text-sm font-medium">Telefone / WhatsApp</label>
+                                <Input placeholder="5511999999999" value={phone} onChange={e => setPhone(e.target.value)} />
+                                <p className="text-xs text-muted-foreground">Será usado para criar a instância do WhatsApp automaticamente.</p>
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Função</label>
                                 <Select value={role} onValueChange={setRole}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="agent">Corretor (Agent)</SelectItem>
-                                        <SelectItem value="manager">Gerente</SelectItem>
-                                        <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="agent">Corretor (Acesso Limitado)</SelectItem>
+                                        <SelectItem value="admin">Admin (Acesso Total)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -166,7 +188,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nome</TableHead>
-                            <TableHead>Email</TableHead>
+                            <TableHead>Contato</TableHead>
                             <TableHead>Função</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
@@ -182,13 +204,17 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                             members.map((m) => (
                                 <TableRow key={m.id}>
                                     <TableCell className="font-medium">{m.name}</TableCell>
-                                    <TableCell>{m.email || "-"}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm">{m.email || "-"}</span>
+                                            <span className="text-xs text-muted-foreground">{m.phone || ""}</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${m.role === 'admin' ? 'bg-red-100 text-red-700' :
-                                                m.role === 'manager' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-green-100 text-green-700'
+                                            'bg-green-100 text-green-700'
                                             }`}>
-                                            {m.role === 'agent' ? 'Corretor' : m.role === 'manager' ? 'Gerente' : 'Admin'}
+                                            {m.role === 'agent' ? 'Corretor' : 'Admin'}
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-right">

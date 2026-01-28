@@ -11,7 +11,7 @@ import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircl
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { IntegrationManager } from "@/components/settings/IntegrationManager";
+
 import { TeamManager } from "@/components/settings/TeamManager";
 
 export default function Settings() {
@@ -61,7 +61,7 @@ export default function Settings() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get("tab") || "integrations";
+  const currentTab = searchParams.get("tab") || "company";
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -79,22 +79,12 @@ export default function Settings() {
           <TabsTrigger value="company" className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
           <TabsTrigger value="profile" className="flex items-center gap-2"><User className="h-4 w-4" /> Perfil</TabsTrigger>
           <TabsTrigger value="team" className="flex items-center gap-2"><Users className="h-4 w-4" /> Minha Equipe</TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center gap-2"><Smartphone className="h-4 w-4" /> Integrações</TabsTrigger>
+
           <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notificações</TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="integrations">
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp Multi-Contas</CardTitle>
-              <CardDescription>Gerencie as conexões de WhatsApp para cada corretor da equipe.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <IntegrationManager />
-            </CardContent>
-          </Card>
-        </TabsContent>
+
 
         <TabsContent value="team">
           <Card>

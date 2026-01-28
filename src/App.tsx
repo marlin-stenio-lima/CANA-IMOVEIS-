@@ -13,6 +13,7 @@ import Kanban from "./pages/Kanban";
 import Conversations from "./pages/Conversations";
 import Tasks from "./pages/Tasks";
 import Schedules from "./pages/Schedules";
+import WhatsApp from "./pages/WhatsApp";
 import Settings from "./pages/Settings";
 import Properties from "./pages/Properties";
 import SiteSettings from "./pages/SiteSettings";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/conversations" element={<Conversations />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/schedules" element={<Schedules />} />
+              <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/properties" element={<Properties />} />
               <Route path="/site-settings" element={<SiteSettings />} />

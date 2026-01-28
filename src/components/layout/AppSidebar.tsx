@@ -40,7 +40,7 @@ const menuItems = [
   { title: "Conversas", url: "/conversations", icon: MessageCircle },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
   { title: "Agendamentos", url: "/schedules", icon: Calendar },
-  { title: "WhatsApp", url: "/settings?tab=integrations", icon: Smartphone },
+  { title: "WhatsApp", url: "/whatsapp", icon: Smartphone },
 ];
 
 const portalItems = [

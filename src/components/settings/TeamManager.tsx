@@ -102,18 +102,8 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
             } else {
                 toast.success("Membro adicionado!");
 
-                // Automatic Instance Creation if Phone is present
-                if (phone && newMember) {
-                    const instanceName = `crm_${newMember.id.split('-')[0]}`;
-                    const { error: instanceError } = await supabase.from('instances').insert({
-                        name: instanceName,
-                        assigned_to: newMember.id,
-                        company_id: '00000000-0000-0000-0000-000000000000',
-                        status: 'closed' // Ready to connect
-                    });
-                    if (instanceError) console.error("Auto-instance error:", instanceError);
-                    else toast.success("Instância de WhatsApp pré-criada!");
-                }
+                // Automatic Instance Creation REMOVED as per user request
+                // We now only create the user. Connection is manual.
 
                 setIsOpen(false);
                 fetchTeam();

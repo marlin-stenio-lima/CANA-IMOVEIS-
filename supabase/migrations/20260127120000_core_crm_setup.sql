@@ -5,7 +5,11 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For text search
 -- ----------------------------
 -- 1. Team & Permissions (Simple RBAC)
 -- ----------------------------
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'agent');
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('admin', 'manager', 'agent');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.team_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,7 +51,11 @@ CREATE TABLE IF NOT EXISTS public.contacts (
 -- ----------------------------
 -- 3. Conversations & Messages (WhatsApp/Email)
 -- ----------------------------
-CREATE TYPE channel_type AS ENUM ('whatsapp', 'email', 'sms', 'webchat');
+DO $$ BEGIN
+    CREATE TYPE channel_type AS ENUM ('whatsapp', 'email', 'sms', 'webchat');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

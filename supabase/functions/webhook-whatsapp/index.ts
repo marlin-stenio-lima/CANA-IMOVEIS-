@@ -1,161 +1,146 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+console.log("Hello from webhook-whatsapp!")
 
 Deno.serve(async (req) => {
-    if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders })
-    }
-
     try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-        const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')!
-        const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')!
+        const body = await req.json()
+        console.log("Webhook received:", JSON.stringify(body))
 
-        const supabase = createClient(supabaseUrl, supabaseKey)
+        if (!body || !body.data) {
+            return new Response('No data', { status: 200 })
+        }
 
-        const payload = await req.json()
-        console.log('Webhook payload:', JSON.stringify(payload).substring(0, 200))
+        const { event, instance, data, sender } = body
 
-        // 1. Identify Instance & Broker
-        const instanceName = payload.instance
-        if (!instanceName) return new Response(JSON.stringify({ message: 'No instance' }), { headers: corsHeaders })
+        if (event !== 'MESSAGES_UPSERT') {
+            return new Response('Event ignored', { status: 200 })
+        }
 
-        // Fetch Instance definition from DB to find the Broker
-        const { data: instanceData } = await supabase
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+        const supabase = createClient(supabaseUrl!, supabaseKey!)
+
+        const messageData = data.message || data
+        const remoteJid = data.key.remoteJid
+        const fromMe = data.key.fromMe
+
+        // 1. Get Instance
+        const { data: instanceData, error: instanceError } = await supabase
             .from('instances')
-            .select('id, assigned_to, company_id')
-            .eq('name', instanceName)
+            .select('id, company_id')
+            .eq('name', instance)
             .single()
 
-        if (!instanceData) {
-            console.error(`Instance ${instanceName} not found in DB`)
-            return new Response(JSON.stringify({ error: 'Unknown Instance' }), { headers: corsHeaders })
+        if (instanceError || !instanceData) {
+            console.error("Instance not found:", instance)
+            return new Response('Instance not found', { status: 404 })
         }
 
-        const { id: instanceId, assigned_to: brokerId, company_id: companyId } = instanceData
+        // 2. Upsert Contact
+        const pushName = data.pushName || sender?.name || remoteJid.split('@')[0]
+        const senderNumber = remoteJid.split('@')[0]
+        const profilePicUrl = sender?.image || null;
 
-        // Check Evolution Event
-        const eventType = payload.event || payload.type
-        if (eventType !== 'messages.upsert') {
-            return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: corsHeaders })
-        }
-
-        const messageData = payload.data
-        if (!messageData || messageData.key.fromMe) {
-            return new Response(JSON.stringify({ message: 'Ignored outbound' }), { headers: corsHeaders })
-        }
-
-        const senderPhone = messageData.key.remoteJid.replace('@s.whatsapp.net', '')
-        const content = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text
-        const pushName = messageData.pushName || 'Unknown'
-
-        if (!content) {
-            return new Response(JSON.stringify({ message: 'No content' }), { headers: corsHeaders })
-        }
-
-        // 2. Upsert Contact (Linked to THIS Broker)
-        // Try find contact for this company
-        const { data: existingContact } = await supabase
+        let contactId = null;
+        const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .select('id, assigned_to')
-            .eq('company_id', companyId)
-            .eq('phone', senderPhone)
-            .maybeSingle()
+            .upsert({
+                remote_jid: remoteJid,
+                name: pushName,
+                phone: senderNumber,
+                profile_pic_url: profilePicUrl,
+                company_id: instanceData.company_id,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'remote_jid' })
+            .select()
+            .single()
 
-        let contactId = existingContact?.id
+        if (contactError) {
+            console.error("Error upserting contact:", contactError)
+            return new Response('Error saving contact', { status: 500 })
+        }
+        contactId = contact.id
 
-        if (!contactId) {
-            // New Lead! Assign to the owner of this instance (BrokerId)
-            const { data: newContact } = await supabase
-                .from('contacts')
-                .insert({
-                    company_id: companyId,
-                    name: pushName,
-                    phone: senderPhone,
-                    status: 'new',
-                    assigned_to: brokerId // Capture the lead for this broker
-                })
-                .select('id')
-                .single()
-            contactId = newContact.id
+        // 3. Extract Content
+        let content = ""
+        let messageType = "text"
+
+        if (messageData.conversation) {
+            content = messageData.conversation
+        } else if (messageData.extendedTextMessage?.text) {
+            content = messageData.extendedTextMessage.text
+        } else if (messageData.imageMessage) {
+            messageType = "image"
+            content = messageData.imageMessage.caption || "Imagem"
+        } else if (messageData.audioMessage) {
+            messageType = "audio"
+            content = "Áudio"
+        } else if (messageData.videoMessage) {
+            messageType = "video"
+            content = "Vídeo"
         }
 
-        // 3. Find or Create Conversation (Contextual to Instance)
-        const { data: conversation } = await supabase
+        // 4. Upsert Conversation
+        const { data: existingConv } = await supabase
             .from('conversations')
             .select('id')
             .eq('contact_id', contactId)
-            .eq('instance_id', instanceId) // Critical: Chat is tied to this line
-            .eq('status', 'open')
-            .maybeSingle()
+            .eq('instance_id', instanceData.id)
+            .single()
 
-        let conversationId = conversation?.id
-        if (!conversationId) {
+        let conversationId = existingConv?.id
+
+        if (conversationId) {
+            await supabase
+                .from('conversations')
+                .update({
+                    last_message: content,
+                    last_message_at: new Date().toISOString(),
+                    unread_count: fromMe ? 0 : undefined
+                })
+                .eq('id', conversationId)
+        } else {
             const { data: newConv } = await supabase
                 .from('conversations')
                 .insert({
-                    company_id: companyId,
+                    company_id: instanceData.company_id,
                     contact_id: contactId,
-                    instance_id: instanceId,
+                    instance_id: instanceData.id,
                     channel: 'whatsapp',
-                    status: 'open'
+                    last_message: content,
+                    last_message_at: new Date().toISOString(),
+                    unread_count: fromMe ? 0 : 1
                 })
-                .select('id')
+                .select()
                 .single()
-            conversationId = newConv.id
+            conversationId = newConv?.id
         }
 
-        // 4. Log Message
-        await supabase.from('messages').insert({
-            conversation_id: conversationId,
-            sender_type: 'contact',
-            content: content,
-            metadata: messageData
-        })
-
-        // 5. Call AI Agent (Pass Instance Context)
-        // Fetch History
-        const { data: history } = await supabase
+        // 5. Insert Message
+        const { error: msgError } = await supabase
             .from('messages')
-            .select('sender_type, content')
-            .eq('conversation_id', conversationId)
-            .order('created_at', { ascending: true })
-            .limit(10)
-
-        const formattedHistory = history?.map(h => ({
-            role: h.sender_type === 'contact' ? 'user' : 'assistant',
-            content: h.content
-        })) || []
-
-        await fetch(`${supabaseUrl}/functions/v1/ai-agent`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: content,
-                contact_id: contactId,
-                company_id: companyId,
+            .insert({
                 conversation_id: conversationId,
-                instance_name: instanceName, // Pass the sender identity
-                broker_id: brokerId,
-                conversation_history: formattedHistory
+                instance_id: instanceData.id,
+                contact_id: contactId,
+                remote_jid: remoteJid,
+                content: content,
+                message_type: messageType,
+                direction: fromMe ? 'outbound' : 'inbound',
+                status: 'delivered',
+                sender_type: fromMe ? 'user' : 'contact'
             })
-        })
 
-        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders })
+        if (msgError) {
+            console.error("Error inserting message:", msgError)
+            return new Response('Error saving message', { status: 500 })
+        }
+
+        return new Response('Message saved', { status: 200 })
 
     } catch (error) {
-        console.error('Webhook Error:', error)
-        return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        console.error("Webhook error:", error)
+        return new Response(`Error: ${error.message}`, { status: 500 })
     }
 })

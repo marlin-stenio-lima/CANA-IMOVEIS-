@@ -101,7 +101,6 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                 toast.error(`Erro: ${error.message || "Falha ao adicionar membro"}`);
             } else {
                 toast.success("Membro adicionado!");
-
                 // Automatic Instance Creation REMOVED as per user request
                 // We now only create the user. Connection is manual.
 
@@ -153,7 +152,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Telefone / WhatsApp</label>
                                 <Input placeholder="5511999999999" value={phone} onChange={e => setPhone(e.target.value)} />
-                                <p className="text-xs text-muted-foreground">Será usado para criar a instância do WhatsApp automaticamente.</p>
+                                <p className="text-xs text-muted-foreground">Opcional. Adicione se quiser vincular uma conta de WhatsApp depois.</p>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Função</label>

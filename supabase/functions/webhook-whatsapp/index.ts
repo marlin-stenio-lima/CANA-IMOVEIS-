@@ -19,9 +19,12 @@ Deno.serve(async (req) => {
             body = JSON.parse(rawBody);
         } catch (e) {
             console.error("JSON Parse Error:", e);
-            await supabase.from('webhook_logs').insert({
-                payload: { error: 'JSON Parse Error', raw: rawBody }
-            });
+            // Only log if it's not an empty body which sometimes happens with keepalives
+            if (rawBody.trim().length > 0) {
+                await supabase.from('webhook_logs').insert({
+                    payload: { error: 'JSON Parse Error', raw: rawBody, event: 'PARSE_ERROR' }
+                });
+            }
             return new Response('Invalid JSON', { status: 400 });
         }
 
@@ -41,9 +44,16 @@ Deno.serve(async (req) => {
             if (key?.remoteJid && status) {
                 await supabase
                     .from('messages')
-                    .update({ status: status.toLowerCase() }) // delivered, read, etc.
+                const statusToUpdate = status.toLowerCase(); // delivered, read, etc.
+                if (statusToUpdate === 'played') {
+                    // evolution sends 'played' for audio
+                }
+
+                await supabase
+                    .from('messages')
+                    .update({ status: statusToUpdate })
                     .eq('remote_jid', key.remoteJid)
-                    .eq('id', key.id) // Evolution usually sends the message ID in 'id' or 'key.id'
+                    .eq('wamid', key.id) // Use WAMID, not ID (ID is uuid)
 
                 // If read, we might want to update conversation unread count? 
                 // Usually handled by reading the conversation in UI.
@@ -51,16 +61,27 @@ Deno.serve(async (req) => {
             return new Response('Status updated', { status: 200 })
         }
 
-        const validEvents = ['MESSAGES_UPSERT', 'messages.upsert', 'SEND_MESSAGE', 'send.message'];
-        if (!validEvents.includes(event)) {
+        const validEvents = ['MESSAGES_UPSERT', 'SEND_MESSAGE'];
+        const incomingEvent = event ? event.toUpperCase() : '';
+
+        if (!validEvents.includes(incomingEvent) && !validEvents.includes(incomingEvent.replace('.', '_'))) {
             // We allow send.message (API outbound) and messages.upsert (Sync)
+            // But log ignored events just in case
+            console.log(`Event ignored: ${event}`);
             return new Response('Event ignored', { status: 200 })
+        }
+
+        // Check for required data
+        if (!data || !data.key) {
+            console.log("Missing key in data", data);
+            return new Response('Missing key', { status: 200 });
         }
 
         const messageData = data.message || data
         const remoteJid = data.key.remoteJid
-        const fromMe = data.key.fromMe
+        const fromMe = data.key.fromMe || false
         const messageId = data.key.id
+        const status = data.status || 'DELIVERED';
         const participant = data.key.participant || data.participant; // For groups or LIDs
 
         // FILTER: Ignore Group Messages (Strict)
@@ -93,9 +114,11 @@ Deno.serve(async (req) => {
         if (remoteJid.includes('@lid')) {
             if (participant && participant.includes('@s.whatsapp.net')) {
                 senderNumber = participant.split('@')[0];
+                // Update remoteJid to the real phone number JID for storage transparency
+                // But keep original for replying? No, usually we reply to the phone JID.
+                // Let's normalize everything to s.whatsapp.net for contacts.
+                remoteJid = `${senderNumber}@s.whatsapp.net`;
             } else {
-                // If we can't find the real number, we CANNOT create a valid contact.
-                // LIDs are internal integers, not phone numbers.
                 console.log(`Ignored LID message without participant mapping: ${remoteJid}`);
                 return new Response('LID message ignored (no phone map)', { status: 200 });
             }
@@ -104,32 +127,63 @@ Deno.serve(async (req) => {
         let pushName = data.pushName || sender?.name || senderNumber
         const profilePicUrl = sender?.image || null;
 
-        // Clean up pushName if it equals senderNumber (optional)
-        if (pushName === senderNumber && !senderNumber.includes('@')) {
-            // Keep it
+        // Fetch existing contact to decide if we should update the name
+        const { data: existingContact } = await supabase
+            .from('contacts')
+            .select('id, name, profile_pic_url, remote_jid')
+            .or(`remote_jid.eq.${remoteJid},phone.eq.${senderNumber}`)
+            .maybeSingle();
+
+        let contactId = existingContact?.id;
+
+        // Logic: specific logic to NOT overwrite a good name with a phone number or empty string
+        let shouldUpdateName = false;
+        let nameToSave = existingContact?.name || pushName;
+
+        if (!existingContact) {
+            shouldUpdateName = true; // New contact, save whatever we have
+        } else {
+            // If we have a name already, only update if the new one is better (not the phone number) and not from me
+            if (!fromMe && pushName && pushName !== senderNumber && pushName !== existingContact.name) {
+                shouldUpdateName = true;
+                nameToSave = pushName;
+            }
+            // Always update profile pic if available and different
+            if (profilePicUrl && profilePicUrl !== existingContact.profile_pic_url) {
+                shouldUpdateName = true;
+            }
         }
 
-        let contactId = null;
-        // We use maybeSingle to check if it exists first to avoid overwriting good names with bad ones (optional optimization)
+        const contactPayload: any = {
+            remote_jid: remoteJid,
+            phone: senderNumber, // Always save the phone number
+            company_id: instanceData.company_id,
+            updated_at: new Date().toISOString()
+        };
+
+        if (shouldUpdateName) {
+            contactPayload.name = nameToSave;
+            if (profilePicUrl) contactPayload.profile_pic_url = profilePicUrl;
+        }
 
         const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .upsert({
-                remote_jid: remoteJid,
-                name: pushName,
-                phone: senderNumber,
-                profile_pic_url: profilePicUrl,
-                company_id: instanceData.company_id,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'remote_jid' })
+            .upsert(contactPayload, { onConflict: 'remote_jid' })
             .select()
             .single()
 
         if (contactError) {
             console.error("Error upserting contact:", contactError)
-            return new Response('Error saving contact: ' + JSON.stringify(contactError), { status: 500 })
+            // Fallback: try to just get the contact again if upsert failed (race condition)
+            const { data: retryContact } = await supabase.from('contacts').select('id').eq('remote_jid', remoteJid).single();
+            if (retryContact) {
+                contactId = retryContact.id;
+            } else {
+                return new Response('Error saving contact: ' + JSON.stringify(contactError), { status: 500 })
+            }
+        } else {
+            contactId = contact.id
         }
-        contactId = contact.id
 
         // 3. Extract Content & Type
         let content = ""
@@ -189,42 +243,48 @@ Deno.serve(async (req) => {
 
                 // If we get a URL:
                 if (mediaSourceUrl) {
-                    try {
-                        console.log(`Attempting to download media from: ${mediaSourceUrl}`);
-                        const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
-                        const fetchHeaders = {}
-                        if (evolutionKey) fetchHeaders['apikey'] = evolutionKey
+                    // Check if it's already a Supabase URL (Outbound message we just sent)
+                    if (mediaSourceUrl.includes('supabase.co') && mediaSourceUrl.includes('/storage/v1/object/public/')) {
+                        console.log("Detected existing Supabase URL, skipping download:", mediaSourceUrl);
+                        mediaUrl = mediaSourceUrl;
+                    } else {
+                        try {
+                            console.log(`Attempting to download media from: ${mediaSourceUrl}`);
+                            const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
+                            const fetchHeaders = {}
+                            if (evolutionKey) fetchHeaders['apikey'] = evolutionKey
 
-                        const fileRes = await fetch(mediaSourceUrl, { headers: fetchHeaders })
+                            const fileRes = await fetch(mediaSourceUrl, { headers: fetchHeaders })
 
-                        if (fileRes.ok) {
-                            const fileBlob = await fileRes.blob();
-                            const ext = mime.split('/')[1] || 'bin';
-                            const fileName = `${instanceData.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                            if (fileRes.ok) {
+                                const fileBlob = await fileRes.blob();
+                                const ext = mime.split('/')[1] || 'bin';
+                                const fileName = `${instanceData.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
 
-                            const { data: uploadData, error: uploadError } = await supabase.storage
-                                .from('chat-media')
-                                .upload(fileName, fileBlob, {
-                                    contentType: mime,
-                                    upsert: false
-                                });
+                                const { data: uploadData, error: uploadError } = await supabase.storage
+                                    .from('chat-media')
+                                    .upload(fileName, fileBlob, {
+                                        contentType: mime,
+                                        upsert: false
+                                    });
 
-                            if (!uploadError && uploadData) {
-                                const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
-                                mediaUrl = publicUrlData.publicUrl;
-                                console.log("Media uploaded to:", mediaUrl);
+                                if (!uploadError && uploadData) {
+                                    const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+                                    mediaUrl = publicUrlData.publicUrl;
+                                    console.log("Media uploaded to:", mediaUrl);
+                                } else {
+                                    console.error("Upload error:", uploadError);
+                                }
                             } else {
-                                console.error("Upload error:", uploadError);
+                                console.error("Failed to fetch media from Evolution URL:", fileRes.status);
                             }
-                        } else {
-                            console.error("Failed to fetch media from Evolution URL:", fileRes.status);
+                        } catch (err) {
+                            console.error("Error processing media:", err);
                         }
-                    } catch (err) {
-                        console.error("Error processing media:", err);
                     }
                 }
             }
-        }
+        } // Close else for media type checking
 
         // 4. Upsert Conversation
         const { data: existingConv } = await supabase
@@ -232,7 +292,9 @@ Deno.serve(async (req) => {
             .select('id, unread_count')
             .eq('contact_id', contactId)
             .eq('instance_id', instanceData.id)
-            .single()
+            .eq('contact_id', contactId)
+            .eq('instance_id', instanceData.id)
+            .maybeSingle()
 
         let conversationId = existingConv?.id
 
@@ -262,27 +324,82 @@ Deno.serve(async (req) => {
             conversationId = newConv?.id
         }
 
-        // 5. Insert Message
-        const { error: msgError } = await supabase
-            .from('messages')
-            .insert({
-                // id: messageId, // Use default UUID or store Evolution ID in a separate column if needed
-                conversation_id: conversationId,
-                instance_id: instanceData.id,
-                contact_id: contactId,
-                remote_jid: remoteJid,
-                content: content,
-                message_type: messageType,
-                media_url: mediaUrl,
-                direction: fromMe ? 'outbound' : 'inbound',
-                status: 'delivered',
-                sender_type: fromMe ? 'user' : 'contact'
-            })
-
-        if (msgError) {
-            console.error("Error inserting message:", msgError)
-            return new Response('Error saving message', { status: 500 })
+        if (!conversationId) {
+            // Fallback if creation didn't return data for some reason
+            const { data: fetchConv } = await supabase
+                .from('conversations')
+                .select('id')
+                .eq('contact_id', contactId)
+                .eq('instance_id', instanceData.id)
+                .maybeSingle();
+            conversationId = fetchConv?.id;
         }
+
+        // 5. Insert Message
+        // 5. Upsert Message (Handle WAMID)
+        // Check if message already exists by WAMID (to preserve media_url if we inserted it via manager)
+        const { data: existingMsg } = await supabase
+            .from('messages')
+            .select('id, media_url')
+            .eq('wamid', messageId)
+            .single();
+
+        if (existingMsg) {
+            console.log(`Message ${messageId} already exists. Updating status...`);
+            const updatePayload: any = {
+                status: 'delivered', // Or whatever status comes in, but usually this is UPSERT so 'delivered' is fine
+                content: content, // Update content just in case
+            }
+            // Only update media_url if we actually found one in the webhook (e.g. inbound media)
+            // For outbound, if we already have it from manager, we don't want to overwrite with null
+            if (mediaUrl) {
+                updatePayload.media_url = mediaUrl;
+            }
+
+            await supabase
+                .from('messages')
+                .update(updatePayload)
+                .eq('id', existingMsg.id);
+        } else {
+            // Only insert if it doesn't exist
+            const { error: msgError } = await supabase
+                .from('messages')
+                .insert({
+                    // id: messageId, // Use default UUID or store Evolution ID in a separate column if needed
+                    wamid: messageId,
+                    conversation_id: conversationId,
+                    instance_id: instanceData.id,
+                    contact_id: contactId,
+                    remote_jid: remoteJid,
+                    content: content,
+                    message_type: messageType,
+                    media_url: mediaUrl,
+                    direction: fromMe ? 'outbound' : 'inbound',
+                    status: status.toLowerCase(), // Use the status from the event if available, else 'delivered'
+                    sender_type: fromMe ? 'user' : 'contact'
+                })
+
+            if (msgError) {
+                // If it's a unique constraint error on wamid, it means we raced. Let's try to update instead.
+                if (msgError.code === '23505') { // Unique violation
+                    console.log(`Race condition detected for ${messageId}, updating instead.`);
+                    const updatePayloadRace: any = {
+                        status: 'delivered',
+                        content: content
+                    }
+                    if (mediaUrl) updatePayloadRace.media_url = mediaUrl;
+
+                    await supabase.from('messages').update(updatePayloadRace).eq('wamid', messageId);
+                } else {
+                    console.error("Error inserting message:", msgError)
+                    // Log fatal error
+                    await supabase.from('webhook_logs').insert({ payload: { error: 'Message Insert Failed', details: msgError, wamid: messageId } })
+                    return new Response('Error saving message', { status: 500 })
+                }
+            }
+        }
+
+
 
         return new Response('Message saved', { status: 200 })
 

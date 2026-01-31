@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -69,7 +69,47 @@ interface Message {
   media_url?: string | null;
 }
 
+// Error Boundary Component
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Chat Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded m-4">
+          <h3 className="font-bold">Algo deu errado no chat</h3>
+          <p className="text-sm mt-2">{this.state.error?.message}</p>
+          <Button variant="outline" className="mt-4" onClick={() => this.setState({ hasError: false, error: null })}>
+            Tentar Novamente
+          </Button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function Conversations() {
+  return (
+    <ErrorBoundary>
+      <ConversationsContent />
+    </ErrorBoundary>
+  );
+}
+
+function ConversationsContent() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -246,7 +286,19 @@ export default function Conversations() {
       else if (file.type.startsWith('video/')) mediaType = 'video';
       else if (file.type.startsWith('audio/')) mediaType = 'audio';
 
-
+      // Optimistic Update
+      const fakeId = Math.random().toString();
+      const newMessage: Message = {
+        id: fakeId,
+        conversation_id: selectedConversation.id,
+        sender_type: 'user',
+        content: mediaType === 'image' ? 'Imagem enviada' : mediaType === 'audio' ? 'Áudio enviado' : file.name,
+        created_at: new Date().toISOString(),
+        status: 'sent',
+        message_type: mediaType as any,
+        media_url: publicUrl
+      };
+      setMessages(prev => [...prev, newMessage]);
 
       await supabase.functions.invoke('evolution-manager', {
         body: {
@@ -292,15 +344,28 @@ export default function Conversations() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      if (mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      // Remove the onstop handler so it doesn't trigger upload
+      mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      audioChunksRef.current = [];
+      toast.info("Gravação cancelada");
     }
   };
 
   const handleStopRecording = async () => {
     if (!selectedConversation) return;
 
-    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
     const timestamp = Date.now();
     const fileName = `${selectedConversation.instance_id}/voice_notes/${timestamp}.webm`;
 
@@ -308,7 +373,7 @@ export default function Conversations() {
     try {
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('chat-media')
-        .upload(fileName, audioBlob, { contentType: 'audio/webm' });
+        .upload(fileName, audioBlob, { contentType: 'audio/webm', upsert: true });
 
       if (uploadError) throw uploadError;
 
@@ -316,7 +381,19 @@ export default function Conversations() {
 
       const instanceName = selectedConversation.instance?.name;
 
-
+      // Optimistic Update (Audio)
+      const fakeId = Math.random().toString();
+      const newMessage: Message = {
+        id: fakeId,
+        conversation_id: selectedConversation.id,
+        sender_type: 'user',
+        content: "Áudio enviado",
+        created_at: new Date().toISOString(),
+        status: 'sent',
+        message_type: 'audio',
+        media_url: publicUrl
+      };
+      setMessages(prev => [...prev, newMessage]);
 
       await supabase.functions.invoke('evolution-manager', {
         body: {
@@ -339,17 +416,23 @@ export default function Conversations() {
 
   // Helpers
   const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "";
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return "";
+    }
   };
 
   const getInitials = (name: string) => name?.substring(0, 2).toUpperCase() || "?";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#e9edef] dark:bg-[#0b141a]"> {/* WhatsApp Web Background Color */}
+    <div className="flex h-screen overflow-hidden bg-[#efe7dd] dark:bg-[#0b141a] relative"> {/* Main Container */}
 
       {/* Sidebar - Contact List */}
-
-      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[400px] flex-col border-r bg-white dark:bg-[#111b21]`}>
+      <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[400px] flex-col border-r bg-white dark:bg-[#111b21] z-20`}>
         {/* Header */}
         <div className="h-[60px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between px-4 py-2 border-b dark:border-gray-800 shrink-0">
           <Avatar className="h-10 w-10 cursor-pointer">
@@ -357,9 +440,6 @@ export default function Conversations() {
             <AvatarFallback>EU</AvatarFallback>
           </Avatar>
           <div className="flex gap-4 text-[#54656f] dark:text-[#aebac1] items-center">
-
-
-
             <MoreVertical className="w-6 h-6 cursor-pointer" />
           </div>
         </div>
@@ -377,57 +457,62 @@ export default function Conversations() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {conversations.map(conv => (
-            <div
-              key={conv.id}
-              onClick={() => setSelectedConversation(conv)}
-              className={`flex items-center px-3 py-3 cursor-pointer hover:bg-[#f5f6f6] dark:hover:bg-[#202c33] transition-colors relative group
+          {conversations.map(conv => {
+            if (!conv || !conv.contact) return null; // Safe guard
+            return (
+              <div
+                key={conv.id}
+                onClick={() => setSelectedConversation(conv)}
+                className={`flex items-center px-3 py-3 cursor-pointer hover:bg-[#f5f6f6] dark:hover:bg-[#202c33] transition-colors relative group
                          ${selectedConversation?.id === conv.id ? 'bg-[#f0f2f5] dark:bg-[#2a3942]' : ''}`}
-            >
-              <Avatar className="h-12 w-12 mr-3 shrink-0">
-                <AvatarImage src={conv.contact.profile_pic_url} />
-                <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-white">
-                  {getInitials(conv.contact.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0 border-b dark:border-gray-800 pb-3 h-full justify-center flex flex-col">
-                <div className="flex justify-between items-baseline mb-1">
-                  <h3 className="text-[17px] text-[#111b21] dark:text-[#e9edef] font-normal truncate">{conv.contact.name}</h3>
-                  <span className="text-xs text-[#667781] dark:text-[#8696a0] whitespace-nowrap ml-2">{formatTime(conv.last_message_at)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-[#3b4a54] dark:text-[#8696a0] truncate max-w-[90%] flex items-center gap-1">
-                    {/* Icon for media types in preview */}
-                    {conv.message_type === 'image' && <ImageIcon className="w-3 h-3" />}
-                    {conv.message_type === 'audio' && <Mic className="w-3 h-3" />}
-                    {conv.message_type === 'video' && <span className="text-[10px]">🎥</span>}
+              >
+                <Avatar className="h-12 w-12 mr-3 shrink-0">
+                  <AvatarImage src={conv.contact.profile_pic_url || undefined} />
+                  <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-white">
+                    {getInitials(conv.contact.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 border-b dark:border-gray-800 pb-3 h-full justify-center flex flex-col">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-[17px] text-[#111b21] dark:text-[#e9edef] font-normal truncate">{conv.contact.name || "Sem Nome"}</h3>
+                    <span className="text-xs text-[#667781] dark:text-[#8696a0] whitespace-nowrap ml-2">
+                      {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-[#3b4a54] dark:text-[#8696a0] truncate max-w-[90%] flex items-center gap-1">
+                      {/* Icon for media types in preview */}
+                      {conv.message_type === 'image' && <ImageIcon className="w-3 h-3" />}
+                      {conv.message_type === 'audio' && <Mic className="w-3 h-3" />}
+                      {conv.message_type === 'video' && <span className="text-[10px]">🎥</span>}
 
-                    {conv.message_type === 'image' ? 'Imagem' :
-                      conv.message_type === 'audio' ? 'Áudio' :
-                        conv.message_type === 'video' ? 'Vídeo' :
-                          conv.message_type === 'document' ? 'Documento' :
-                            conv.last_message}
-                  </p>
-                  {conv.unread_count > 0 && (
-                    <div className="bg-[#25d366] text-white text-[10px] font-bold px-[5px] min-w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0">
-                      {conv.unread_count}
-                    </div>
-                  )}
+                      {conv.message_type === 'image' ? 'Imagem' :
+                        conv.message_type === 'audio' ? 'Áudio' :
+                          conv.message_type === 'video' ? 'Vídeo' :
+                            conv.message_type === 'document' ? 'Documento' :
+                              (conv.last_message || '')}
+                    </p>
+                    {conv.unread_count > 0 && (
+                      <div className="bg-[#25d366] text-white text-[10px] font-bold px-[5px] min-w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0">
+                        {conv.unread_count}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* Main Chat Area */}
       {selectedConversation ? (
-        <div className="flex-1 flex flex-col h-full bg-[#efeae2] dark:bg-[#0b141a] relative">
+        <div className="flex-1 flex flex-col h-full bg-[#efeae2] dark:bg-[#0b141a] relative min-w-0">
           {/* Chat Background Pattern */}
           <div className="absolute inset-0 opacity-40 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d93ea9372bd.png')] pointer-events-none" />
 
           {/* Header */}
-          <div className="h-[60px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-4 py-2 justify-between z-10 border-l border-[#d1d7db] dark:border-gray-700 w-full shrink-0">
+          <div className="h-[60px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-4 py-2 justify-between z-20 border-l border-[#d1d7db] dark:border-gray-700 w-full shrink-0">
             <div className="flex items-center cursor-pointer" onClick={() => { }}>
               {/* Back button for mobile */}
               <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={() => setSelectedConversation(null)}>
@@ -444,6 +529,7 @@ export default function Conversations() {
                 </span>
                 {/* Only show phone if it's different from the name AND implies a real number (not LID) */}
                 {selectedConversation.contact.name !== selectedConversation.contact.phone &&
+                  selectedConversation.contact.phone &&
                   !selectedConversation.contact.phone.includes('@') && (
                     <span className="text-xs text-[#667781] dark:text-[#8696a0] truncate">
                       {selectedConversation.contact.phone}
@@ -476,22 +562,25 @@ export default function Conversations() {
             </div>
           </div>
 
-          {/* Messages List */}
-          <div className="flex-1 overflow-y-auto px-[5%] py-4 z-10" ref={scrollRef}>
-            <div className="flex flex-col gap-2 pb-2">
+          {/* Messages List Area (Scrollable) */}
+          <div className="flex-1 overflow-y-auto z-10 custom-scrollbar" ref={scrollRef}>
+            <div className="px-[5%] py-4 pb-2 flex flex-col justify-end min-h-full">
               {messages.map(msg => {
+                if (!msg || !msg.id) return null; // Defensive check for invalid messages
                 const isUser = msg.sender_type === 'user';
                 return (
                   <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} group mb-1`}>
                     <div
-                      className={`relative max-w-[65%] rounded-lg px-2 py-1 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] text-sm 
+                      className={`relative max-w-[85%] md:max-w-[65%] rounded-lg shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] text-sm flex flex-col
                                 ${isUser
                           ? 'bg-[#d9fdd3] dark:bg-[#005c4b] rounded-tr-none'
                           : 'bg-white dark:bg-[#202c33] rounded-tl-none'
                         }`}
                     >
-                      {/* Message Content */}
-                      <div className={`px-1 pt-1 pb-4 text-[#111b21] dark:text-[#e9edef] ${msg.message_type === 'image' ? 'pb-1' : ''}`}>
+                      {/* Message Content Area */}
+                      <div className={`px-2 pt-2 pb-1 text-[#111b21] dark:text-[#e9edef] ${msg.message_type === 'image' ? 'p-1' : ''}`}>
+
+                        {/* Image Type */}
                         {msg.message_type === 'image' && msg.media_url ? (
                           <div className="mb-1 rounded-lg overflow-hidden relative">
                             <img
@@ -508,11 +597,23 @@ export default function Conversations() {
                             {msg.content && msg.content !== "Vídeo" && <p className="mt-1 break-words">{msg.content}</p>}
                           </div>
                         ) : msg.message_type === 'audio' && msg.media_url ? (
-                          <div className="flex items-center gap-2 min-w-[240px] py-1">
-                            <audio controls src={msg.media_url} className="w-full h-8" />
+                          // Custom Audio Player UI
+                          <div className="flex items-center gap-3 min-w-[280px] p-2">
+                            <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage src={isUser ? undefined : selectedConversation.contact.profile_pic_url} />
+                                <AvatarFallback>{isUser ? 'EU' : getInitials(selectedConversation.contact.name)}</AvatarFallback>
+                              </Avatar>
+                              <div className="absolute -bottom-1 -right-1">
+                                <Mic className={`w-4 h-4 ${isUser ? 'text-[#005c4b] dark:text-[#00a884]' : 'text-[#54656f] dark:text-[#8696a0]'}`} />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <audio controls src={msg.media_url} className="w-full h-8" />
+                            </div>
                           </div>
                         ) : msg.message_type === 'document' && msg.media_url ? (
-                          <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-2 rounded-md cursor-pointer hover:bg-black/10 transition-colors" onClick={() => window.open(msg.media_url!, '_blank')}>
+                          <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-3 rounded-md cursor-pointer hover:bg-black/10 transition-colors max-w-[300px]" onClick={() => window.open(msg.media_url!, '_blank')}>
                             <div className="text-3xl text-red-500">📄</div>
                             <div className="overflow-hidden">
                               <p className="truncate font-medium hover:underline">{msg.content || "Documento"}</p>
@@ -520,17 +621,17 @@ export default function Conversations() {
                             </div>
                           </div>
                         ) : (
-                          <p className="break-words whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                          <p className="break-words whitespace-pre-wrap leading-relaxed pr-16 min-w-[80px]">{msg.content}</p>
                         )}
                       </div>
 
-                      {/* Timestamp & Status */}
-                      <div className={`absolute right-2 bottom-1 flex items-center gap-1 ${msg.message_type === 'image' ? 'text-white drop-shadow-md right-3 bottom-2' : ''}`}>
-                        <span className={`text-[11px] min-w-fit ${msg.message_type === 'image' ? 'text-white' : 'text-[#667781] dark:text-[#8696a0]'}`}>
+                      {/* Timestamp & Status (Float Bottom Right) */}
+                      <div className={`flex justify-end items-center gap-1 px-2 pb-1 ${msg.message_type === 'image' || msg.message_type === 'video' ? 'absolute bottom-1 right-2 bg-gradient-to-t from-black/50 to-transparent rounded px-1' : 'ml-auto mt-[-10px]'}`}>
+                        <span className={`text-[11px] min-w-fit ${msg.message_type === 'image' || msg.message_type === 'video' ? 'text-white' : 'text-[#667781] dark:text-[#8696a0]'}`}>
                           {formatTime(msg.created_at)}
                         </span>
                         {isUser && (
-                          <span className={`${msg.status === 'read' ? 'text-[#53bdeb]' : (msg.message_type === 'image' ? 'text-white' : 'text-[#667781]')}`}>
+                          <span className={`${msg.status === 'read' ? 'text-[#53bdeb]' : (msg.message_type === 'image' || msg.message_type === 'video' ? 'text-white' : 'text-[#667781]')}`}>
                             <CheckCheck className="w-3 h-3" />
                           </span>
                         )}
@@ -542,8 +643,8 @@ export default function Conversations() {
             </div>
           </div>
 
-          {/* Input Area */}
-          <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-4 py-2 gap-3 z-10 border-t border-[#d1d7db] dark:border-gray-700">
+          {/* Input Area (Sticky Footer) */}
+          <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-4 py-2 gap-3 z-20 border-t border-[#d1d7db] dark:border-gray-700 shrink-0">
             {/* Hidden Input for Files */}
             <input
               type="file"
@@ -576,18 +677,30 @@ export default function Conversations() {
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               disabled={isRecording}
+              autoFocus
             />
 
             {messageInput.trim() ? (
               <div onClick={handleSendMessage} className="cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
                 <Send className="w-6 h-6 text-[#54656f] dark:text-[#aebac1]" />
               </div>
+            ) : isRecording ? (
+              <div className="flex gap-2">
+                {/* Cancel Recording */}
+                <div onClick={cancelRecording} className="cursor-pointer p-2 hover:bg-red-100 rounded-full transition-colors text-red-500">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                {/* Send Recording (Stop & Send) */}
+                <div onClick={stopRecording} className="cursor-pointer p-2 hover:bg-green-100 rounded-full transition-colors text-green-500 animate-pulse">
+                  <Send className="w-6 h-6" />
+                </div>
+              </div>
             ) : (
               <div
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`cursor-pointer p-2 rounded-full transition-colors ${isRecording ? 'text-red-500 animate-pulse bg-red-100 dark:bg-red-900/20' : 'text-[#54656f] dark:text-[#aebac1] hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                onClick={startRecording}
+                className="cursor-pointer p-2 rounded-full transition-colors text-[#54656f] dark:text-[#aebac1] hover:bg-gray-200 dark:hover:bg-gray-700"
               >
-                {isRecording ? <X className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                <Mic className="w-6 h-6" />
               </div>
             )}
           </div>

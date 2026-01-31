@@ -5,27 +5,22 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function checkWebhook() {
-    console.log("Fetching Webhook Config from Evolution API...");
+async function checkWebhookConfig() {
+    console.log("Checking Webhook Configuration...");
 
     const { data, error } = await supabase.functions.invoke('evolution-manager', {
         body: {
-            action: 'check-webhook',
+            action: 'check-webhook', // This calls /webhook/find/:instanceName
             instanceName: 'vendas'
         }
     });
 
     if (error) {
-        console.error("Error invoking function:", error);
-        if (error.context && typeof error.context.json === 'function') {
-            try {
-                const errBody = await error.context.json();
-                console.error("Error Body:", JSON.stringify(errBody, null, 2));
-            } catch (e) { }
-        }
-    } else {
-        console.log("Evolution API Config Response:", JSON.stringify(data, null, 2));
+        console.error("Function Error:", error);
+        return;
     }
+
+    console.log("Webhook Config:", JSON.stringify(data, null, 2));
 }
 
-checkWebhook();
+checkWebhookConfig();

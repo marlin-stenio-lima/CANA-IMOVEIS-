@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
         const body = await req.json()
         const { action, instanceName, text, number, mediaUrl, mediaType, email, userId } = body
 
-        if (!instanceName) {
+        if (!instanceName && action !== 'debug-db' && action !== 'setup-storage') {
             throw new Error('Instance Name required')
         }
 
@@ -126,60 +126,93 @@ Deno.serve(async (req) => {
             }
 
             const data = await res.json()
-            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
+            const wamid = data?.key?.id || data?.id
 
-        if (action === 'send-media') {
-            const { instanceName, number, mediaUrl, mediaType, caption } = body
-            if (!instanceName || !number || !mediaUrl || !mediaType) {
-                return new Response('Missing parameters', { status: 400 })
+            if (wamid) {
+                const supabaseUrl = Deno.env.get('SUPABASE_URL')
+                const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+                const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
+
+                // Resolve Instance ID and Contact ID
+                const { data: instanceData } = await adminSupabase.from('instances').select('id, company_id').eq('name', instanceName).single()
+
+                if (instanceData) {
+                    let remoteJid = number.includes('@') ? number : `${number}@s.whatsapp.net`
+                    if (instanceData) {
+                        let remoteJid = number.includes('@') ? number : `${number}@s.whatsapp.net`
+
+                        // 1. Ensure Contact Exists
+                        const { data: contact } = await adminSupabase.from('contacts').select('id, name').eq('remote_jid', remoteJid).single()
+                        let contactId = contact?.id
+
+                        if (!contactId) {
+                            console.log(`Contact not found for ${remoteJid}, creating...`);
+                            const { data: newContact, error: createContactError } = await adminSupabase.from('contacts').insert({
+                                remote_jid: remoteJid,
+                                name: number, // Default name is number until we get info
+                                company_id: instanceData.company_id,
+                                profile_pic_url: null,
+                                updated_at: new Date().toISOString()
+                            }).select().single();
+
+                            if (newContact) {
+                                contactId = newContact.id;
+                            } else {
+                                console.error("Failed to create contact on send:", createContactError);
+                            }
+                        }
+
+                        if (contactId) {
+                            // 2. Ensure Conversation Exists
+                            const { data: existingConv } = await adminSupabase.from('conversations')
+                                .select('id, unread_count').eq('contact_id', contactId).eq('instance_id', instanceData.id).single()
+
+                            let conversationId = existingConv?.id
+                            if (!conversationId) {
+                                const { data: newConv } = await adminSupabase.from('conversations').insert({
+                                    company_id: instanceData.company_id,
+                                    contact_id: contactId,
+                                    instance_id: instanceData.id,
+                                    channel: 'whatsapp',
+                                    last_message: text,
+                                    last_message_at: new Date().toISOString(),
+                                    unread_count: 0
+                                }).select().single();
+                                conversationId = newConv?.id;
+                            }
+
+                            if (conversationId) {
+                                // 3. Upsert Message
+                                await adminSupabase.from('messages').upsert({
+                                    wamid: wamid,
+                                    conversation_id: conversationId,
+                                    instance_id: instanceData.id,
+                                    contact_id: contactId,
+                                    remote_jid: remoteJid,
+                                    content: text,
+                                    message_type: 'text',
+                                    direction: 'outbound',
+                                    status: 'sent',
+                                    sender_type: 'user',
+                                    created_at: new Date().toISOString()
+                                }, { onConflict: 'wamid' })
+
+                                await adminSupabase.from('conversations').update({
+                                    last_message: text,
+                                    last_message_at: new Date().toISOString()
+                                }).eq('id', conversationId)
+                            }
+                        } else {
+                            console.error("Could not resolve contact ID, message will rely on webhook to be saved.");
+                        }
+                    }
+                }
             }
 
-            const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
-            const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
-
-            const response = await fetch(`${evolutionUrl}/message/sendMedia/${instanceName}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': evolutionKey!
-                },
-                body: JSON.stringify({
-                    number,
-                    media: mediaUrl,
-                    mediatype: mediaType, // image, video, document
-                    caption: caption || ''
-                })
-            })
-
-            const data = await response.json()
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
-        if (action === 'send-audio') {
-            const { instanceName, number, audioUrl } = body
-            if (!instanceName || !number || !audioUrl) {
-                return new Response('Missing parameters', { status: 400 })
-            }
 
-            const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
-            const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
-
-            const response = await fetch(`${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': evolutionKey!
-                },
-                body: JSON.stringify({
-                    number,
-                    audio: audioUrl
-                })
-            })
-
-            const data = await response.json()
-            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-        }
 
         if (action === 'setup-storage') {
             const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -297,7 +330,6 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'send-media') {
-            // Payload: { instanceName, number, mediaType, mimetype, caption, mediaUrl }
             const { instanceName, number, mediaType, mimetype, caption, mediaUrl } = body;
             const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
             const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
@@ -320,6 +352,85 @@ Deno.serve(async (req) => {
             })
 
             const data = await res.json()
+
+            // --- PERSISTENCE LOGIC START ---
+            const wamid = data?.key?.id || data?.id
+
+            if (wamid) {
+                const supabaseUrl = Deno.env.get('SUPABASE_URL')
+                const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+                const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
+
+                // Resolve Instance ID
+                const { data: instanceData } = await adminSupabase.from('instances').select('id, company_id').eq('name', instanceName).single()
+
+                if (instanceData) {
+                    let remoteJid = number.includes('@') ? number : `${number}@s.whatsapp.net`
+
+                    // 1. Ensure Contact
+                    const { data: contact } = await adminSupabase.from('contacts')
+                        .select('id')
+                        .or(`remote_jid.eq.${remoteJid},phone.eq.${number}`)
+                        .maybeSingle();
+
+                    let contactId = contact?.id;
+                    if (!contactId && instanceData.company_id) {
+                        const { data: newContact } = await adminSupabase.from('contacts').insert({
+                            remote_jid: remoteJid,
+                            name: number,
+                            phone: number,
+                            company_id: instanceData.company_id,
+                            updated_at: new Date().toISOString()
+                        }).select('id').single();
+                        contactId = newContact?.id;
+                    }
+
+                    if (contactId) {
+                        // 2. Ensure Conversation
+                        const { data: existingConv } = await adminSupabase.from('conversations')
+                            .select('id').eq('contact_id', contactId).eq('instance_id', instanceData.id).maybeSingle()
+
+                        let conversationId = existingConv?.id
+                        if (!conversationId) {
+                            const { data: newConv } = await adminSupabase.from('conversations').insert({
+                                company_id: instanceData.company_id,
+                                contact_id: contactId,
+                                instance_id: instanceData.id,
+                                channel: 'whatsapp',
+                                last_message: mediaType === 'image' ? 'Imagem' : 'Arquivo',
+                                last_message_at: new Date().toISOString(),
+                                unread_count: 0
+                            }).select('id').single();
+                            conversationId = newConv?.id;
+                        }
+
+                        if (conversationId) {
+                            // 3. Insert Message
+                            await adminSupabase.from('messages').upsert({
+                                wamid: wamid,
+                                conversation_id: conversationId,
+                                instance_id: instanceData.id,
+                                contact_id: contactId,
+                                remote_jid: remoteJid,
+                                content: caption || (mediaType === 'image' ? 'Imagem' : 'Arquivo'),
+                                message_type: mediaType === 'document' ? 'document' : mediaType,
+                                direction: 'outbound',
+                                status: 'sent',
+                                sender_type: 'user',
+                                media_url: mediaUrl,
+                                created_at: new Date().toISOString()
+                            }, { onConflict: 'wamid' })
+
+                            await adminSupabase.from('conversations').update({
+                                last_message: mediaType === 'image' ? 'Imagem' : 'Arquivo',
+                                last_message_at: new Date().toISOString()
+                            }).eq('id', conversationId)
+                        }
+                    }
+                }
+            }
+            // --- PERSISTENCE LOGIC END ---
+
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
@@ -339,11 +450,92 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    media: mediaUrl
+                    audio: mediaUrl,
+                    delay: 1200,
+                    encoding: true
                 })
             })
 
             const data = await res.json()
+
+            // --- PERSISTENCE LOGIC START ---
+            const wamid = data?.key?.id || data?.id
+
+            if (wamid) {
+                const supabaseUrl = Deno.env.get('SUPABASE_URL')
+                const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+                const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
+
+                // Resolve Instance ID
+                const { data: instanceData } = await adminSupabase.from('instances').select('id, company_id').eq('name', instanceName).single()
+
+                if (instanceData) {
+                    let remoteJid = number.includes('@') ? number : `${number}@s.whatsapp.net`
+
+                    // 1. Ensure Contact
+                    const { data: contact } = await adminSupabase.from('contacts')
+                        .select('id')
+                        .or(`remote_jid.eq.${remoteJid},phone.eq.${number}`)
+                        .maybeSingle();
+
+                    let contactId = contact?.id;
+                    if (!contactId && instanceData.company_id) {
+                        const { data: newContact } = await adminSupabase.from('contacts').insert({
+                            remote_jid: remoteJid,
+                            name: number,
+                            phone: number,
+                            company_id: instanceData.company_id,
+                            updated_at: new Date().toISOString()
+                        }).select('id').single();
+                        contactId = newContact?.id;
+                    }
+
+                    if (contactId) {
+                        // 2. Ensure Conversation
+                        const { data: existingConv } = await adminSupabase.from('conversations')
+                            .select('id').eq('contact_id', contactId).eq('instance_id', instanceData.id).maybeSingle()
+
+                        let conversationId = existingConv?.id
+                        if (!conversationId) {
+                            const { data: newConv } = await adminSupabase.from('conversations').insert({
+                                company_id: instanceData.company_id,
+                                contact_id: contactId,
+                                instance_id: instanceData.id,
+                                channel: 'whatsapp',
+                                last_message: 'Áudio',
+                                last_message_at: new Date().toISOString(),
+                                unread_count: 0
+                            }).select('id').single();
+                            conversationId = newConv?.id;
+                        }
+
+                        if (conversationId) {
+                            // 3. Insert Message
+                            await adminSupabase.from('messages').upsert({
+                                wamid: wamid,
+                                conversation_id: conversationId,
+                                instance_id: instanceData.id,
+                                contact_id: contactId,
+                                remote_jid: remoteJid,
+                                content: 'Áudio',
+                                message_type: 'audio',
+                                direction: 'outbound',
+                                status: 'sent',
+                                sender_type: 'user',
+                                media_url: mediaUrl,
+                                created_at: new Date().toISOString()
+                            }, { onConflict: 'wamid' })
+
+                            await adminSupabase.from('conversations').update({
+                                last_message: 'Áudio',
+                                last_message_at: new Date().toISOString()
+                            }).eq('id', conversationId)
+                        }
+                    }
+                }
+            }
+            // --- PERSISTENCE LOGIC END ---
+
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
@@ -354,16 +546,28 @@ Deno.serve(async (req) => {
         if (action === 'debug-db') {
             const table = body.table || 'webhook_logs';
             const limit = body.limit || 10;
+            const filter = body.filter; // Optional filter string
 
             const supabaseUrl = Deno.env.get('SUPABASE_URL')
             const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
             const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
 
-            const { data, error } = await adminSupabase
+            const filterColumn = body.filterColumn;
+
+            let query = adminSupabase
                 .from(table)
                 .select('*')
                 .order('created_at', { ascending: false })
                 .limit(limit);
+
+            if (filter && filterColumn) {
+                query = query.ilike(filterColumn, `%${filter}%`);
+            } else if (filter) {
+                // Fallback for legacy calls (assuming webhook_logs)
+                query = query.ilike('payload->>event', `%${filter}%`);
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 return new Response(JSON.stringify({ error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

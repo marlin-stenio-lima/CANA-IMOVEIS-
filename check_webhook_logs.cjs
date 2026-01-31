@@ -11,9 +11,11 @@ async function checkLogs() {
     const { data, error } = await supabase.functions.invoke('evolution-manager', {
         body: {
             action: 'debug-db',
-            table: 'webhook_logs',
-            limit: 10,
-            instanceName: 'vendas'
+            query: `
+          select * from webhook_logs 
+          order by created_at desc 
+          limit 50
+        `
         }
     });
 

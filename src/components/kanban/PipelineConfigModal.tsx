@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,11 +22,12 @@ interface PipelineConfigModalProps {
   onCreateStage: (data: { name: string; color: string; target_days: number; is_won_stage: boolean; is_lost_stage: boolean }) => void;
   onUpdateStage: (id: string, data: Partial<PipelineStage>) => void;
   onDeleteStage: (id: string) => void;
+  onDeletePipeline?: (id: string) => void;
   isCreating?: boolean;
 }
 
 const defaultColors = [
-  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", 
+  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
   "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
 ];
 
@@ -39,15 +40,28 @@ export function PipelineConfigModal({
   onCreateStage,
   onUpdateStage,
   onDeleteStage,
+  onDeletePipeline,
   isCreating,
 }: PipelineConfigModalProps) {
   const [name, setName] = useState(pipeline?.name || "");
   const [description, setDescription] = useState(pipeline?.description || "");
   const [isDefault, setIsDefault] = useState(pipeline?.is_default || false);
-  
+
   const [newStageName, setNewStageName] = useState("");
   const [newStageColor, setNewStageColor] = useState(defaultColors[0]);
   const [newStageTargetDays, setNewStageTargetDays] = useState(7);
+
+  useEffect(() => {
+    if (pipeline) {
+      setName(pipeline.name);
+      setDescription(pipeline.description || "");
+      setIsDefault(pipeline.is_default || false);
+    } else if (isCreating) {
+      setName("");
+      setDescription("");
+      setIsDefault(false);
+    }
+  }, [pipeline, isCreating]);
 
   const handleSavePipeline = () => {
     if (!name.trim()) return;
@@ -115,13 +129,28 @@ export function PipelineConfigModal({
               <Switch checked={isDefault} onCheckedChange={setIsDefault} />
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSavePipeline} disabled={!name.trim()}>
-                {isCreating ? "Criar Pipeline" : "Salvar"}
-              </Button>
+            <div className="flex justify-between pt-4">
+              {!isCreating && pipeline && onDeletePipeline && (
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Tem certeza que deseja excluir este pipeline? Todos os leads serão perdidos se não forem movidos antes.")) {
+                      onDeletePipeline(pipeline.id);
+                    }
+                  }}
+                >
+                  Excluir Pipeline
+                </Button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSavePipeline} disabled={!name.trim()}>
+                  {isCreating ? "Criar Pipeline" : "Salvar"}
+                </Button>
+              </div>
             </div>
           </TabsContent>
 
@@ -143,14 +172,7 @@ export function PipelineConfigModal({
                     onChange={(e) => onUpdateStage(stage.id, { name: e.target.value })}
                     className="flex-1"
                   />
-                  <Input
-                    type="number"
-                    value={stage.target_days || 7}
-                    onChange={(e) => onUpdateStage(stage.id, { target_days: parseInt(e.target.value) || 7 })}
-                    className="w-20"
-                    min={1}
-                  />
-                  <span className="text-xs text-muted-foreground">dias</span>
+                  {/* Days input removed as per user request */}
                   <div className="flex gap-1">
                     {stage.is_won_stage && (
                       <Badge variant="secondary" className="bg-green-100 text-green-700">Ganho</Badge>
@@ -193,14 +215,7 @@ export function PipelineConfigModal({
                   className="flex-1"
                   onKeyDown={(e) => e.key === "Enter" && handleCreateStage()}
                 />
-                <Input
-                  type="number"
-                  value={newStageTargetDays}
-                  onChange={(e) => setNewStageTargetDays(parseInt(e.target.value) || 7)}
-                  className="w-20"
-                  min={1}
-                />
-                <span className="text-xs text-muted-foreground self-center">dias</span>
+                {/* Days input removed */}
                 <Button onClick={handleCreateStage} disabled={!newStageName.trim()}>
                   <Plus className="h-4 w-4" />
                 </Button>

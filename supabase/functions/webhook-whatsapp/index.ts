@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
         }
 
         const messageData = data.message || data
-        const remoteJid = data.key.remoteJid
+        let remoteJid = data.key.remoteJid
         const fromMe = data.key.fromMe || false
         const messageId = data.key.id
         const status = data.status || 'DELIVERED';
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
         // 1. Get Instance
         const { data: instanceData, error: instanceError } = await supabase
             .from('instances')
-            .select('id, company_id')
+            .select('id, company_id, assigned_to, settings')
             .eq('name', instance)
             .single()
 
@@ -107,8 +107,30 @@ Deno.serve(async (req) => {
             return new Response('Instance not found', { status: 404 })
         }
 
+        // Global AI Switch Check
+        const instanceSettings = instanceData.settings || {};
+        const isGlobalAiActive = instanceSettings.is_global_ai_active !== false; // Default true
+        const globalAgentId = instanceSettings.active_agent_id; // Could be undefined
+
         // 2. Upsert Contact
         let senderNumber = remoteJid.split('@')[0];
+
+        // START REALTOR DETECTION
+        const { data: realtorProfile } = await supabase
+            .from('profiles')
+            .select('id, key:id, name:full_name, role:job_title') // Select relevant fields
+            .or(`phone.eq.${senderNumber},phone.eq.${senderNumber.substring(2)}`) // Check with and without prefix (assuming 55)
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (realtorProfile) {
+            console.log(`Realtor detected: ${realtorProfile.name} (${senderNumber}). Skipping lead processing.`);
+
+            // TODO: Implement Command Parser here (Task #20)
+            // For now, we just acknowledge and stop to prevent polluting Contacts.
+            return new Response('Realtor detected - Command Parser Pending', { status: 200 });
+        }
+        // END REALTOR DETECTION
 
         // Handle LID JIDs (Device IDs) - We ONLY want to process if we can resolve to a real phone
         if (remoteJid.includes('@lid')) {
@@ -128,10 +150,14 @@ Deno.serve(async (req) => {
         const profilePicUrl = sender?.image || null;
 
         // Fetch existing contact to decide if we should update the name
+        // Robust Lookup: Check remote_jid matching, OR phone matching exact, OR phone matching without 55 prefix
+        const cleanSender = senderNumber.replace(/\D/g, "");
+        const senderWithout55 = cleanSender.startsWith('55') && cleanSender.length > 11 ? cleanSender.substring(2) : cleanSender;
+
         const { data: existingContact } = await supabase
             .from('contacts')
-            .select('id, name, profile_pic_url, remote_jid')
-            .or(`remote_jid.eq.${remoteJid},phone.eq.${senderNumber}`)
+            .select('id, name, profile_pic_url, remote_jid, phone')
+            .or(`remote_jid.eq.${remoteJid},phone.eq.${senderNumber},phone.eq.${senderWithout55}`)
             .maybeSingle();
 
         let contactId = existingContact?.id;
@@ -225,24 +251,28 @@ Deno.serve(async (req) => {
                 let mime = incomingMedia.mimetype || 'application/octet-stream';
 
                 // Try Base64 (Evolution v2 sometimes puts it in 'base64' or 'jpegThumbnail' if configured)
-                // But typically for full media we rely on download.
+                let fileBlob: Blob | null = null;
 
-                // Evolution v2 URL often comes in 'url' or 'directPath' but might need keys.
-                // However, Evolution often converts media to base64 if 'webhookBase64' is true in instance config.
-                // If it's a URL, we attempt fetch.
+                // 1. Logic: Try direct Base64 if available in payload
+                if ((incomingMedia as any).base64) {
+                    try {
+                        console.log("Found Base64 in payload, converting...");
+                        const binaryStr = atob((incomingMedia as any).base64);
+                        const len = binaryStr.length;
+                        const bytes = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            bytes[i] = binaryStr.charCodeAt(i);
+                        }
+                        fileBlob = new Blob([bytes], { type: mime });
+                    } catch (e) {
+                        console.error("Error decoding Base64:", e);
+                    }
+                }
 
-                // Fallback: If we can't find a direct download URL or Base64, we might log it.
-                // But usually 'url' is present if not base64.
+                // 2. Logic: Fetch from URL if no Blob yet
+                const mediaSourceUrl = incomingMedia.url || incomingMedia.directPath;
 
-                const mediaSourceUrl = incomingMedia.url || incomingMedia.directPath; // directPath is internal WA
-                // NOTE: 'url' in Evolution might be a local container URL or a signed one.
-                // Evolution also has a separate route GET /message/base64 could be used if we have the message ID.
-
-                // For now, let's look for known fields in the payload that Evolution V2 sends when media is received.
-                // If 'mediaData' event is used, it's different. But we use 'messages.upsert'.
-
-                // If we get a URL:
-                if (mediaSourceUrl) {
+                if (!fileBlob && mediaSourceUrl) {
                     // Check if it's already a Supabase URL (Outbound message we just sent)
                     if (mediaSourceUrl.includes('supabase.co') && mediaSourceUrl.includes('/storage/v1/object/public/')) {
                         console.log("Detected existing Supabase URL, skipping download:", mediaSourceUrl);
@@ -251,36 +281,40 @@ Deno.serve(async (req) => {
                         try {
                             console.log(`Attempting to download media from: ${mediaSourceUrl}`);
                             const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
-                            const fetchHeaders = {}
+                            const fetchHeaders: any = {}
                             if (evolutionKey) fetchHeaders['apikey'] = evolutionKey
 
                             const fileRes = await fetch(mediaSourceUrl, { headers: fetchHeaders })
 
                             if (fileRes.ok) {
-                                const fileBlob = await fileRes.blob();
-                                const ext = mime.split('/')[1] || 'bin';
-                                const fileName = `${instanceData.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-
-                                const { data: uploadData, error: uploadError } = await supabase.storage
-                                    .from('chat-media')
-                                    .upload(fileName, fileBlob, {
-                                        contentType: mime,
-                                        upsert: false
-                                    });
-
-                                if (!uploadError && uploadData) {
-                                    const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
-                                    mediaUrl = publicUrlData.publicUrl;
-                                    console.log("Media uploaded to:", mediaUrl);
-                                } else {
-                                    console.error("Upload error:", uploadError);
-                                }
+                                fileBlob = await fileRes.blob();
                             } else {
                                 console.error("Failed to fetch media from Evolution URL:", fileRes.status);
                             }
                         } catch (err) {
-                            console.error("Error processing media:", err);
+                            console.error("Error processing media fetch:", err);
                         }
+                    }
+                }
+
+                // 3. Upload to Storage if we have a Blob
+                if (fileBlob) {
+                    const ext = mime.split('/')[1] || 'bin';
+                    const fileName = `${instanceData.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('chat-media')
+                        .upload(fileName, fileBlob, {
+                            contentType: mime,
+                            upsert: false
+                        });
+
+                    if (!uploadError && uploadData) {
+                        const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+                        mediaUrl = publicUrlData.publicUrl;
+                        console.log("Media uploaded to:", mediaUrl);
+                    } else {
+                        console.error("Upload error:", uploadError);
                     }
                 }
             }
@@ -400,6 +434,57 @@ Deno.serve(async (req) => {
         }
 
 
+
+        // 2b. Auto-Activate AI for NEW contacts (Optional: could be config driven)
+        // If we just inserted, contactPayload might not have ai_status. 
+        // We rely on DB default? No, DB default is 'stopped'.
+        // Let's force active for new leads if that's the business rule.
+        // But here we rely on the upsert result.
+
+        // 6. Trigger AI Agent (if inbound text AND AI is active)
+        // Re-fetch contact to get latest status (in case it changed or if we need to check)
+        // Actually we have 'contact' object from upsert.
+
+        // Check Human Interference (Outbound)
+        if (fromMe) {
+            // Check if this message was sent by AI (look for existing record with same WAMID and sender_type='ai')
+            // Note: This has a race condition window.
+            const { data: aiMsg } = await supabase.from('messages').select('id').eq('wamid', messageId).eq('sender_type', 'ai').maybeSingle();
+
+            if (!aiMsg) {
+                // It is likely a HUMAN message (from Mobile or CRM without AI flag)
+                console.log(`Human interference detected on ${remoteJid}. Stopping AI.`);
+                await supabase.from('contacts').update({ ai_status: 'stopped', human_intervened: true }).eq('id', contactId);
+            }
+        }
+
+        // Trigger AI (Inbound)
+        else if (messageType === 'text') {
+            // Check if AI is active (Global AND Contact)
+            const { data: freshContact } = await supabase.from('contacts').select('ai_status').eq('id', contactId).single();
+
+            if (isGlobalAiActive && (freshContact?.ai_status === 'active' || freshContact?.ai_status === 'chat_only')) {
+                console.log(`Triggering AI Agent for message ${messageId}...`);
+
+                // Fire and forget - don't await response to keep webhook fast
+                supabase.functions.invoke('ai-agent', {
+                    body: {
+                        message: content,
+                        contact_id: contactId,
+                        company_id: instanceData.company_id,
+                        conversation_id: conversationId,
+                        instance_name: instance,
+                        broker_id: contact?.assigned_to || instanceData.assigned_to || instanceData.id, // Fallback to instance owner
+                        active_agent_id: globalAgentId // Pass the global override
+                    }
+                }).then(({ data, error }) => {
+                    if (error) console.error("AI Agent Error:", error);
+                    else console.log("AI Agent Triggered:", data);
+                });
+            } else {
+                console.log(`AI is stopped/paused (Global: ${isGlobalAiActive}, Contact: ${freshContact?.ai_status}) for contact ${contactId}. Skipping.`);
+            }
+        }
 
         return new Response('Message saved', { status: 200 })
 

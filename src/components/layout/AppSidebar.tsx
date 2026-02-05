@@ -11,7 +11,9 @@ import {
   Building2,
   Globe,
   UserCheck,
-  Smartphone
+  Smartphone,
+  Bot,
+  Target
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -40,6 +42,8 @@ const menuItems = [
   { title: "Conversas", url: "/conversations", icon: MessageCircle },
   { title: "Tarefas", url: "/tasks", icon: CheckSquare },
   { title: "Agendamentos", url: "/schedules", icon: Calendar },
+  { title: "Central IA", url: "/agents", icon: Bot },
+  { title: "Roletas (Distribuição)", url: "/roleta", icon: Target },
   { title: "WhatsApp", url: "/whatsapp", icon: Smartphone },
 ];
 
@@ -79,13 +83,20 @@ export function AppSidebar() {
         {/* Brand Header */}
         <div className={`p-4 ${collapsed ? "px-2" : ""}`}>
           <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-md">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
+            {collapsed ? (
+              <div className="h-9 w-9 rounded-lg flex items-center justify-center">
+                <img src="/pigg-icon.png" alt="Pigg" className="h-8 w-8 object-contain" />
+              </div>
+            ) : (
+              <div className="flex items-center w-full justify-center">
+                <img src="/pigg-logo.png" alt="Pigg" className="w-full h-auto object-contain max-w-[200px]" />
+              </div>
+            )}
+
             {!collapsed && (
-              <div className="flex flex-col">
-                <span className="font-bold text-lg text-sidebar-foreground">CRM Pro</span>
-                <span className="text-xs text-muted-foreground">Gestão Inteligente</span>
+              <div className="flex flex-col sr-only"> {/* Hide text visually if logo contains text, but keep for screen readers if needed. Or just remove if logo replaces it completely. Logo provided has text 'pigg'. So I should probably hide the text 'CRM Pro'. */}
+                <span className="font-bold text-lg text-sidebar-foreground">Pigg</span>
+                <span className="text-xs text-muted-foreground">Assistente Imobiliário</span>
               </div>
             )}
           </div>
@@ -222,7 +233,7 @@ export function AppSidebar() {
         </SidebarMenu>
         {!collapsed && (
           <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-            CRM Pro v1.0.0
+            Pigg v1.0.0
           </div>
         )}
       </SidebarFooter>

@@ -41,11 +41,11 @@ export function AppLayout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
           {/* Professional Header */}
           <header className="h-16 border-b flex items-center px-4 gap-4 bg-card shadow-sm sticky top-0 z-10">
             <SidebarTrigger className="h-9 w-9" />
-            
+
             {/* Breadcrumb */}
             <nav className="flex items-center gap-1 text-sm">
               <Link to="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -59,8 +59,8 @@ export function AppLayout() {
             <div className="flex-1 max-w-md mx-4 hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Buscar contatos, negócios..." 
+                <Input
+                  placeholder="Buscar contatos, negócios..."
                   className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
                 />
               </div>

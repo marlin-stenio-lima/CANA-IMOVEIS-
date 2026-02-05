@@ -7,13 +7,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Filter, Search, Columns3 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Filter, Search, Columns3, ChevronDown } from "lucide-react";
 
 interface ContactsFilterBarProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
+  filters: any;
+  onFilterChange: (key: string, value: any) => void;
+  sources: string[];
+  owners: any[];
+  properties: any[];
 }
 
 export default function ContactsFilterBar({
@@ -21,43 +32,90 @@ export default function ContactsFilterBar({
   onSearchChange,
   sortBy,
   onSortChange,
+  filters,
+  onFilterChange,
+  sources,
+  owners,
+  properties,
 }: ContactsFilterBarProps) {
   return (
-    <div className="flex items-center gap-3 py-3">
-      <Button variant="outline" className="gap-2">
-        <Filter className="h-4 w-4" />
-        Filtros avançados
-      </Button>
-      
-      <Select value={sortBy} onValueChange={onSortChange}>
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Ordem" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="name-asc">Nome A-Z</SelectItem>
-          <SelectItem value="name-desc">Nome Z-A</SelectItem>
-          <SelectItem value="created-desc">Mais recentes</SelectItem>
-          <SelectItem value="created-asc">Mais antigos</SelectItem>
-          <SelectItem value="activity-desc">Última atividade</SelectItem>
-        </SelectContent>
-      </Select>
-      
-      <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Pesquisar Contatos"
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
-        />
+    <div className="flex flex-col gap-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar Contatos (Nome, Email, Telefone)"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <Select value={filters.source} onValueChange={(v) => onFilterChange("source", v)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Origem" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Origens</SelectItem>
+            {sources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={filters.ownerId} onValueChange={(v) => onFilterChange("ownerId", v)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {owners.map(o => (
+              <SelectItem key={o.id} value={o.id}>{o.full_name || "Usuário"}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={filters.propertyId} onValueChange={(v) => onFilterChange("propertyId", v)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Imóvel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {properties.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
+          <Select value={sortBy} onValueChange={onSortChange}>
+            <SelectTrigger className="w-[140px] bg-background">
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_desc">Mais Recentes</SelectItem>
+              <SelectItem value="created_asc">Mais Antigos</SelectItem>
+              <SelectItem value="name_asc">Nome (A-Z)</SelectItem>
+              <SelectItem value="name_desc">Nome (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Colunas <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>Nome</DropdownMenuItem>
+            <DropdownMenuItem>Telefone</DropdownMenuItem>
+            <DropdownMenuItem>Email</DropdownMenuItem>
+            <DropdownMenuItem>Origem</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      
-      <div className="flex-1" />
-      
-      <Button variant="outline" className="gap-2">
-        <Columns3 className="h-4 w-4" />
-        Gerir colunas
-      </Button>
     </div>
   );
 }

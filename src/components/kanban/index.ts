@@ -5,4 +5,7 @@ export { KanbanCard } from "./KanbanCard";
 export { DealQuickActions } from "./DealQuickActions";
 export { LossReasonModal } from "./LossReasonModal";
 export { CreateDealModal } from "./CreateDealModal";
+export type { LinkDealData } from "./CreateDealModal";
 export { ColumnMetrics } from "./ColumnMetrics";
+export { EditDealModal } from "./EditDealModal";
+export { ViewDealModal } from "./ViewDealModal";

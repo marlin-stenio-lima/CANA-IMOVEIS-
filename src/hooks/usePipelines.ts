@@ -77,6 +77,23 @@ export function usePipelines() {
 
   const deletePipeline = useMutation({
     mutationFn: async (id: string) => {
+      // 1. Delete all deals associated with this pipeline
+      const { error: dealsError } = await supabase
+        .from("deals")
+        .delete()
+        .eq("pipeline_id", id);
+
+      if (dealsError) throw dealsError;
+
+      // 2. Delete all stages associated with this pipeline
+      const { error: stagesError } = await supabase
+        .from("pipeline_stages")
+        .delete()
+        .eq("pipeline_id", id);
+
+      if (stagesError) throw stagesError;
+
+      // 3. Finally delete the pipeline
       const { error } = await supabase
         .from("pipelines")
         .delete()

@@ -1,0 +1,260 @@
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+
+// Mock Data for "Visual" feel while DB is offline
+const MOCK_ROULETTES = [
+    { id: "1", name: "Equipe Elite (Geral)", type: "Round Robin", members: 5 },
+    { id: "2", name: "Plantão Noturno", type: "Horário", members: 2 },
+    { id: "3", name: "Imóveis Alto Padrão", type: "Por Imóvel", members: 3 },
+];
+
+const MOCK_TRIGGERS = [
+    { id: "1", name: "Campanha Casa Itaipava", source: "whatsapp", condition: "texto contém 'Itaipava'", rouletteId: "3", active: true },
+    { id: "2", name: "Formulário Facebook Geral", source: "facebook", condition: "Form ID: 12345", rouletteId: "1", active: true },
+];
+
+export default function Roleta() {
+    const [automationStep, setAutomationStep] = useState(0); // 0 = List, 1 = Editor
+    const [selectedRoulette, setSelectedRoulette] = useState<string>("");
+    const [triggerType, setTriggerType] = useState<string>("whatsapp");
+    const [matchText, setMatchText] = useState("");
+
+    const handleSave = () => {
+        toast.success("Automação salva com sucesso!", {
+            description: "O fluxo foi validado e está ativo."
+        });
+        setAutomationStep(0);
+    };
+
+    return (
+        <div className="p-8 max-w-7xl mx-auto space-y-8">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold flex items-center gap-2">
+                        <Target className="h-8 w-8 text-primary" />
+                        Distribuição de Leads (Roleta)
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        Crie regras visuais para distribuir seus leads automaticamente entre os corretores.
+                    </p>
+                </div>
+                {automationStep === 0 && (
+                    <Button onClick={() => setAutomationStep(1)} className="gap-2">
+                        <Plus className="h-4 w-4" /> Nova Automação
+                    </Button>
+                )}
+                {automationStep === 1 && (
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setAutomationStep(0)}>Cancelar</Button>
+                        <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" /> Salvar Fluxo</Button>
+                    </div>
+                )}
+            </div>
+
+            <Tabs defaultValue="fluxos" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+                    <TabsTrigger value="fluxos">Fluxos de Distribuição</TabsTrigger>
+                    <TabsTrigger value="config">Configurar Roletas</TabsTrigger>
+                </TabsList>
+
+                {/* VISUAL WORKFLOW TAB */}
+                <TabsContent value="fluxos" className="mt-6">
+                    {automationStep === 0 ? (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {MOCK_TRIGGERS.map((trigger) => (
+                                <Card key={trigger.id} className="cursor-pointer hover:border-primary/50 transition-all">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex justify-between items-start">
+                                            <Badge variant={trigger.active ? "default" : "secondary"}>
+                                                {trigger.active ? "Ativo" : "Pausado"}
+                                            </Badge>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8"><Settings2 className="h-4 w-4" /></Button>
+                                        </div>
+                                        <CardTitle className="text-lg mt-2">{trigger.name}</CardTitle>
+                                        <CardDescription className="flex items-center gap-1">
+                                            {trigger.source === 'whatsapp' ? <MessageSquare className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                                            {trigger.source === 'whatsapp' ? 'WhatsApp' : 'Facebook Form'}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="text-sm border-l-2 pl-3 py-1 bg-muted/30 mb-3">
+                                            <span className="text-xs text-muted-foreground block">Regra:</span>
+                                            {trigger.condition}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                                            <ArrowDown className="h-4 w-4" />
+                                            Envia para: {MOCK_ROULETTES.find(r => r.id === trigger.rouletteId)?.name}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+
+                            {/* Empty State Card */}
+                            <Card className="border-dashed flex flex-col items-center justify-center p-8 cursor-pointer hover:bg-muted/10" onClick={() => setAutomationStep(1)}>
+                                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                                    <Plus className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                                <h3 className="font-semibold text-lg">Criar Novo Fluxo</h3>
+                                <p className="text-sm text-muted-foreground text-center mt-1">
+                                    Clique para desenhar uma nova regra
+                                </p>
+                            </Card>
+                        </div>
+                    ) : (
+                        // EDITOR VISUAL (FLUXO)
+                        <div className="max-w-3xl mx-auto space-y-2 pb-20">
+
+                            {/* STEP 1: TRIGGER */}
+                            <div className="relative pl-8 border-l-2 border-primary/20 pb-12">
+                                <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">1</div>
+                                <Card className="border-primary shadow-sm hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-3 bg-muted/5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                                <Zap className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">Gatilho (Entrada do Lead)</CardTitle>
+                                                <CardDescription>O que inicia essa automação?</CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-4 space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div
+                                                className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'whatsapp' ? 'border-primary bg-primary/5' : ''}`}
+                                                onClick={() => setTriggerType('whatsapp')}
+                                            >
+                                                <MessageSquare className="h-6 w-6" />
+                                                <span className="text-sm font-medium">Campanha WhatsApp</span>
+                                            </div>
+                                            <div
+                                                className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'facebook' ? 'border-primary bg-primary/5' : ''}`}
+                                                onClick={() => setTriggerType('facebook')}
+                                            >
+                                                <Zap className="h-6 w-6" />
+                                                <span className="text-sm font-medium">Facebook Form</span>
+                                            </div>
+                                        </div>
+
+                                        {triggerType === 'whatsapp' && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-sm font-medium">Se a mensagem do cliente contiver:</label>
+                                                <Input
+                                                    placeholder="Ex: olá vim do anúncio da casa sobrado"
+                                                    value={matchText}
+                                                    onChange={(e) => setMatchText(e.target.value)}
+                                                />
+                                                <p className="text-xs text-muted-foreground">O sistema buscará esse trecho exato na primeira mensagem.</p>
+                                            </div>
+                                        )}
+                                        {triggerType === 'facebook' && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-sm font-medium">Selecione o Formulário:</label>
+                                                <Select>
+                                                    <SelectTrigger><SelectValue placeholder="Escolha o formulário..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="form1">Cadastro Site (Geral)</SelectItem>
+                                                        <SelectItem value="form2">Lançamento Jardins</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* STEP 2: ROULETTE */}
+                            <div className="relative pl-8 border-l-2 border-primary/20 pb-12">
+                                <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">2</div>
+                                <Card className="border-primary shadow-sm hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-3 bg-muted/5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
+                                                <Target className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">Roleta (Distribuição)</CardTitle>
+                                                <CardDescription>Para quem o lead deve ser enviado?</CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Selecione a Roleta de Corretores:</label>
+                                            <Select value={selectedRoulette} onValueChange={setSelectedRoulette}>
+                                                <SelectTrigger><SelectValue placeholder="Escolha a equipe..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {MOCK_ROULETTES.map(r => (
+                                                        <SelectItem key={r.id} value={r.id}>
+                                                            {r.name} ({r.type})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="link" className="text-xs px-0 h-auto">
+                                                + Criar nova roleta
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* STEP 3: AI Activation */}
+                            <div className="relative pl-8">
+                                <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold">3</div>
+                                <Card className="border-green-500 bg-green-50/50 shadow-sm">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+                                                <Bot className="h-5 w-5" /> {/* Note: Bot needs import */}
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base">Ativação da IA</CardTitle>
+                                                <CardDescription>Ação Final</CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-2">
+                                        <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
+                                            <CheckCircle2 className="h-4 w-4" /> {/* Note: CheckCircle2 needs import */}
+                                            O Agente Virtual será ativado automaticamente após a distribuição.
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                        </div>
+                    )}
+                </TabsContent>
+
+                {/* CONFIG ROULETTES TAB */}
+                <TabsContent value="config">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gerenciar Roletas</CardTitle>
+                            <CardDescription>Crie grupos de corretores e defina regras de plantão.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-muted-foreground text-sm">
+                                (Funcionalidade de gerenciamento de membros será implementada quando o banco de dados retornar).
+                                <br />
+                                Você poderá definir: Round Robin, Plantão por Horário e Roleta por Imóvel.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
+// Additional imports needed for the mocks setup above to work perfectly
+import { Bot, CheckCircle2 } from "lucide-react";

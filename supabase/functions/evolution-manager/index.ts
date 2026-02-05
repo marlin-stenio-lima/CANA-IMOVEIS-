@@ -330,13 +330,22 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'send-media') {
-            const { instanceName, number, mediaType, mimetype, caption, mediaUrl } = body;
+            const { instanceName, number, mediaType, mimetype, caption, mediaUrl, mediaBase64 } = body;
             const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
             const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
 
-            console.log(`Sending media (${mediaType}) to ${number} via ${instanceName}...`);
+            console.log(`Sending media (${mediaType}) to ${number} via ${instanceName} (V1 API)...`);
 
-            const res = await fetch(`${evolutionUrl}/message/send/media/${instanceName}`, {
+            // V1 Logic: Prefer URL since S3 is configured, fallback to Base64
+            let mediaPayload = mediaUrl || mediaBase64;
+
+            // Only strip prefix if we are actually using Base64
+            if (!mediaUrl && mediaPayload && mediaPayload.startsWith('data:')) {
+                mediaPayload = mediaPayload.split(',')[1];
+            }
+
+            // V1 Endpoint: /message/sendMedia/{instance}
+            const res = await fetch(`${evolutionUrl}/message/sendMedia/${instanceName}`, {
                 method: 'POST',
                 headers: {
                     'apikey': evolutionKey!,
@@ -344,10 +353,10 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    mediatype: mediaType, // image, document, video
-                    mimetype,
-                    caption,
-                    media: mediaUrl
+                    mediatype: mediaType === 'document' ? 'document' : 'image',
+                    mimetype: mimetype || 'image/jpeg',
+                    media: mediaPayload,
+                    caption: caption || ""
                 })
             })
 
@@ -435,14 +444,22 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'send-audio') {
-            // Payload: { instanceName, number, mediaUrl }
-            const { instanceName, number, mediaUrl } = body;
+            // Payload: { instanceName, number, mediaUrl, mediaBase64 }
+            const { instanceName, number, mediaUrl, mediaBase64 } = body;
             const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
             const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
 
-            console.log(`Sending audio to ${number} via ${instanceName}...`);
+            console.log(`Sending audio to ${number} via ${instanceName} (V1 API)...`);
 
-            const res = await fetch(`${evolutionUrl}/message/send/whatsappAudio/${instanceName}`, {
+            // V1 Logic for Audio: Prefer URL, fallback to Base64
+            let audioPayload = mediaUrl || mediaBase64;
+
+            // Strip prefix only if using Base64
+            if (!mediaUrl && audioPayload && audioPayload.startsWith('data:')) {
+                audioPayload = audioPayload.split(',')[1];
+            }
+
+            const res = await fetch(`${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`, {
                 method: 'POST',
                 headers: {
                     'apikey': evolutionKey!,
@@ -450,9 +467,7 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    audio: mediaUrl,
-                    delay: 1200,
-                    encoding: true
+                    audio: audioPayload // V1 expects 'audio' field (raw base64)
                 })
             })
 

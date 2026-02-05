@@ -19,20 +19,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Contact {
-  id: number;
+  id: string;
   name: string;
-  phone: string;
-  email: string;
-  createdAt: string;
-  lastActivity: string | null;
-  tags: string[];
-  source: string;
+  phone: string | null;
+  email: string | null;
+  created_at: string | null;
+  last_activity?: string | null;
+  tags: string[] | null;
+  source: string | null;
 }
 
 interface ContactsTableProps {
   contacts: Contact[];
-  selectedIds: number[];
-  onSelectionChange: (ids: number[]) => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+  onDelete?: (ids: string[]) => void;
+  onRowClick?: (contact: Contact) => void;
 }
 
 const tagColors: Record<string, string> = {
@@ -88,7 +90,7 @@ function formatDateTime(dateString: string | null): string {
   });
 }
 
-export default function ContactsTable({ contacts, selectedIds, onSelectionChange }: ContactsTableProps) {
+export default function ContactsTable({ contacts, selectedIds, onSelectionChange, onDelete, onRowClick }: ContactsTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -100,7 +102,7 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
     }
   };
 
-  const handleSelectOne = (id: number, checked: boolean) => {
+  const handleSelectOne = (id: string, checked: boolean) => {
     if (checked) {
       onSelectionChange([...selectedIds, id]);
     } else {
@@ -126,8 +128,8 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
     );
   };
 
-  const isAllSelected = contacts.length > 0 && selectedIds.length === contacts.length;
-  const isIndeterminate = selectedIds.length > 0 && selectedIds.length < contacts.length;
+  const isAllSelected = contacts.length > 0 && contacts.every(c => selectedIds.includes(c.id));
+  const isIndeterminate = selectedIds.length > 0 && !isAllSelected;
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -142,7 +144,7 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
                 onCheckedChange={handleSelectAll}
               />
             </TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:text-foreground"
               onClick={() => handleSort("name")}
             >
@@ -153,7 +155,7 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
             </TableHead>
             <TableHead>Telefone</TableHead>
             <TableHead>E-mail</TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:text-foreground"
               onClick={() => handleSort("createdAt")}
             >
@@ -170,8 +172,15 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
         </TableHeader>
         <TableBody>
           {contacts.map((contact) => (
-            <TableRow key={contact.id} className="hover:bg-muted/30">
-              <TableCell>
+            <TableRow
+              key={contact.id}
+              className="hover:bg-muted/30 cursor-pointer"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('.stop-propagation')) return;
+                onRowClick && onRowClick(contact);
+              }}
+            >
+              <TableCell className="stop-propagation">
                 <Checkbox
                   checked={selectedIds.includes(contact.id)}
                   onCheckedChange={(checked) => handleSelectOne(contact.id, !!checked)}
@@ -194,18 +203,19 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
               <TableCell>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-4 w-4" />
-                  {contact.email}
+                  {contact.email || '-'}
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
-                {formatDateTime(contact.createdAt)}
+                {formatDateTime(contact.created_at)}
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
-                {formatDateTime(contact.lastActivity)}
+                {/* {formatDateTime(contact.lastActivity)} */}
+                -
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {contact.tags.slice(0, 2).map((tag, index) => (
+                  {contact.tags?.slice(0, 2).map((tag, index) => (
                     <Badge
                       key={index}
                       variant="outline"
@@ -214,7 +224,7 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
                       {tag}
                     </Badge>
                   ))}
-                  {contact.tags.length > 2 && (
+                  {contact.tags && contact.tags.length > 2 && (
                     <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                       +{contact.tags.length - 2}
                     </Badge>
@@ -222,11 +232,11 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
                 </div>
               </TableCell>
               <TableCell>
-                <span className={`text-xs px-2 py-1 rounded ${sourceColors[contact.source] || "bg-muted text-muted-foreground"}`}>
-                  {contact.source}
+                <span className={`text-xs px-2 py-1 rounded ${sourceColors[contact.source || ''] || "bg-muted text-muted-foreground"}`}>
+                  {contact.source || '-'}
                 </span>
               </TableCell>
-              <TableCell>
+              <TableCell className="stop-propagation">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -237,7 +247,12 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
                     <DropdownMenuItem>Editar</DropdownMenuItem>
                     <DropdownMenuItem>Ver histórico</DropdownMenuItem>
                     <DropdownMenuItem>Enviar mensagem</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => onDelete && onDelete([contact.id])}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

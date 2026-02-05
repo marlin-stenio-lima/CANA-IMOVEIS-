@@ -37,12 +37,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Search, 
-  Users, 
-  MoreHorizontal, 
-  Phone, 
-  Mail, 
+import {
+  Search,
+  Users,
+  MoreHorizontal,
+  Phone,
+  Mail,
   MessageCircle,
   ExternalLink,
   Trash2
@@ -70,14 +70,14 @@ export default function Leads() {
   const [deletingInquiry, setDeletingInquiry] = useState<PropertyInquiry | null>(null);
 
   const filteredInquiries = inquiries.filter((inquiry) => {
-    const matchesSearch = 
+    const matchesSearch =
       inquiry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inquiry.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inquiry.phone.includes(searchTerm) ||
       inquiry.property?.title?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || inquiry.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -204,8 +204,8 @@ export default function Leads() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Select 
-                      value={inquiry.status} 
+                    <Select
+                      value={inquiry.status}
                       onValueChange={(value) => handleStatusChange(inquiry.id, value as PropertyInquiry['status'])}
                     >
                       <SelectTrigger className="w-32">
@@ -232,9 +232,9 @@ export default function Leads() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <a 
-                            href={`https://wa.me/${inquiry.phone.replace(/\D/g, '')}`} 
-                            target="_blank" 
+                          <a
+                            href={`https://wa.me/${inquiry.phone.replace(/\D/g, '')}`}
+                            target="_blank"
                             rel="noopener noreferrer"
                           >
                             <MessageCircle className="h-4 w-4 mr-2" />
@@ -250,10 +250,10 @@ export default function Leads() {
                         {inquiry.contact_id && (
                           <DropdownMenuItem>
                             <ExternalLink className="h-4 w-4 mr-2" />
-                            Ver Contato no CRM
+                            Ver Contato no Pigg
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-destructive"
                           onClick={() => setDeletingInquiry(inquiry)}
                         >

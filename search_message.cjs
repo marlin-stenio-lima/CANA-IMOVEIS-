@@ -5,16 +5,15 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function checkLogs() {
-    console.log("Checking Webhook Logs...");
+async function checkMessageContent() {
+    console.log("Searching for 'duplex' in Messages...");
 
     const { data, error } = await supabase.functions.invoke('evolution-manager', {
         body: {
             action: 'debug-db',
             table: 'messages',
-            filterColumn: 'content',
-            filter: 'gostaria',
-            order: 'created_at.desc',
+            filterColumn: 'content', // dbug-db supports filterColumn
+            filter: 'duplex',
             limit: 5
         }
     });
@@ -25,10 +24,10 @@ async function checkLogs() {
     }
 
     if (data && data.data) {
-        console.log("Recent Logs:", JSON.stringify(data.data, null, 2));
+        console.log("Found Messages:", JSON.stringify(data.data, null, 2));
     } else {
         console.log("No data returned:", data);
     }
 }
 
-checkLogs();
+checkMessageContent();

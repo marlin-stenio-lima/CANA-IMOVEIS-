@@ -18,6 +18,8 @@ import Settings from "./pages/Settings";
 import Properties from "./pages/Properties";
 import SiteSettings from "./pages/SiteSettings";
 import Leads from "./pages/Leads";
+import Agents from "./pages/Agents";
+import Roleta from "./pages/Roleta";
 import PublicSite from "./pages/public/PublicSite";
 import PublicProperty from "./pages/public/PublicProperty";
 import NotFound from "./pages/NotFound";
@@ -53,6 +55,8 @@ const App = () => (
               <Route path="/properties" element={<Properties />} />
               <Route path="/site-settings" element={<SiteSettings />} />
               <Route path="/leads" element={<Leads />} />
+              <Route path="/agents" element={<Agents />} />
+              <Route path="/roleta" element={<Roleta />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

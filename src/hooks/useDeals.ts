@@ -9,9 +9,34 @@ type DealUpdate = TablesUpdate<"deals">;
 
 export interface DealWithContact extends Deal {
   contacts?: {
+    id: string; // Needed for update
     name: string;
     phone: string | null;
     source: string | null;
+    ai_status?: string;
+    follow_up_step?: number;
+    interest_property_id?: string | null;
+    assigned_to?: string | null;
+    details?: any;
+    email?: string;
+    document?: string | null;
+    tags?: string[] | null;
+    notes?: string | null;
+    status?: string | null;
+    custom_fields?: any;
+    job_title?: string | null;
+    properties?: {
+      title: string;
+      code?: string;
+    } | null;
+    appointments?: {
+      id: string;
+      start_time: string;
+      status: string;
+    }[] | null;
+  } | null;
+  profiles?: {
+    full_name: string | null;
   } | null;
 }
 
@@ -28,9 +53,16 @@ export function useDeals(pipelineId: string | null) {
         .select(`
           *,
           contacts (
-            name,
-            phone,
-            source
+            *,
+            properties:interest_property_id (*),
+            appointments (
+              id,
+              start_time,
+              status
+            )
+          ),
+          profiles:assigned_to (
+            full_name
           )
         `)
         .eq("pipeline_id", pipelineId)
@@ -46,9 +78,13 @@ export function useDeals(pipelineId: string | null) {
 
   const createDeal = useMutation({
     mutationFn: async (deal: Omit<DealInsert, "company_id">) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found");
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("company_id")
+        .eq("id", user.id)
         .single();
 
       if (!profile?.company_id) throw new Error("Company not found");
@@ -64,10 +100,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal criado com sucesso");
     },
     onError: (error) => {
-      toast.error("Erro ao criar deal: " + error.message);
+      console.error("Erro ao criar deal:", error);
     },
   });
 
@@ -85,10 +120,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal atualizado com sucesso");
     },
     onError: (error) => {
-      toast.error("Erro ao atualizar deal: " + error.message);
+      console.error("Erro ao atualizar deal:", error);
     },
   });
 
@@ -96,7 +130,7 @@ export function useDeals(pipelineId: string | null) {
     mutationFn: async ({ dealId, stageId }: { dealId: string; stageId: string }) => {
       const { data, error } = await supabase
         .from("deals")
-        .update({ 
+        .update({
           stage_id: stageId,
           stage_entered_at: new Date().toISOString()
         })
@@ -109,10 +143,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal movido com sucesso");
     },
     onError: (error) => {
-      toast.error("Erro ao mover deal: " + error.message);
+      console.error("Erro ao mover deal:", error);
     },
   });
 
@@ -120,7 +153,7 @@ export function useDeals(pipelineId: string | null) {
     mutationFn: async (dealId: string) => {
       const { data, error } = await supabase
         .from("deals")
-        .update({ 
+        .update({
           closed_at: new Date().toISOString(),
           stage: "won"
         })
@@ -133,10 +166,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal marcado como ganho!");
     },
     onError: (error) => {
-      toast.error("Erro ao marcar deal: " + error.message);
+      console.error("Erro ao marcar deal:", error);
     },
   });
 
@@ -144,7 +176,7 @@ export function useDeals(pipelineId: string | null) {
     mutationFn: async ({ dealId, lossReasonId }: { dealId: string; lossReasonId: string }) => {
       const { data, error } = await supabase
         .from("deals")
-        .update({ 
+        .update({
           lost_at: new Date().toISOString(),
           lost_reason_id: lossReasonId,
           stage: "lost"
@@ -158,10 +190,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal marcado como perdido");
     },
     onError: (error) => {
-      toast.error("Erro ao marcar deal: " + error.message);
+      console.error("Erro ao marcar deal:", error);
     },
   });
 
@@ -176,10 +207,9 @@ export function useDeals(pipelineId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
-      toast.success("Deal excluído com sucesso");
     },
     onError: (error) => {
-      toast.error("Erro ao excluir deal: " + error.message);
+      console.error("Erro ao excluir deal:", error);
     },
   });
 

@@ -8,37 +8,37 @@ import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 const stats = [
-  { 
-    title: "Total de Contatos", 
-    value: "248", 
-    icon: Users, 
-    change: "+12%", 
+  {
+    title: "Total de Contatos",
+    value: "248",
+    icon: Users,
+    change: "+12%",
     trend: "up",
-    color: "primary" 
+    color: "primary"
   },
-  { 
-    title: "Empresas", 
-    value: "45", 
-    icon: Building2, 
-    change: "+5%", 
+  {
+    title: "Empresas",
+    value: "45",
+    icon: Building2,
+    change: "+5%",
     trend: "up",
-    color: "success" 
+    color: "success"
   },
-  { 
-    title: "Negócios Ativos", 
-    value: "32", 
-    icon: HandshakeIcon, 
-    change: "+18%", 
+  {
+    title: "Negócios Ativos",
+    value: "32",
+    icon: HandshakeIcon,
+    change: "+18%",
     trend: "up",
-    color: "info" 
+    color: "info"
   },
-  { 
-    title: "Tarefas Pendentes", 
-    value: "18", 
-    icon: CheckSquare, 
-    change: "-8%", 
+  {
+    title: "Tarefas Pendentes",
+    value: "18",
+    icon: CheckSquare,
+    change: "-8%",
     trend: "down",
-    color: "warning" 
+    color: "warning"
   },
 ];
 
@@ -106,7 +106,7 @@ export default function Dashboard() {
             {getGreeting()}, {firstName}! 👋
           </h1>
           <p className="text-muted-foreground mt-1">
-            Aqui está o resumo do seu CRM hoje
+            Aqui está o resumo do seu assistente hoje
           </p>
         </div>
         <Button asChild>
@@ -121,8 +121,8 @@ export default function Dashboard() {
         {stats.map((stat, index) => {
           const colors = colorClasses[stat.color];
           return (
-            <Card 
-              key={stat.title} 
+            <Card
+              key={stat.title}
               className="hover-lift animate-fade-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
@@ -170,27 +170,27 @@ export default function Dashboard() {
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="name" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `R$${value/1000}k`} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
+                  <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `R$${value / 1000}k`} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
                     formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Valor']}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="hsl(var(--primary))" 
-                    fillOpacity={1} 
-                    fill="url(#colorValue)" 
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="hsl(var(--primary))"
+                    fillOpacity={1}
+                    fill="url(#colorValue)"
                     strokeWidth={2}
                   />
                 </AreaChart>
@@ -225,16 +225,16 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
                     formatter={(value: number) => [`${value} negócios`, '']}
                   />
-                  <Legend 
-                    verticalAlign="bottom" 
+                  <Legend
+                    verticalAlign="bottom"
                     height={36}
                     formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
                   />
@@ -264,8 +264,8 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentDeals.map((deal, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                 >
                   <Avatar className="h-10 w-10">
@@ -306,20 +306,18 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentTasks.map((task, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                 >
-                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                    task.priority === "Alta" ? "bg-destructive/10" :
-                    task.priority === "Média" ? "bg-warning/10" :
-                    "bg-muted"
-                  }`}>
-                    <CheckSquare className={`h-5 w-5 ${
-                      task.priority === "Alta" ? "text-destructive" :
-                      task.priority === "Média" ? "text-warning" :
-                      "text-muted-foreground"
-                    }`} />
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${task.priority === "Alta" ? "bg-destructive/10" :
+                      task.priority === "Média" ? "bg-warning/10" :
+                        "bg-muted"
+                    }`}>
+                    <CheckSquare className={`h-5 w-5 ${task.priority === "Alta" ? "text-destructive" :
+                        task.priority === "Média" ? "text-warning" :
+                          "text-muted-foreground"
+                      }`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{task.title}</p>
@@ -328,13 +326,12 @@ export default function Dashboard() {
                       <span>Vencimento: {task.due}</span>
                     </div>
                   </div>
-                  <Badge 
+                  <Badge
                     variant="outline"
-                    className={`text-xs ${
-                      task.priority === "Alta" ? "border-destructive text-destructive" :
-                      task.priority === "Média" ? "border-warning text-warning" :
-                      "border-muted-foreground text-muted-foreground"
-                    }`}
+                    className={`text-xs ${task.priority === "Alta" ? "border-destructive text-destructive" :
+                        task.priority === "Média" ? "border-warning text-warning" :
+                          "border-muted-foreground text-muted-foreground"
+                      }`}
                   >
                     {task.priority}
                   </Badge>

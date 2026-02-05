@@ -12,7 +12,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading, signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Form states
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -31,25 +31,25 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const { error } = await signIn(loginEmail, loginPassword);
-    
+
     setIsLoading(false);
-    
+
     if (error) {
       toast({
         title: "Erro ao entrar",
-        description: error.message === "Invalid login credentials" 
-          ? "Email ou senha incorretos" 
+        description: error.message === "Invalid login credentials"
+          ? "Email ou senha incorretos"
           : error.message,
         variant: "destructive",
       });
       return;
     }
-    
+
     toast({
       title: "Login realizado!",
-      description: "Bem-vindo ao CRM.",
+      description: "Bem-vindo ao Pigg.",
     });
     navigate("/dashboard");
   };
@@ -57,7 +57,7 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     if (signupPassword.length < 6) {
       setIsLoading(false);
       toast({
@@ -67,11 +67,11 @@ export default function Auth() {
       });
       return;
     }
-    
+
     const { error } = await signUp(signupEmail, signupPassword, signupName, signupCompany);
-    
+
     setIsLoading(false);
-    
+
     if (error) {
       let message = error.message;
       if (message.includes("already registered")) {
@@ -84,7 +84,7 @@ export default function Auth() {
       });
       return;
     }
-    
+
     toast({
       title: "Conta criada!",
       description: "Verifique seu email para confirmar o cadastro.",
@@ -103,8 +103,11 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">CRM</CardTitle>
-          <CardDescription>Gerencie seus clientes e negócios</CardDescription>
+          <div className="flex justify-center mb-6">
+            <img src="/pigg-logo.png" alt="Pigg" className="h-24 object-contain" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-primary">Pigg</CardTitle>
+          <CardDescription>Seu assistente imobiliário inteligente</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
@@ -112,15 +115,15 @@ export default function Auth() {
               <TabsTrigger value="login">Entrar</TabsTrigger>
               <TabsTrigger value="signup">Cadastrar</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
-                  <Input 
-                    id="login-email" 
-                    type="email" 
-                    placeholder="seu@email.com" 
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="seu@email.com"
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
@@ -128,10 +131,10 @@ export default function Auth() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
-                  <Input 
-                    id="login-password" 
-                    type="password" 
-                    placeholder="••••••••" 
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
@@ -142,15 +145,15 @@ export default function Auth() {
                 </Button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Nome completo</Label>
-                  <Input 
-                    id="signup-name" 
-                    type="text" 
-                    placeholder="Seu nome" 
+                  <Input
+                    id="signup-name"
+                    type="text"
+                    placeholder="Seu nome"
                     required
                     value={signupName}
                     onChange={(e) => setSignupName(e.target.value)}
@@ -158,10 +161,10 @@ export default function Auth() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
-                  <Input 
-                    id="signup-email" 
-                    type="email" 
-                    placeholder="seu@email.com" 
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="seu@email.com"
                     required
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
@@ -169,10 +172,10 @@ export default function Auth() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
-                  <Input 
-                    id="signup-password" 
-                    type="password" 
-                    placeholder="••••••••" 
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
                     required
                     minLength={6}
                     value={signupPassword}
@@ -181,10 +184,10 @@ export default function Auth() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-company">Nome da empresa</Label>
-                  <Input 
-                    id="signup-company" 
-                    type="text" 
-                    placeholder="Sua empresa" 
+                  <Input
+                    id="signup-company"
+                    type="text"
+                    placeholder="Sua empresa"
                     required
                     value={signupCompany}
                     onChange={(e) => setSignupCompany(e.target.value)}
@@ -198,7 +201,7 @@ export default function Auth() {
           </Tabs>
         </CardContent>
         <CardFooter className="text-center text-sm text-muted-foreground">
-          <p className="w-full">Sistema CRM Multi-tenant</p>
+          <p className="w-full">Pigg - Assistente Imobiliário</p>
         </CardFooter>
       </Card>
     </div>

@@ -15,14 +15,47 @@ import {
   Image as ImageIcon,
   FileText,
   X,
-  Trash2
+  Trash2,
+  Filter,
+  Users,
+  Globe, // Added missing Globe
+  Home,
+  Layers,
+  User,        // Added
+  Pencil,      // Added
+  Save,        // Added
+  LayoutKanban,// Added
+  UserPlus     // Added
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Bot, Zap } from "lucide-react"; // Import Bot icon
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +73,7 @@ interface Contact {
   id: string;
   name: string;
   phone: string;
-  profile_pic_url?: string;
+  // profile_pic_url removed as it doesn't exist
 }
 
 interface Instance {
@@ -115,17 +148,18 @@ function ConversationsContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-
-  // Media Upload State
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-
-  // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
+  // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+
+  // Agent Control State
+  const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
+  const [contactAgentSettings, setContactAgentSettings] = useState<{ id: string, ai_status: string, active_agent_id: number } | null>(null);
 
   // Load Conversations
   useEffect(() => {
@@ -137,14 +171,56 @@ function ConversationsContent() {
     return () => { supabase.removeChannel(channel) };
   }, []);
 
+  // Fetch Contact Agent Settings when conversation is selected
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    const fetchAgentSettings = async () => {
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, ai_status, active_agent_id')
+        .eq('id', selectedConversation.contact_id)
+        .single();
+
+      if (data) {
+        setContactAgentSettings({
+          id: data.id,
+          ai_status: data.ai_status || 'stopped',
+          active_agent_id: data.active_agent_id || 1 // Default to 1 if not set
+        });
+      }
+    };
+    fetchAgentSettings();
+  }, [selectedConversation]);
+
+  const updateAgentSettings = async (updates: any) => {
+    if (!contactAgentSettings) return;
+
+    // Optimistic
+    setContactAgentSettings(prev => ({ ...prev!, ...updates }));
+
+    const { error } = await supabase
+      .from('contacts')
+      .update(updates)
+      .eq('id', contactAgentSettings.id);
+
+    if (error) {
+      toast.error("Erro ao salvar configuração do agente");
+      console.error(error);
+    } else {
+      toast.success("Configuração do Agente atualizada!");
+    }
+  };
+
   const fetchConversations = async () => {
     const { data, error } = await supabase
       .from('conversations')
-      .select('*, contact:contacts(*), instance:instances(name)')
+      .select('*, contact:contacts(*), instance:instances(name)') // Removed explicit non-existent columns, relying on *
       .order('last_message_at', { ascending: false });
 
     if (error) {
       console.error("Error fetching conversations:", error);
+      toast.error("Erro ao carregar conversas: " + error.message);
     }
     if (data) setConversations(data as any);
   };
@@ -286,6 +362,14 @@ function ConversationsContent() {
       else if (file.type.startsWith('video/')) mediaType = 'video';
       else if (file.type.startsWith('audio/')) mediaType = 'audio';
 
+      // Convert to Base64 for reliable sending (bypasses bucket auth issues)
+      const base64Coords = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
       // Optimistic Update
       const fakeId = Math.random().toString();
       const newMessage: Message = {
@@ -300,7 +384,7 @@ function ConversationsContent() {
       };
       setMessages(prev => [...prev, newMessage]);
 
-      await supabase.functions.invoke('evolution-manager', {
+      const { error: invokeError } = await supabase.functions.invoke('evolution-manager', {
         body: {
           action: 'send-media',
           instanceName,
@@ -308,9 +392,12 @@ function ConversationsContent() {
           mediaType: mediaType === 'document' ? 'document' : mediaType,
           mimetype: file.type,
           caption: "",
-          mediaUrl: publicUrl
+          mediaUrl: publicUrl,
+          mediaBase64: base64Coords // Send the full Data URI
         }
       });
+
+      if (invokeError) throw invokeError;
 
     } catch (error) {
       console.error(error);
@@ -429,18 +516,42 @@ function ConversationsContent() {
   const getInitials = (name: string) => name?.substring(0, 2).toUpperCase() || "?";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#efe7dd] dark:bg-[#0b141a] relative"> {/* Main Container */}
+    <div className="flex h-[calc(100vh-8.5rem)] overflow-hidden bg-[#efe7dd] dark:bg-[#0b141a] relative rounded-xl border shadow-sm"> {/* Main Container */}
 
       {/* Sidebar - Contact List */}
       <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} w-full md:w-[400px] flex-col border-r bg-white dark:bg-[#111b21] z-20`}>
         {/* Header */}
         <div className="h-[60px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between px-4 py-2 border-b dark:border-gray-800 shrink-0">
-          <Avatar className="h-10 w-10 cursor-pointer">
-            <AvatarImage src="/placeholder-user.jpg" />
-            <AvatarFallback>EU</AvatarFallback>
-          </Avatar>
+
+          {/* Filters Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10" title="Filtrar Conversas">
+                <Filter className="w-5 h-5 text-[#54656f] dark:text-[#aebac1]" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem>
+                <Users className="w-4 h-4 mr-2" /> Corretores
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Globe className="w-4 h-4 mr-2" /> Origem do Lead
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Home className="w-4 h-4 mr-2" /> Imóveis de Interesse
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <Layers className="w-4 h-4 mr-2" /> Todos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <div className="flex gap-4 text-[#54656f] dark:text-[#aebac1] items-center">
-            <MoreVertical className="w-6 h-6 cursor-pointer" />
+            {/* Delete Button (Requested replacement for 3 dots) */}
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Excluir">
+              <Trash2 className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
@@ -466,15 +577,38 @@ function ConversationsContent() {
                 className={`flex items-center px-3 py-3 cursor-pointer hover:bg-[#f5f6f6] dark:hover:bg-[#202c33] transition-colors relative group
                          ${selectedConversation?.id === conv.id ? 'bg-[#f0f2f5] dark:bg-[#2a3942]' : ''}`}
               >
-                <Avatar className="h-12 w-12 mr-3 shrink-0">
-                  <AvatarImage src={conv.contact.profile_pic_url || undefined} />
-                  <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-white">
-                    {getInitials(conv.contact.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative mr-3 shrink-0">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={conv.contact.profile_pic_url || undefined} />
+                    <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-white">
+                      {getInitials(conv.contact.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Owner Indicator */}
+                  <div
+                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-600 border-2 border-white dark:border-[#111b21] flex items-center justify-center z-10 shadow-sm"
+                    title="Proprietário: Marlon Stenio"
+                  >
+                    <span className="text-[8px] font-bold text-white leading-none">MS</span>
+                  </div>
+                </div>
+
                 <div className="flex-1 min-w-0 border-b dark:border-gray-800 pb-3 h-full justify-center flex flex-col">
                   <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="text-[17px] text-[#111b21] dark:text-[#e9edef] font-normal truncate">{conv.contact.name || "Sem Nome"}</h3>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className="text-[17px] text-[#111b21] dark:text-[#e9edef] font-normal truncate">
+                        {conv.contact.name || "Sem Nome"}
+                      </h3>
+
+                      {/* AI Status Badge - List View */}
+                      {(conv.contact as any)?.ai_status === 'active' && (
+                        <Bot className="w-3.5 h-3.5 text-green-500 fill-green-100 dark:fill-green-900" />
+                      )}
+                      {(conv.contact as any)?.ai_status === 'paused' && (
+                        <div className="w-2 h-2 rounded-full bg-yellow-500" title="Pausado" />
+                      )}
+                    </div>
+
                     <span className="text-xs text-[#667781] dark:text-[#8696a0] whitespace-nowrap ml-2">
                       {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
                     </span>
@@ -538,6 +672,69 @@ function ConversationsContent() {
               </div>
             </div>
             <div className="flex gap-4 text-[#54656f] dark:text-[#aebac1] items-center">
+              {/* Agent Settings Trigger */}
+              <Dialog open={isAgentDialogOpen} onOpenChange={setIsAgentDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative text-[#54656f] dark:text-[#aebac1] hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <Bot className={`w-5 h-5 ${contactAgentSettings?.ai_status === 'active' ? 'text-green-500' : ''}`} />
+                    {contactAgentSettings?.ai_status === 'active' && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]"></span>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Configuração do Agente (Lead)</DialogTitle>
+                    <DialogDescription>
+                      Controle como a IA interage com <strong>{selectedConversation.contact.name}</strong>.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {contactAgentSettings && (
+                    <div className="py-4 space-y-6">
+                      {/* Master Toggle */}
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-0.5">
+                          <div className="font-medium">Status da IA</div>
+                          <div className="text-sm text-muted-foreground">
+                            {contactAgentSettings.ai_status === 'active' ? "Ligado / Respondendo" : "Pausado / Humano"}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={contactAgentSettings.ai_status === 'active'}
+                          onCheckedChange={(checked) => updateAgentSettings({ ai_status: checked ? 'active' : 'paused' })}
+                        />
+                      </div>
+
+                      {/* Agent Selection Override */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">Forçar Agente Específico</label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {[
+                            { id: 1, name: "1. Agente de Triagem" },
+                            { id: 2, name: "2. Agente de Agendamento" }
+                          ].map((agent) => (
+                            <div
+                              key={agent.id}
+                              onClick={() => updateAgentSettings({ active_agent_id: agent.id })}
+                              className={`p-3 rounded-md border cursor-pointer transition-all flex items-center justify-between
+                                     ${contactAgentSettings.active_agent_id === agent.id
+                                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                  : "hover:bg-muted"
+                                }
+                                  `}
+                            >
+                              <span className="text-sm">{agent.name}</span>
+                              {contactAgentSettings.active_agent_id === agent.id && <CheckCheck className="w-4 h-4 text-primary" />}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
               <Search className="w-5 h-5 cursor-pointer" />
 
               {/* Delete SINGLE Conversation Button */}
@@ -549,7 +746,7 @@ function ConversationsContent() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Excluir esta conversa?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Isso apagará o histórico desta conversa no CRM. As mensagens no WhatsApp não serão apagadas.
+                      Isso apagará o histórico desta conversa no Pigg. As mensagens no WhatsApp não serão apagadas.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -558,7 +755,16 @@ function ConversationsContent() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <MoreVertical className="w-5 h-5 cursor-pointer" />
+              {/* Direct 'Details' Button (No Dropdown) */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-[#54656f] dark:text-[#aebac1]"
+                onClick={() => setDetailsOpen(true)}
+                title="Dados do Contato"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </Button>
             </div>
           </div>
 
@@ -581,45 +787,73 @@ function ConversationsContent() {
                       <div className={`px-2 pt-2 pb-1 text-[#111b21] dark:text-[#e9edef] ${msg.message_type === 'image' ? 'p-1' : ''}`}>
 
                         {/* Image Type */}
-                        {msg.message_type === 'image' && msg.media_url ? (
-                          <div className="mb-1 rounded-lg overflow-hidden relative">
-                            <img
-                              src={msg.media_url}
-                              alt="Imagem"
-                              className="max-w-full max-h-[300px] object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                              onClick={() => window.open(msg.media_url!, '_blank')}
-                            />
-                            {msg.content && msg.content !== "Imagem" && msg.content !== "Imagem enviada" && <p className="mt-1 break-words px-1">{msg.content}</p>}
-                          </div>
-                        ) : msg.message_type === 'video' && msg.media_url ? (
-                          <div className="mb-1">
-                            <video controls src={msg.media_url} className="rounded-lg max-w-full max-h-[300px]" />
-                            {msg.content && msg.content !== "Vídeo" && <p className="mt-1 break-words">{msg.content}</p>}
-                          </div>
-                        ) : msg.message_type === 'audio' && msg.media_url ? (
-                          // Custom Audio Player UI
-                          <div className="flex items-center gap-3 min-w-[280px] p-2">
-                            <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-                              <Avatar className="w-10 h-10">
-                                <AvatarImage src={isUser ? undefined : selectedConversation.contact.profile_pic_url} />
-                                <AvatarFallback>{isUser ? 'EU' : getInitials(selectedConversation.contact.name)}</AvatarFallback>
-                              </Avatar>
-                              <div className="absolute -bottom-1 -right-1">
-                                <Mic className={`w-4 h-4 ${isUser ? 'text-[#005c4b] dark:text-[#00a884]' : 'text-[#54656f] dark:text-[#8696a0]'}`} />
+                        {msg.message_type === 'image' ? (
+                          msg.media_url ? (
+                            <div className="mb-1 rounded-lg overflow-hidden relative">
+                              <img
+                                src={msg.media_url}
+                                alt="Imagem"
+                                className="max-w-full max-h-[300px] object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                onClick={() => window.open(msg.media_url!, '_blank')}
+                                onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Erro+Imagem'; }}
+                              />
+                              {msg.content && msg.content !== "Imagem" && msg.content !== "Imagem enviada" && <p className="mt-1 break-words px-1">{msg.content}</p>}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded mb-1 border border-red-200/50">
+                              <ImageIcon className="w-5 h-5 text-gray-400" />
+                              <span className="italic text-xs text-gray-500">Imagem indisponível</span>
+                            </div>
+                          )
+                        ) : msg.message_type === 'video' ? (
+                          msg.media_url ? (
+                            <div className="mb-1">
+                              <video controls src={msg.media_url} className="rounded-lg max-w-full max-h-[300px]" />
+                              {msg.content && msg.content !== "Vídeo" && <p className="mt-1 break-words">{msg.content}</p>}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded mb-1">
+                              <span className="text-xl">🎥</span>
+                              <span className="italic text-xs text-gray-500">Vídeo indisponível</span>
+                            </div>
+                          )
+                        ) : msg.message_type === 'audio' ? (
+                          msg.media_url ? (
+                            <div className="flex items-center gap-3 min-w-[280px] p-2">
+                              <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+                                <Avatar className="w-10 h-10">
+                                  <AvatarImage src={isUser ? undefined : selectedConversation.contact.profile_pic_url} />
+                                  <AvatarFallback>{isUser ? 'EU' : getInitials(selectedConversation.contact.name)}</AvatarFallback>
+                                </Avatar>
+                                <div className="absolute -bottom-1 -right-1">
+                                  <Mic className={`w-4 h-4 ${isUser ? 'text-[#005c4b] dark:text-[#00a884]' : 'text-[#54656f] dark:text-[#8696a0]'}`} />
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <audio controls src={msg.media_url} className="w-full h-8" />
                               </div>
                             </div>
-                            <div className="flex-1">
-                              <audio controls src={msg.media_url} className="w-full h-8" />
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 min-w-[150px] bg-gray-100 dark:bg-gray-800 rounded">
+                              <Mic className="w-5 h-5 text-gray-400" />
+                              <span className="italic text-xs text-gray-500">Áudio não carregado</span>
                             </div>
-                          </div>
-                        ) : msg.message_type === 'document' && msg.media_url ? (
-                          <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-3 rounded-md cursor-pointer hover:bg-black/10 transition-colors max-w-[300px]" onClick={() => window.open(msg.media_url!, '_blank')}>
-                            <div className="text-3xl text-red-500">📄</div>
-                            <div className="overflow-hidden">
-                              <p className="truncate font-medium hover:underline">{msg.content || "Documento"}</p>
-                              <span className="text-xs uppercase opacity-70">PDF/DOC</span>
+                          )
+                        ) : msg.message_type === 'document' ? (
+                          msg.media_url ? (
+                            <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-3 rounded-md cursor-pointer hover:bg-black/10 transition-colors max-w-[300px]" onClick={() => window.open(msg.media_url!, '_blank')}>
+                              <div className="text-3xl text-red-500">📄</div>
+                              <div className="overflow-hidden">
+                                <p className="truncate font-medium hover:underline">{msg.content || "Documento"}</p>
+                                <span className="text-xs uppercase opacity-70">PDF/DOC</span>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded mb-1">
+                              <FileText className="w-5 h-5 text-gray-400" />
+                              <span className="italic text-xs text-gray-500">Arquivo indisponível</span>
+                            </div>
+                          )
                         ) : (
                           <p className="break-words whitespace-pre-wrap leading-relaxed pr-16 min-w-[80px]">{msg.content}</p>
                         )}
@@ -707,25 +941,24 @@ function ConversationsContent() {
         </div>
       ) : (
         <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-[#f0f2f5] dark:bg-[#222e35] border-b-[6px] border-[#25d366]">
-          <div className="text-center space-y-4 max-w-[500px]">
-            {/* WhatsApp Intro Image or Icon Could Go Here */}
-            <h1 className="text-3xl font-light text-[#41525d] dark:text-[#e9edef]">WhatsApp Web CRM</h1>
-            <p className="text-[#667781] dark:text-[#8696a0]">Envie e receba mensagens sem interrupções. Selecione uma conversa para começar.</p>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                toast.info("Gerando dados de teste...");
-                const { error } = await supabase.functions.invoke('seed-db');
-                if (error) toast.error("Erro ao gerar dados: " + error.message);
-                else {
-                  toast.success("Dados gerados! Atualizando...");
-                  fetchConversations();
-                }
-              }}
-              className="mt-4"
-            >
-              Gerar Conversa de Teste
-            </Button>
+          {/* Simple Clean Empty State */}
+          <div className="text-center space-y-6 max-w-[500px] p-8">
+            <div className="flex justify-center">
+              <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <Bot className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl text-[#41525d] dark:text-[#e9edef] font-light">
+                CRM Suite Pro
+              </h1>
+              <p className="text-[#667781] dark:text-[#8696a0] text-sm">
+                Gerencie seus atendimentos de forma inteligente.
+                <br />
+                Selecione uma conversa ao lado para começar.
+              </p>
+            </div>
           </div>
         </div>
       )}

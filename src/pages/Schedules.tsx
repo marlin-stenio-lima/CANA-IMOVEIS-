@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,8 +31,12 @@ import {
   Clock,
   MapPin,
   User,
-  Phone
+  Phone,
+  Pencil,
+  Bell,
+  Trash2
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   addDays,
   format,
@@ -46,7 +51,9 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
-import { ContactSelect } from "@/components/appointments/ContactSelect"; // Import at top (correct)
+import { ContactSelect } from "@/components/appointments/ContactSelect";
+import { useAppointments } from "@/hooks/useAppointments";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 
 type ViewType = "day" | "week" | "month";
 
@@ -57,61 +64,70 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: "scheduled" | "completed" | "cancelled";
-  description?: string;
+  notes?: string;
   contact?: { name: string; phone: string };
+  assigned_to?: string;
 }
 
 export default function Schedules() {
   const { profile } = useAuth(); // Get current user profile
+  const { mode } = useCrmMode();
+  const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
   const [searchTerm, setSearchTerm] = useState("");
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { appointments, isLoading } = useAppointments();
 
-  // New Appointment State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAppt, setNewAppt] = useState({ title: "", date: "", time: "09:00", duration: 60, contactName: "" });
+  const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
+  const [newAppt, setNewAppt] = useState({ 
+    title: "", 
+    date: format(new Date(), "yyyy-MM-dd"), 
+    startTime: "09:00", 
+    endTime: "10:00", 
+    contactId: "",
+    notes: "",
+    send_whatsapp_reminder: false
+  });
   const [isCreating, setIsCreating] = useState(false);
 
-  // Calendar Logic
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 }); // Sunday start for fuller view, or 1 for Monday
+  useEffect(() => {
+    if (editingAppt) {
+      const start = parseISO(editingAppt.start_time);
+      const end = parseISO(editingAppt.end_time);
+      setNewAppt({
+        title: editingAppt.title,
+        date: format(start, "yyyy-MM-dd"),
+        startTime: format(start, "HH:mm"),
+        endTime: format(end, "HH:mm"),
+        contactId: editingAppt.contact_id,
+        notes: editingAppt.notes || "",
+        send_whatsapp_reminder: false // Default to false or fetch from DB if column exists
+      });
+      setIsDialogOpen(true);
+    }
+  }, [editingAppt]);
+
+  const resetForm = () => {
+    setNewAppt({ 
+      title: "", 
+      date: format(new Date(), "yyyy-MM-dd"), 
+      startTime: "09:00", 
+      endTime: "10:00", 
+      contactId: "",
+      notes: "",
+      send_whatsapp_reminder: false
+    });
+    setEditingAppt(null);
+  };
+
+  // Calendar Logic (Restored)
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 }); // Sunday
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Fetch Appointments
-  const fetchAppointments = async () => {
-    setIsLoading(true);
-    // Fetch range based on current view window (optimization for later)
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('*, contact:contacts(name, phone)')
-      .order('start_time', { ascending: true });
-
-    if (error) {
-      console.error("Error fetching appointments:", error);
-      toast.error("Erro ao carregar agenda");
-    } else {
-      setAppointments(data as any);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchAppointments();
-
-    const channel = supabase
-      .channel('public:appointments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        fetchAppointments();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel) };
-  }, []);
-
   const filteredAppointments = useMemo(() => {
-    return appointments.filter(apt => {
+    return (appointments || []).filter(apt => {
       const clientName = apt.contact?.name || "";
       const clientPhone = apt.contact?.phone || "";
       if (searchTerm) {
@@ -135,16 +151,26 @@ export default function Schedules() {
   };
 
   const getAppointmentsForSlot = (day: Date, hour: number) => {
-    return filteredAppointments.filter(apt => {
+    return (appointments || []).filter(apt => {
+      // Use parseISO to properly handle UTC/Local variations from DB
       const aptDate = parseISO(apt.start_time);
+      const isSame = isSameDay(aptDate, day);
       const aptHour = aptDate.getHours();
-      return isSameDay(aptDate, day) && aptHour === hour;
+      return isSame && aptHour === hour;
     });
   };
 
   const handleCreateAppointment = async () => {
-    if (!newAppt.title || !newAppt.date || !newAppt.contactId) {
-      toast.error("Preencha título, data e selecione um cliente");
+    if (!newAppt.title) {
+      toast.error("Por favor, insira um assunto");
+      return;
+    }
+    if (!newAppt.contactId) {
+      toast.error("Por favor, selecione um cliente");
+      return;
+    }
+    if (!newAppt.date) {
+      toast.error("Por favor, selecione uma data");
       return;
     }
 
@@ -155,30 +181,73 @@ export default function Schedules() {
 
     setIsCreating(true);
     try {
-      const startDateTime = `${newAppt.date}T${newAppt.time}:00`;
-      const startDate = new Date(startDateTime);
-      const endDate = new Date(startDate.getTime() + newAppt.duration * 60000);
+      // Create local date objects for start and end
+      const [year, month, day] = newAppt.date.split('-').map(Number);
+      const [startH, startM] = newAppt.startTime.split(':').map(Number);
+      const [endH, endM] = newAppt.endTime.split(':').map(Number);
+      
+      const startDate = new Date(year, month - 1, day, startH, startM);
+      const endDate = new Date(year, month - 1, day, endH, endM);
 
-      const { error } = await supabase.from('appointments').insert({
-        company_id: profile.company_id,
-        user_id: profile.id,
-        title: newAppt.title,
-        status: 'scheduled',
-        start_time: startDateTime,
-        end_time: endDate.toISOString(),
-        contact_id: newAppt.contactId,
-      });
+      if (endDate <= startDate) {
+        toast.error("O horário de término deve ser após o início");
+        setIsCreating(false);
+        return;
+      }
 
-      if (error) throw error;
-      toast.success("Agendamento criado!");
+      if (editingAppt) {
+        const { error } = await supabase.from('appointments').update({
+          title: newAppt.title,
+          notes: newAppt.notes,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          contact_id: newAppt.contactId,
+          business_type: mode as any,
+        }).eq('id', editingAppt.id);
+        if (error) throw error;
+        toast.success("Agendamento atualizado!");
+      } else {
+        const { error } = await supabase.from('appointments').insert({
+          company_id: profile.company_id,
+          assigned_to: profile.id,
+          title: newAppt.title,
+          notes: newAppt.notes,
+          status: 'scheduled',
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          contact_id: newAppt.contactId,
+          business_type: mode as any,
+          // Note: added reminder flag logic would go here if column exists in DB
+        });
+        if (error) throw error;
+        toast.success("Agendamento criado!");
+      }
+
       setIsDialogOpen(false);
-      setNewAppt({ title: "", date: "", time: "09:00", duration: 60, contactId: "" });
-      fetchAppointments();
+      resetForm();
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     } catch (error) {
       console.error(error);
       toast.error("Erro ao criar agendamento: " + (error as any).message);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    
+    try {
+      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      if (error) throw error;
+      
+      toast.success("Agendamento excluído!");
+      setIsDialogOpen(false);
+      resetForm();
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao excluir agendamento.");
     }
   };
 
@@ -188,9 +257,9 @@ export default function Schedules() {
   const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 to 20:00
 
   const statusColors = {
-    scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-    completed: "bg-green-100 text-green-700 border-green-200",
-    cancelled: "bg-red-100 text-red-700 border-red-200",
+    scheduled: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
+    completed: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+    cancelled: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100",
   };
 
   return (
@@ -225,11 +294,11 @@ export default function Schedules() {
           </div>
 
           <div className="flex flex-col">
-            <h2 className="text-xl font-bold text-foreground capitalize">
+            <h2 className="text-xl font-bold text-slate-800 capitalize leading-none">
               {format(currentDate, "MMMM yyyy", { locale: ptBR })}
             </h2>
-            <p className="text-xs text-muted-foreground capitalize">
-              {view === 'week' ? `Semana de ${format(weekStart, "dd")} a ${format(weekEnd, "dd MMM")}` : format(currentDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              {view === 'week' ? `Semana de ${format(weekStart, "dd")} a ${format(weekEnd, "dd 'de' MMM", { locale: ptBR })}` : format(currentDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
             </p>
           </div>
         </div>
@@ -245,57 +314,117 @@ export default function Schedules() {
             />
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
-              <Button className="gap-2 shadow-sm">
+              <Button className="gap-2 shadow-sm" onClick={() => resetForm()}>
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Novo</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Novo Compromisso</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
+                <DialogTitle>{editingAppt ? "Editar Compromisso" : "Novo Compromisso"}</DialogTitle>
+              </DialogHeader>              <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Assunto</Label>
+                  <Label>Título do Evento</Label>
                   <Input
                     value={newAppt.title}
                     onChange={e => setNewAppt({ ...newAppt, title: e.target.value })}
                     placeholder="Ex: Visita ao Imóvel X"
+                    className="text-lg font-semibold"
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label>Cliente (Obrigatório)</Label>
+                  <Label>Cliente</Label>
                   <ContactSelect
                     value={newAppt.contactId}
                     onChange={(val) => setNewAppt({ ...newAppt, contactId: val })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label>Data</Label>
+                    <Label className="flex items-center gap-2">
+                      <CalendarIcon className="h-3.5 w-3.5" /> Data
+                    </Label>
                     <Input
                       type="date"
                       value={newAppt.date}
                       onChange={e => setNewAppt({ ...newAppt, date: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hora Início</Label>
-                    <Input
-                      type="time"
-                      value={newAppt.time}
-                      onChange={e => setNewAppt({ ...newAppt, time: e.target.value })}
+                      className="cursor-pointer"
                     />
                   </div>
                 </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5" /> Início
+                    </Label>
+                    <Input
+                      type="time"
+                      value={newAppt.startTime}
+                      onChange={e => setNewAppt({ ...newAppt, startTime: e.target.value })}
+                    />
+                  </div>
+                  <div className="mt-8 text-slate-400">—</div>
+                  <div className="flex-1 space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-3.5 w-3.5" /> Término
+                    </Label>
+                    <Input
+                      type="time"
+                      value={newAppt.endTime}
+                      onChange={e => setNewAppt({ ...newAppt, endTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descrição / Notas</Label>
+                  <textarea
+                    className="w-full min-h-[80px] rounded-md border border-slate-200 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Adicione detalhes, observações ou o endereço..."
+                    value={newAppt.notes}
+                    onChange={e => setNewAppt({ ...newAppt, notes: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold flex items-center gap-2">
+                      <Bell className="h-3.5 w-3.5 text-indigo-500" />
+                      Lembrete WhatsApp
+                    </Label>
+                    <p className="text-[10px] text-slate-500">Enviar aviso para lead/corretor</p>
+                  </div>
+                  <Switch 
+                    checked={newAppt.send_whatsapp_reminder}
+                    onCheckedChange={(checked) => setNewAppt({ ...newAppt, send_whatsapp_reminder: checked })}
+                  />
+                </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreateAppointment} disabled={isCreating}>
-                  {isCreating ? "Salvando..." : "Agendar"}
-                </Button>
+              <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+                {editingAppt ? (
+                  <Button 
+                    variant="ghost" 
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 font-bold"
+                    onClick={() => handleDeleteAppointment(editingAppt.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </Button>
+                ) : <div />}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleCreateAppointment} disabled={isCreating}>
+                    {isCreating ? "Salvando..." : (editingAppt ? "Atualizar" : "Agendar")}
+                  </Button>
+                </div>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -315,12 +444,12 @@ export default function Schedules() {
               return (
                 <div
                   key={i}
-                  className={`flex flex-col items-center justify-center p-2 text-center border-r last:border-r-0 transition-colors ${active ? "bg-primary/5" : ""}`}
+                  className={`flex flex-col items-center justify-center p-2 text-center border-r last:border-r-0 transition-colors ${active ? "bg-indigo-50/50" : ""}`}
                 >
-                  <span className={`text-xs uppercase font-semibold ${active ? "text-primary" : "text-muted-foreground"}`}>
-                    {format(day, "EEE", { locale: ptBR })}
+                  <span className={`text-[10px] uppercase font-bold tracking-wider ${active ? "text-indigo-600" : "text-slate-400"}`}>
+                    {format(day, "EEEE", { locale: ptBR }).split('-')[0]}
                   </span>
-                  <div className={`mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${active ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground"}`}>
+                  <div className={`mt-1 flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black transition-all ${active ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-110" : "text-slate-700 hover:bg-slate-100"}`}>
                     {format(day, "dd")}
                   </div>
                 </div>
@@ -357,33 +486,60 @@ export default function Schedules() {
                         {/* Hover effect for adding (future feature) */}
                         <div className="absolute inset-0 hover:bg-muted/10 transition-colors pointer-events-none" />
 
-                        {slots.map((apt, aptIndex) => (
-                          <div
-                            key={apt.id}
-                            className={`absolute inset-x-1 p-2 rounded-md border text-xs shadow-sm cursor-pointer hover:shadow-md transition-all z-10 ${statusColors[apt.status] || "bg-gray-100"}`}
-                            style={{
-                              top: "2px",
-                              height: "calc(100% - 4px)",
-                              left: `${aptIndex * 4}px`, // Simple Stacking
-                              zIndex: 10 + aptIndex
-                            }}
-                          >
-                            <div className="font-semibold truncate flex items-center gap-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${apt.status === 'confirmed' ? 'bg-green-500' : 'bg-blue-500'}`} />
-                              {apt.title}
-                            </div>
-                            {apt.contact && (
-                              <div className="flex items-center gap-1 mt-1 text-muted-foreground truncate">
-                                <User className="h-3 w-3" />
-                                {apt.contact.name}
+                        {slots.map((apt, aptIndex) => {
+                          const start = parseISO(apt.start_time);
+                          const end = parseISO(apt.end_time);
+                          const minutesFromStart = start.getMinutes();
+                          const topOffset = (minutesFromStart / 60) * 100;
+                          
+                          // Calculate duration in minutes
+                          const durationInMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+                          // 20rem (80px) is 60 mins, so height is (duration / 60) * 100%
+                          const heightFactor = (durationInMinutes / 60) * 100;
+                          
+                          return (
+                            <div
+                              key={apt.id}
+                              className={`absolute inset-x-1 p-2 rounded-lg border text-[11px] shadow-sm cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all z-10 overflow-hidden ${statusColors[apt.status] || "bg-slate-100"}`}
+                              style={{
+                                top: `${topOffset}%`,
+                                height: `${Math.max(heightFactor, 25)}%`, // At least 25% of the slot
+                                width: slots.length > 1 ? `${95 / slots.length}%` : "95%",
+                                left: `${(aptIndex * 95) / slots.length}%`,
+                                zIndex: 10 + aptIndex,
+                                borderLeftWidth: '4px'
+                              }}
+                            >
+                              <div className="font-bold text-slate-900 truncate flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={apt.status === 'scheduled' ? 'text-indigo-600' : 'text-emerald-600'}>●</span>
+                                  {apt.title}
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingAppt(apt);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
                               </div>
-                            )}
-                            <div className="flex items-center gap-1 mt-0.5 text-muted-foreground truncate font-mono">
-                              <Clock className="h-3 w-3" />
-                              {format(parseISO(apt.start_time), "HH:mm")} - {format(parseISO(apt.end_time), "HH:mm")}
+                              {apt.contact && (
+                                <div className="flex items-center gap-1 mt-1 text-slate-600 font-medium truncate">
+                                  <User className="h-3 w-3 opacity-70" />
+                                  {apt.contact.name}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1 mt-1 text-slate-500 font-bold truncate bg-white/40 w-fit px-1.5 rounded">
+                                <Clock className="h-3 w-3" />
+                                {format(parseISO(apt.start_time), "HH:mm")} - {format(parseISO(apt.end_time), "HH:mm")}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })}

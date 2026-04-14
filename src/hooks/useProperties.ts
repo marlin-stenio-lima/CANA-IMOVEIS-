@@ -1,7 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCrmMode } from '@/contexts/CrmModeContext';
 import { toast } from 'sonner';
+import mockData from '@/data/mockProperties.json';
+
+const USE_MOCK = false;
+
+/**
+ * Helper to convert mock IDs (like 'mock-3074') into valid UUID format
+ */
+const toUuid = (id: string) => {
+    if (!id.startsWith('mock-')) return id;
+    const numericPart = id.replace('mock-', '').slice(0, 12).padStart(12, '0');
+    return `00000000-0000-0000-0000-${numericPart}`;
+};
+
+/**
+ * Helper to map mock property data for consistent use across the app
+ */
+const mapMockProperty = (p: any) => ({
+    ...p,
+    company_id: '00000000-0000-0000-0000-000000000000', // Master ID found in DB
+    id: toUuid(p.id)
+});
 
 export interface Property {
   id: string;
@@ -30,6 +52,12 @@ export interface Property {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  export_to_portals?: boolean;
+  condo_fee: number | null;
+  iptu: number | null;
+  year_built: number | null;
+  internal_id: string | null;
+  portal_config: any;
   images?: PropertyImage[];
 }
 
@@ -62,15 +90,27 @@ export interface PropertyFormData {
   status?: Property['status'];
   is_featured?: boolean;
   is_published?: boolean;
+  export_to_portals?: boolean;
+  condo_fee?: number;
+  iptu?: number;
+  year_built?: number;
+  internal_id?: string;
+  portal_config?: any;
 }
 
 export function useProperties() {
   const { profile } = useAuth();
+  const { mode } = useCrmMode();
   const queryClient = useQueryClient();
 
   const propertiesQuery = useQuery({
-    queryKey: ['properties', profile?.company_id],
+    queryKey: ['properties', profile?.company_id, mode],
     queryFn: async () => {
+      if (USE_MOCK) {
+        if (mode === 'barcos') return [] as Property[];
+        return (mockData as any[]).map(mapMockProperty) as Property[];
+      }
+      
       if (!profile?.company_id) return [];
       
       const { data, error } = await supabase
@@ -87,6 +127,8 @@ export function useProperties() {
     },
     enabled: !!profile?.company_id,
   });
+
+  const entityLabel = mode === 'barcos' ? 'Embarcação' : 'Imóvel';
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: PropertyFormData) => {
@@ -107,10 +149,10 @@ export function useProperties() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
-      toast.success('Imóvel cadastrado com sucesso!');
+      toast.success(`${entityLabel} cadastrado com sucesso!`);
     },
     onError: (error) => {
-      toast.error('Erro ao cadastrar imóvel: ' + error.message);
+      toast.error(`Erro ao cadastrar ${entityLabel.toLowerCase()}: ` + error.message);
     },
   });
 
@@ -128,10 +170,10 @@ export function useProperties() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
-      toast.success('Imóvel atualizado com sucesso!');
+      toast.success(`${entityLabel} atualizado com sucesso!`);
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar imóvel: ' + error.message);
+      toast.error(`Erro ao atualizar ${entityLabel.toLowerCase()}: ` + error.message);
     },
   });
 
@@ -146,10 +188,10 @@ export function useProperties() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
-      toast.success('Imóvel excluído com sucesso!');
+      toast.success(`${entityLabel} excluído com sucesso!`);
     },
     onError: (error) => {
-      toast.error('Erro ao excluir imóvel: ' + error.message);
+      toast.error(`Erro ao excluir ${entityLabel.toLowerCase()}: ` + error.message);
     },
   });
 
@@ -168,7 +210,6 @@ export function useProperties() {
         .from('property-images')
         .getPublicUrl(fileName);
 
-      // Get current max position
       const { data: existingImages } = await supabase
         .from('property_images')
         .select('position')
@@ -240,6 +281,11 @@ export function useProperty(id: string | undefined) {
     queryKey: ['property', id],
     queryFn: async () => {
       if (!id) return null;
+      
+      if (USE_MOCK) {
+        const mappedData = (mockData as any[]).map(mapMockProperty);
+        return mappedData.find(p => p.id === id) || null;
+      }
       
       const { data, error } = await supabase
         .from('properties')

@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { UserPlus, Trash2, Pencil, Save, X } from "lucide-react";
+import { UserPlus, Shield, Copy, Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
     Dialog,
     DialogContent,
@@ -21,152 +22,111 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TeamPermissionsModal } from "./TeamPermissionsModal";
+import { Label } from "@/components/ui/label";
 
 export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
+    const { profile } = useAuth();
     const [members, setMembers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
 
-    // Form State
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [phone, setPhone] = useState("");
-    const [role, setRole] = useState("agent");
+    // Modals
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [permissionsMember, setPermissionsMember] = useState<any | null>(null);
+
+    // Link Generator State
+    const [inviteRole, setInviteRole] = useState("agent");
+    const [inviteArea, setInviteArea] = useState("imoveis");
+    const [generatedLink, setGeneratedLink] = useState("");
+    const [copied, setCopied] = useState(false);
 
     const fetchTeam = async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('team_members').select('*').order('created_at', { ascending: false });
+        // Featches real users from profiles
+        const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
         if (data) setMembers(data);
         setLoading(false);
     };
 
     useEffect(() => { fetchTeam(); }, []);
 
-    const resetForm = () => {
-        setName("");
-        setEmail("");
-        setPhone("");
-        setRole("agent");
-        setEditingId(null);
+    const handleGenerateLink = () => {
+        // Creates a link pointing to the homepage / auth with URL params
+        const baseUrl = window.location.origin;
+        const url = new URL(`${baseUrl}/`);
+        url.searchParams.set('action', 'register');
+        url.searchParams.set('role', inviteRole);
+        url.searchParams.set('area', inviteArea);
+        
+        setGeneratedLink(url.toString());
+        setCopied(false);
     };
 
-    const handleOpenChange = (open: boolean) => {
-        if (!open) resetForm();
-        setIsOpen(open);
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(generatedLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast.success("Link copiado para a área de transferência!");
     };
-
-    const handleEdit = (member: any) => {
-        setEditingId(member.id);
-        setName(member.name);
-        setEmail(member.email || "");
-        setPhone(member.phone || "");
-        setRole(member.role);
-        setIsOpen(true);
-    };
-
-    const handleSave = async () => {
-        if (!name) return toast.error("Nome obrigatório");
-
-        setLoading(true);
-
-        if (editingId) {
-            // Update existing
-            const { error } = await supabase
-                .from('team_members')
-                .update({ name, email, phone, role: role as any })
-                .eq('id', editingId);
-
-            if (error) {
-                console.error(error);
-                toast.error("Erro ao atualizar membro");
-            } else {
-                toast.success("Membro atualizado!");
-                setIsOpen(false);
-                fetchTeam();
-                if (onUpdate) onUpdate();
-            }
-        } else {
-            // Create new
-            const { data: newMember, error } = await supabase.from('team_members').insert({
-                name,
-                email,
-                phone,
-                role: role as any,
-                company_id: '00000000-0000-0000-0000-000000000000', // Placeholder
-            }).select().single();
-
-            if (error) {
-                console.error("Supabase Error:", error);
-                toast.error(`Erro: ${error.message || "Falha ao adicionar membro"}`);
-            } else {
-                toast.success("Membro adicionado!");
-                // Automatic Instance Creation REMOVED as per user request
-                // We now only create the user. Connection is manual.
-
-                setIsOpen(false);
-                fetchTeam();
-                if (onUpdate) onUpdate();
-            }
-        }
-        setLoading(false);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!confirm("Tem certeza que deseja remover este membro?")) return;
-        const { error } = await supabase.from('team_members').delete().eq('id', id);
-        if (error) toast.error("Erro ao remover");
-        else {
-            toast.success("Membro removido");
-            fetchTeam();
-        }
-    }
 
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-medium">Membros da Equipe</h3>
-                    <p className="text-sm text-muted-foreground">Gerencie quem tem acesso ao sistema e atribua funções.</p>
+                    <h3 className="text-lg font-medium">Equipe e Permissões</h3>
+                    <p className="text-sm text-muted-foreground">Gerencie quem tem acesso ao sistema, crie convites e edite permissões.</p>
                 </div>
-                <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+                
+                {/* Invite Generator Modal */}
+                <Dialog open={isInviteOpen} onOpenChange={(open) => { setIsInviteOpen(open); if(!open) setGeneratedLink(""); }}>
                     <DialogTrigger asChild>
-                        <Button size="sm"><UserPlus className="h-4 w-4 mr-2" /> Adicionar Membro</Button>
+                        <Button size="sm"><UserPlus className="h-4 w-4 mr-2" /> Gerar Convite</Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>{editingId ? "Editar Membro" : "Novo Membro"}</DialogTitle>
+                            <DialogTitle>Gerar Link de Convite</DialogTitle>
                             <DialogDescription>
-                                {editingId ? "Atualize as informações do membro da equipe." : "Adicione um corretor para gerenciar leads e WhatsApp."}
+                                Crie um link personalizado para convidar novos usuários.
                             </DialogDescription>
                         </DialogHeader>
+                        
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Nome</label>
-                                <Input placeholder="Nome do Corretor" value={name} onChange={e => setName(e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Email (Opcional)</label>
-                                <Input placeholder="email@exemplo.com" value={email} onChange={e => setEmail(e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Telefone / WhatsApp</label>
-                                <Input placeholder="5511999999999" value={phone} onChange={e => setPhone(e.target.value)} />
-                                <p className="text-xs text-muted-foreground">Opcional. Adicione se quiser vincular uma conta de WhatsApp depois.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Função</label>
-                                <Select value={role} onValueChange={setRole}>
+                                <Label>Qual será o cargo?</Label>
+                                <Select value={inviteRole} onValueChange={setInviteRole}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="agent">Corretor (Acesso Limitado)</SelectItem>
-                                        <SelectItem value="admin">Admin (Acesso Total)</SelectItem>
+                                        <SelectItem value="agent">Usuário Comum (Corretor)</SelectItem>
+                                        <SelectItem value="admin">Administrador Geral</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <Button onClick={handleSave} disabled={loading} className="w-full">
-                                {loading ? "Salvando..." : (editingId ? "Salvar Alterações" : "Adicionar Membro")}
+                            
+                            <div className="space-y-2">
+                                <Label>Em qual área o usuário vai atuar?</Label>
+                                <Select value={inviteArea} onValueChange={setInviteArea}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="imoveis">Apenas Imóveis</SelectItem>
+                                        <SelectItem value="barcos">Apenas Barcos</SelectItem>
+                                        <SelectItem value="both">Ambas as Áreas</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <Button onClick={handleGenerateLink} className="w-full">
+                                Gerar Link
                             </Button>
+
+                            {generatedLink && (
+                                <div className="p-3 bg-secondary rounded-lg border mt-4 flex items-center gap-2">
+                                    <Input value={generatedLink} readOnly className="h-8 flex-1 text-xs" />
+                                    <Button size="sm" variant="outline" onClick={copyToClipboard} className="shrink-0 gap-2 h-8">
+                                        {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                        {copied ? "Copiado!" : "Copiar"}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -176,10 +136,10 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Nome</TableHead>
-                            <TableHead>Contato</TableHead>
-                            <TableHead>Função</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
+                            <TableHead>Nome e Contato</TableHead>
+                            <TableHead>Cargo</TableHead>
+                            <TableHead>Áreas Liberadas</TableHead>
+                            <TableHead className="text-right">Permissões Especiais</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -190,38 +150,56 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            members.map((m) => (
+                            members.map((m) => {
+                                const roleName = m.role === 'admin' || m.role === 'owner' ? 'Admin' : 'Corretor';
+                                const isSuper = m.role === 'owner';
+                                const areas = m.access_areas || ['imoveis', 'barcos'];
+                                
+                                return (
                                 <TableRow key={m.id}>
-                                    <TableCell className="font-medium">{m.name}</TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="text-sm">{m.email || "-"}</span>
-                                            <span className="text-xs text-muted-foreground">{m.phone || ""}</span>
+                                            <span className="font-medium">{m.full_name || m.email || "Usuário não identificou o nome"}</span>
+                                            <span className="text-xs text-muted-foreground">{m.email}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${m.role === 'admin' ? 'bg-red-100 text-red-700' :
-                                            'bg-green-100 text-green-700'
-                                            }`}>
-                                            {m.role === 'agent' ? 'Corretor' : 'Admin'}
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${m.role === 'admin' || m.role === 'owner' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                            {roleName}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(m)}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(m.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                    <TableCell>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {!areas.length && <span className="text-xs text-muted-foreground">Nenhuma</span>}
+                                            {areas.includes('imoveis') && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded border">Imóveis</span>}
+                                            {areas.includes('barcos') && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded border">Barcos</span>}
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                        {!isSuper ? (
+                                            <Button variant="outline" size="sm" onClick={() => setPermissionsMember(m)} className="h-8 gap-1 text-xs">
+                                                <Shield className="h-3 w-3" />
+                                                Gerenciar
+                                            </Button>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">Master</span>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
-                            ))
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Permissions Modal */}
+            <TeamPermissionsModal 
+                isOpen={!!permissionsMember} 
+                onClose={() => setPermissionsMember(null)}
+                member={permissionsMember}
+                onUpdate={fetchTeam}
+            />
         </div>
     )
 }

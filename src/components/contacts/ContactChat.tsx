@@ -28,6 +28,7 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
     const [loading, setLoading] = useState(true);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [messageInput, setMessageInput] = useState("");
+    const [imageSalts, setImageSalts] = useState<Record<string, number>>({});
     const [sending, setSending] = useState(false);
 
     // Store assigned instance info
@@ -41,7 +42,7 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
 
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
         }
     }, [messages]);
 
@@ -53,9 +54,11 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 .from('conversations')
                 .select('id, instance_id')
                 .eq('contact_id', contactId)
+                .order('created_at', { ascending: false })
+                .limit(1)
                 .maybeSingle();
 
-            if (error) throw error;
+            if (error && error.code !== 'PGRST116') throw error;
 
             if (conv) {
                 setConversationId(conv.id);
@@ -80,25 +83,28 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 const channel = supabase
                     .channel(`chat_modal:${conv.id}`)
                     .on('postgres_changes', {
-                        event: 'INSERT',
+                        event: '*',
                         schema: 'public',
                         table: 'messages',
                         filter: `conversation_id=eq.${conv.id}`
                     }, (payload) => {
-                        // Check if we already have this ID (deduplication of optimistic)
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === payload.new.id)) return prev;
-                            // Also check wamid to avoid dupes? usually ID is unique enough.
-                            return [...prev, payload.new as Message];
-                        });
-                    })
-                    .on('postgres_changes', {
-                        event: 'UPDATE',
-                        schema: 'public',
-                        table: 'messages',
-                        filter: `conversation_id=eq.${conv.id}`
-                    }, (payload) => {
-                        setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
+                        const newMessage = payload.new as Message;
+                        if (payload.eventType === 'INSERT') {
+                            setMessages(prev => {
+                                if (newMessage.wamid && prev.some(m => m.wamid === newMessage.wamid)) return prev;
+                                return [...prev, newMessage];
+                            });
+                        } else if (payload.eventType === 'UPDATE') {
+                            setMessages(prev => prev.map(m => {
+                                if (m.wamid === newMessage.wamid || m.id === newMessage.id) {
+                                    const finalMediaUrl = (newMessage.media_url && newMessage.media_url.includes('http')) 
+                                        ? newMessage.media_url 
+                                        : m.media_url;
+                                    return { ...m, ...newMessage, media_url: finalMediaUrl };
+                                }
+                                return m;
+                            }));
+                        }
                     })
                     .subscribe();
 
@@ -236,7 +242,7 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
     }
 
     return (
-        <div className="flex flex-col h-full bg-[#efe7dd] relative">
+        <div className="absolute inset-0 flex flex-col bg-[#efe7dd]">
             <div className="absolute inset-0 opacity-40 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d93ea9372bd.png')] pointer-events-none" />
 
             {/* Messages Area */}
@@ -257,12 +263,42 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                                     }`}
                             >
                                 {msg.message_type === 'image' && msg.media_url && (
-                                    <img src={msg.media_url} alt="Media" className="rounded mb-1 max-w-full max-h-60 object-cover" />
+                                    <div className="mb-1 rounded-lg overflow-hidden relative min-h-[100px] bg-slate-100">
+                                        <img 
+                                            src={msg.media_url} 
+                                            alt="Media" 
+                                            className="max-w-full max-h-60 object-contain cursor-pointer rounded-md" 
+                                            onClick={() => window.open(msg.media_url!, '_blank')} 
+                                        />
+                                    </div>
+                                )}
+                                {msg.message_type === 'document' && msg.media_url && (
+                                    msg.content.match(/\.(jpg|jpeg|png|gif|webp)$/i) || msg.content === 'Imagem' ? (
+                                        <div className="mb-1 rounded-lg overflow-hidden relative min-h-[100px] bg-slate-100">
+                                            <img 
+                                                src={msg.media_url} 
+                                                alt="Media" 
+                                                className="max-w-full max-h-60 object-contain cursor-pointer rounded-md" 
+                                                onClick={() => window.open(msg.media_url!, '_blank')} 
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded mb-1 border border-gray-100 cursor-pointer" onClick={() => window.open(msg.media_url!, '_blank')}>
+                                            <Paperclip className="h-4 w-4 text-blue-500" />
+                                            <span className="text-xs font-medium truncate max-w-[150px]">{msg.content || 'Documento'}</span>
+                                        </div>
+                                    )
                                 )}
                                 {msg.message_type === 'audio' && (
-                                    <div className="flex items-center gap-2 min-w-[150px]">
-                                        <Mic className="h-4 w-4" />
-                                        <span>Áudio</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {msg.media_url ? (
+                                            <audio src={msg.media_url} controls className="h-10 max-w-[240px]" />
+                                        ) : (
+                                            <div className="flex items-center gap-2 opacity-70">
+                                                <Mic className="h-4 w-4" />
+                                                <span className="text-sm italic">Processando áudio...</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

@@ -6,6 +6,7 @@ import { usePipelineStages } from "@/hooks/usePipelineStages";
 import { useDeals } from "@/hooks/useDeals";
 import { useLossReasons } from "@/hooks/useLossReasons";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import { useTeam } from "@/hooks/useTeam";
 import { useProperties } from "@/hooks/useProperties";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +61,7 @@ const SOURCES = [
 
 export default function Kanban() {
   const { profile } = useAuth();
+  const { mode } = useCrmMode();
   const queryClient = useQueryClient();
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [isCreatingPipeline, setIsCreatingPipeline] = useState(false);
@@ -143,6 +145,13 @@ export default function Kanban() {
       // Filter by Pipeline
       if (selectedPipeline && deal.pipeline_id !== selectedPipeline.id) {
         return false;
+      }
+
+      // Filter by CRM Mode (Imoveis vs Barcos)
+      if (mode && deal.contacts?.business_type) {
+        if (deal.contacts.business_type !== mode) {
+            return false;
+        }
       }
       // Date Filter
       if (filters.dateRange !== "all") {
@@ -269,7 +278,8 @@ export default function Kanban() {
           source: data.source,
           assigned_to: data.ownerId,
           interest_property_id: data.propertyId,
-          notes: data.description
+          notes: data.description,
+          business_type: mode as any
         })
         .select()
         .single();

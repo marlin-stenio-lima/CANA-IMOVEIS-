@@ -751,10 +751,13 @@ export type Database = {
           created_by: string | null
           description: string | null
           due_date: string | null
+          due_time: string | null
           id: string
           priority: string | null
           related_contact_id: string | null
           related_deal_id: string | null
+          reminder_minutes: number | null
+          send_whatsapp_reminder: boolean | null
           status: Database["public"]["Enums"]["task_status"] | null
           title: string
           updated_at: string | null
@@ -771,6 +774,7 @@ export type Database = {
           priority?: string | null
           related_contact_id?: string | null
           related_deal_id?: string | null
+          send_whatsapp_reminder?: boolean | null
           status?: Database["public"]["Enums"]["task_status"] | null
           title: string
           updated_at?: string | null
@@ -783,10 +787,13 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           id?: string
           priority?: string | null
           related_contact_id?: string | null
           related_deal_id?: string | null
+          reminder_minutes?: number | null
+          send_whatsapp_reminder?: boolean | null
           status?: Database["public"]["Enums"]["task_status"] | null
           title?: string
           updated_at?: string | null

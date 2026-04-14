@@ -23,7 +23,10 @@ import { useTeam } from "@/hooks/useTeam";
 import { useProperties } from "@/hooks/useProperties";
 import { TagInput } from "@/components/ui/tag-input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCrmMode } from "@/contexts/CrmModeContext";
+import { PropertySelect } from "@/components/common/PropertySelect";
 import { toast } from "sonner";
+
 import { Loader2 } from "lucide-react";
 
 interface CreateContactSheetProps {
@@ -35,12 +38,22 @@ const initialFormData = {
     name: "",
     phone: "",
     email: "",
+    document: "",
+    birth_date: "",
     source: "",
     ownerId: "",
     propertyId: "none",
     tags: [] as string[],
     notes: "",
+    // Address fields for custom_fields
+    street: "",
+    number: "",
+    neighborhood: "",
+    city: "",
+    state: "",
+    postal_code: "",
 };
+
 
 export default function CreateContactSheet({
     open,
@@ -49,6 +62,7 @@ export default function CreateContactSheet({
     const { createContact, contacts } = useContacts({});
     const { data: teamMembers = [] } = useTeam();
     const { properties = [] } = useProperties();
+    const { mode } = useCrmMode();
 
     // Deduce available tags
     const availableTags = Array.from(new Set(contacts?.flatMap(c => c.tags || []) || [])).sort();
@@ -93,17 +107,35 @@ export default function CreateContactSheet({
 
         setIsLoading(true);
         try {
+            // Find the responsible name
+            const selectedOwner = teamMembers.find(m => m.id === formData.ownerId);
+            const ownerName = selectedOwner ? (selectedOwner.full_name || selectedOwner.email) : (formData.ownerId === "00000000-0000-0000-0000-000000000000" ? "Tatiana" : null);
+
             await createContact.mutateAsync({
                 name: formData.name,
                 phone: finalPhone,
                 email: formData.email || null,
+                document: formData.document || null,
                 source: formData.source || null,
                 assigned_to: formData.ownerId === "unassigned" ? null : formData.ownerId || null,
                 interest_property_id: formData.propertyId === "none" ? null : formData.propertyId || null,
                 tags: formData.tags.length > 0 ? formData.tags : null,
-                notes: formData.notes || null,
+                notes: formData.notes + (ownerName ? `\n[Responsável: ${ownerName}]` : ""),
                 company_id: profile.company_id,
+                business_type: mode,
+                custom_fields: {
+                    birth_date: formData.birth_date || null,
+                    address: {
+                        street: formData.street || null,
+                        number: formData.number || null,
+                        neighborhood: formData.neighborhood || null,
+                        city: formData.city || null,
+                        state: formData.state || null,
+                        postal_code: formData.postal_code || null,
+                    }
+                }
             });
+
 
             toast.success("Contato criado com sucesso!");
             onOpenChange(false); // Keep existing onOpenChange
@@ -183,6 +215,53 @@ export default function CreateContactSheet({
                         />
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="document">CPF / CNPJ</Label>
+                            <Input
+                                id="document"
+                                placeholder="000.000.000-00"
+                                value={formData.document}
+                                onChange={(e) => handleChange("document", e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="birth_date">Data de Nascimento</Label>
+                            <Input
+                                id="birth_date"
+                                type="date"
+                                value={formData.birth_date}
+                                onChange={(e) => handleChange("birth_date", e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+
+                    <div className="space-y-2 pt-2 border-t mt-4">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Endereço</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="col-span-2 space-y-1">
+                                <Label htmlFor="street" className="text-xs">Rua</Label>
+                                <Input id="street" value={formData.street} onChange={(e) => handleChange("street", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="number" className="text-xs">Nº</Label>
+                                <Input id="number" value={formData.number} onChange={(e) => handleChange("number", e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <Label htmlFor="neighborhood" className="text-xs">Bairro</Label>
+                                <Input id="neighborhood" value={formData.neighborhood} onChange={(e) => handleChange("neighborhood", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="city" className="text-xs">Cidade</Label>
+                                <Input id="city" value={formData.city} onChange={(e) => handleChange("city", e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+
+
                     <div className="space-y-2">
                         <Label htmlFor="source">Origem</Label>
                         <Select
@@ -224,23 +303,13 @@ export default function CreateContactSheet({
 
                     <div className="space-y-2">
                         <Label htmlFor="property">Imóvel de Interesse</Label>
-                        <Select
+                        <PropertySelect 
                             value={formData.propertyId}
                             onValueChange={(val) => handleChange("propertyId", val)}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione o imóvel" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">Nenhum</SelectItem>
-                                {properties.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                        {p.code} - {p.title}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            placeholder="Selecione o imóvel (opcional)"
+                        />
                     </div>
+
 
                     <div className="space-y-2">
                         <Label htmlFor="tags">Tags</Label>

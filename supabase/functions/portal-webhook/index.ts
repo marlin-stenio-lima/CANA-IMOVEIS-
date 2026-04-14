@@ -1,0 +1,119 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+interface PortalLead {
+  portal: string;
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  property_id: string;
+}
+
+Deno.serve(async (req) => {
+  const url = new URL(req.url)
+  const company_id = url.searchParams.get('company_id')
+
+  if (!company_id) {
+    return new Response(JSON.stringify({ error: 'Missing company_id' }), { status: 400 })
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    const payload = await req.json()
+    console.log(`Received lead for company ${company_id}:`, payload)
+
+    // Basic Parsing Logic (To be expanded based on specific portal payloads)
+    let leadData: PortalLead = {
+      portal: 'unknown',
+      name: '',
+      email: '',
+      phone: '',
+      message: '',
+      property_id: ''
+    }
+
+    // Example ZAP / VivaReal Payload detection
+    if (payload.lead_origin === 'ZAP' || payload.portal === 'ZAP') {
+      leadData = {
+        portal: 'zap',
+        name: payload.client_name || payload.name,
+        email: payload.client_email || payload.email,
+        phone: payload.client_phone || payload.phone,
+        message: payload.message,
+        property_id: payload.property_id
+      }
+    } else if (payload.portal === 'vivareal') {
+      leadData = {
+        portal: 'vivareal',
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        message: payload.message,
+        property_id: payload.property_id
+      }
+    } else {
+      // Generic fallback
+      leadData = {
+        portal: payload.portal || 'generic',
+        name: payload.name || payload.client?.name,
+        email: payload.email || payload.client?.email,
+        phone: payload.phone || payload.client?.phone,
+        message: payload.message || payload.comments,
+        property_id: payload.property_id || payload.listing_id
+      }
+    }
+
+    // 1. Insert into leads table
+    const { data: leadRecord, error: leadError } = await supabase
+      .from('leads')
+      .insert({
+        company_id,
+        portal_source: leadData.portal,
+        name: leadData.name,
+        email: leadData.email,
+        phone: leadData.phone,
+        message: leadData.message,
+        property_id: leadData.property_id,
+        raw_payload: payload
+      })
+      .select()
+      .single()
+
+    if (leadError) throw leadError
+
+    // 2. Trigger Roleta (Lead Distribution)
+    const { data: broker_id, error: roletaError } = await supabase.rpc('distribute_lead', {
+      company_id_input: company_id
+    })
+
+    if (broker_id) {
+      await supabase.from('leads').update({ assigned_to: broker_id }).eq('id', leadRecord.id)
+      
+      // 3. Optional: Auto-create Contact from Lead
+      // (Depending on business rules, we might wait for the broker to claim or do it now)
+      await supabase.from('contacts').insert({
+        company_id,
+        name: leadData.name,
+        email: leadData.email,
+        phone: leadData.phone,
+        assigned_to: broker_id,
+        status: 'new',
+        custom_fields: {
+          lead_id: leadRecord.id,
+          portal: leadData.portal,
+          property_id: leadData.property_id
+        }
+      })
+    }
+
+    return new Response(JSON.stringify({ success: true, lead_id: leadRecord.id }), { status: 200 })
+
+  } catch (error) {
+    console.error('Error processing portal lead:', error)
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+  }
+})

@@ -7,14 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircle2, AlertCircle, Bot, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { TeamManager } from "@/components/settings/TeamManager";
+import { AiSettings } from "@/components/settings/AiSettings";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
+  const { profile } = useAuth();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'open' | 'close' | 'connecting' | 'unknown'>('unknown');
   const [isLoading, setIsLoading] = useState(false);
@@ -81,6 +84,9 @@ export default function Settings() {
           <TabsTrigger value="team" className="flex items-center gap-2"><Users className="h-4 w-4" /> Minha Equipe</TabsTrigger>
 
           <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notificações</TabsTrigger>
+          {(profile?.id === profile?.company_id || profile?.job_title?.toLowerCase().includes('admin') || profile?.job_title?.toLowerCase().includes('diretor')) && (
+            <TabsTrigger value="ai" className="flex items-center gap-2 text-indigo-600 font-bold"><Bot className="h-4 w-4" /> Inteligência Artificial</TabsTrigger>
+          )}
           <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
         </TabsList>
 
@@ -143,6 +149,21 @@ export default function Settings() {
                 </div>
               </div>
               <Button>Salvar Alterações</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <Card className="border-indigo-100 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-indigo-600" />
+                Inteligência Artificial
+              </CardTitle>
+              <CardDescription>Configure o motor de IA para automação e análise de leads.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AiSettings />
             </CardContent>
           </Card>
         </TabsContent>

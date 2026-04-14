@@ -14,8 +14,17 @@ import {
   MessageSquare,
   User,
   Phone,
-  Home
+  Home,
+  Bot,
+  Loader2,
+  Sparkles,
+  AlertCircle,
+  Clock,
+  Handshake
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatDistanceToNow, parseISO, differenceInHours } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -31,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useQueryClient } from "@tanstack/react-query";
 
 type PipelineStage = Tables<"pipeline_stages">;
 
@@ -57,6 +67,8 @@ export function KanbanCard({
   onMarkAsLost,
   onDelete,
 }: KanbanCardProps) {
+  const queryClient = useQueryClient();
+  const { session, profile } = useAuth();
   // Safety check: Ensure deal exists for hooks, but don't return yet
   const safeDealId = deal?.id || 'missing-deal';
 
@@ -72,8 +84,40 @@ export function KanbanCard({
 
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [localAiStatus, setLocalAiStatus] = useState<string | null>(initialContact?.ai_status || null);
+  const [bolsaoStages, setBolsaoStages] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+
+  // Load Bolsao Config
+  useEffect(() => {
+    const loadConfig = async () => {
+      const { data } = await (supabase.from('companies').select('settings').limit(1).single() as any);
+      if ((data?.settings as any)?.bolsao_stages) {
+        setBolsaoStages((data.settings as any).bolsao_stages);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  // "Live" Logic (Regra das 2 horas)
+  const getHoursWaiting = () => {
+    if (!initialContact) return 0;
+    const referenceDate = deal.updated_at || initialContact?.last_message_at || initialContact?.created_at || deal.created_at;
+    if (!referenceDate) return 0;
+    try {
+      return differenceInHours(new Date(), parseISO(referenceDate));
+    } catch (e) { return 0; }
+  };
+
+  const hoursWaiting = getHoursWaiting();
+  const isWaitingTooLong = hoursWaiting >= 2;
+  const isBolsaoStage = bolsaoStages[currentStage.pipeline_id] === currentStage.id;
+  const isBolsaoActive = isBolsaoStage && isWaitingTooLong;
+  const isChatStage = currentStage.name.toLowerCase().trim() === "em conversa";
+
+  // Sentiment for AI button
+  const displaySentiment = initialContact?.ai_sentiment;
 
   // Sync local state with prop changes
   useEffect(() => {
@@ -130,7 +174,7 @@ export function KanbanCard({
     try {
       const { error } = await supabase
         .from('contacts')
-        .update({ ai_status: newStatus })
+        .update({ ai_status: newStatus } as any)
         .eq('id', deal.contact_id);
 
       if (error) throw error;
@@ -153,33 +197,56 @@ export function KanbanCard({
     if (!deal.contact_id) return;
 
     setIsAiLoading(true);
-    const oldStatus = localAiStatus;
-
-    // Logic:
-    // If Active/ChatOnly -> Paused (Off)
-    // If Scheduled -> Chat Only (Follow-up OFF, Mutual Exclusivity)
-    // If Paused -> Chat Only (Follow-up OFF)
-    let newStatus = 'chat_only';
-    if (oldStatus === 'chat_only' || oldStatus === 'active') newStatus = 'paused';
-
-    // Optimistic Update
-    setLocalAiStatus(newStatus);
 
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ ai_status: newStatus })
-        .eq('id', deal.contact_id);
+      toast.info(`Iniciando análise de IA para ${contact?.name || 'este lead'}...`);
+
+      const { data, error } = await supabase.functions.invoke('ai-analyzer', {
+        body: { contactId: deal.contact_id }
+      });
 
       if (error) throw error;
-      if (newStatus === 'chat_only') toast.success('IA Ativada (Chat apenas)');
-      else toast.success('IA Pausada');
-    } catch (err) {
-      // Revert on error
-      setLocalAiStatus(oldStatus);
-      toast.error("Erro ao alterar status da IA");
+
+      toast.success('Análise concluída!');
+
+      // We could trigger a refetch here if needed, but for now we rely on the parent
+      // or the user manually refreshing. However, since the Card is part of a list, 
+      // we usually want to update local state if possible.
+      if (data?.analysis?.sentiment) {
+        // Note: In a real app, you'd probably use a global state or refetch the Kanban data
+        // But here we show immediate success feedback.
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Erro: ${err.message || "A análise falhou. Verifique sua chave API."}`);
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+
+  const handleClaim = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!initialContact || !session?.user?.id) return;
+
+    setIsClaiming(true);
+    try {
+      // Call the trusted database function to bypass any Row Level Security
+      const { error } = await supabase.rpc('claim_bolsao_lead', {
+        p_deal_id: deal.id,
+        p_contact_id: initialContact.id
+      });
+
+      if (error) throw error;
+
+      toast.success("Lead assumido com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro ao assumir lead: " + err.message);
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -204,7 +271,11 @@ export function KanbanCard({
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none">
       <Card
-        className="group relative hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing border-l-4 border-l-transparent hover:border-l-primary"
+        className={`group relative hover:shadow-md transition-all duration-300 cursor-grab active:cursor-grabbing border-l-4 
+          ${isBolsaoActive
+            ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] bg-red-50/10'
+            : 'border-l-transparent hover:border-l-primary'
+          }`}
         onClick={onViewDetails}
       >
         <CardContent className="p-3 space-y-3">
@@ -220,7 +291,9 @@ export function KanbanCard({
             {/* Owner Name (Clear & Discrete) */}
             <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground" title="Responsável pelo Lead">
               <User className="w-3 h-3 text-muted-foreground/70" />
-              <span>Resp: <span className="font-medium text-foreground/80 lowercase capitalize">{deal.profiles?.full_name?.split(' ')[0] || (deal.assigned_to ? 'Proprietário' : 'Sem Dono')}</span></span>
+              <span>Resp: <span className="font-medium text-foreground/80 lowercase capitalize">
+                {isBolsaoActive ? 'Sem Dono (Bolsão)' : (deal.profiles?.full_name?.split(' ')[0] || (deal.assigned_to ? 'Proprietário' : 'Sem Dono'))}
+              </span></span>
             </div>
 
             {/* 2. Source */}
@@ -284,29 +357,52 @@ export function KanbanCard({
           {/* CONTROLS ROW */}
           <div className="pt-2 mt-1 border-t border-border/50 flex items-center justify-between gap-1">
 
-            {/* AI Control */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-start ${(localAiStatus === 'active' || localAiStatus === 'chat_only') ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300' : 'text-muted-foreground hover:bg-muted'}`}
-              onClick={handleToggleAI}
-              disabled={isAiLoading}
-              title={(localAiStatus === 'active' || localAiStatus === 'chat_only') ? 'Desativar IA' : 'Ativar IA'}
-            >
-              <BrainCircuit className={`w-3 h-3 ${isAiLoading ? 'animate-pulse' : ''}`} />
-              <span className="truncate">{(localAiStatus === 'active' || localAiStatus === 'chat_only') ? 'IA On' : 'IA Off'}</span>
-            </Button>
+            {/* BOLSAO OR AI BUTTON */}
+            {isBolsaoActive ? (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-6 px-1.5 gap-1 text-[10px] flex-1 justify-center bg-red-600 hover:bg-red-700 text-white font-black animate-pulse"
+                onClick={handleClaim}
+                disabled={isClaiming}
+              >
+                {isClaiming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Handshake className="w-3 h-3" />}
+                BOLSÃO 🤝 ASSUMIR
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-start ${displaySentiment ? 'bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100' : 'text-muted-foreground hover:bg-muted'}`}
+                onClick={handleToggleAI}
+                disabled={isAiLoading}
+                title="Analisar Lead com IA"
+              >
+                {isAiLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
+                ) : (
+                  <>
+                    <Bot className="w-3 h-3 text-indigo-400 shrink-0" />
+                    <span className="truncate font-bold text-[10px]">
+                      {isAiLoading ? '...' : (displaySentiment === 'hot' ? 'Quente' :
+                        displaySentiment === 'warm' ? 'Morno' :
+                          displaySentiment === 'cold' ? 'Frio' : 'Analise')}
+                    </span>
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Chat Button */}
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-1.5 gap-1 text-[10px] flex-1 justify-center text-muted-foreground hover:text-primary hover:bg-muted"
+              className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-center hover:bg-muted ${isWaitingTooLong && isChatStage ? 'text-red-600 font-bold animate-pulse ring-1 ring-red-100' : 'text-muted-foreground opacity-60'}`}
               onClick={handleChat}
               title="Abrir Conversa"
             >
-              <MessageSquare className="w-3 h-3" />
-              Chat
+              <MessageSquare className={`w-3 h-3 ${(isWaitingTooLong && isChatStage) ? 'animate-bounce fill-red-600/20' : ''}`} />
+              Chat {isChatStage && hoursWaiting > 0 ? `${hoursWaiting}h` : ''}
             </Button>
 
             {/* Follow-up Control */}

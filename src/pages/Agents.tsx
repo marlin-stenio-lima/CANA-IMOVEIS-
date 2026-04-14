@@ -7,16 +7,20 @@ import {
     AlertTriangle,
     Sparkles,
     Calendar,
-    Search,
     Clock,
-    Info
+    Info,
+    LayoutDashboard,
+    Handshake,
+    Trash2
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import { supabase } from "@/integrations/supabase/client";
 
 // Mock Stats Data
@@ -27,34 +31,18 @@ const STATS = [
     { label: "Msg. Geradas", value: "1.2k", icon: Zap, color: "text-purple-500", trend: "+120" },
 ];
 
-const AGENTS = [
-    {
-        id: 1,
-        name: "Agente de Triagem",
-        description: "Responde dúvidas básicas e transfere para o corretor assumir o atendimento.",
-        icon: Search,
-        color: "bg-blue-100 text-blue-600",
-        features: ["Respostas Rápidas", "Coleta de Dados", "Transferência para Corretor"]
-    },
-    {
-        id: 2,
-        name: "Agente de Agendamento",
-        description: "Responde dúvidas e foca totalmente em agendar uma visita com o lead.",
-        icon: Calendar,
-        color: "bg-green-100 text-green-600",
-        features: ["Respostas Rápidas", "Sugestão de Horários", "Conversão em Visita"]
-    }
-];
-
 export default function Agents() {
     const { profile } = useAuth();
-    const [activeAgentId, setActiveAgentId] = useState<number | null>(2);
-    const [isMasterActive, setIsMasterActive] = useState(true);
+    const { mode } = useCrmMode();
     const [isFollowUpActive, setIsFollowUpActive] = useState(true);
     const [isConfirmationActive, setIsConfirmationActive] = useState(false);
     const [isReminderActive, setIsReminderActive] = useState(false);
+    const [bolsaoStages, setBolsaoStages] = useState<Record<string, string>>({});
+    const [pipelines, setPipelines] = useState<any[]>([]);
+    const [stages, setStages] = useState<any[]>([]);
     const [instanceId, setInstanceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (!profile?.company_id) return;
@@ -62,12 +50,12 @@ export default function Agents() {
         const fetchSettings = async () => {
             try {
                 setLoading(true);
-                const { data, error } = await supabase
-                    .from('instances')
+                const { data, error } = await (supabase
+                    .from('instances' as any)
                     .select('id, settings')
-                    .eq('company_id', profile.company_id)
+                    .eq('company_id' as any, profile.company_id)
                     .limit(1)
-                    .maybeSingle();
+                    .maybeSingle() as any);
 
                 if (error) {
                     console.error("Error fetching instance:", error);
@@ -76,16 +64,27 @@ export default function Agents() {
                 }
 
                 if (data) {
-                    setInstanceId(data.id);
-                    const settings = data.settings as any || {};
+                    setInstanceId((data as any).id);
+                    const settings = (data as any).settings as any || {};
 
-                    if (settings.active_agent_id) setActiveAgentId(settings.active_agent_id);
-                    if (settings.is_global_ai_active !== undefined) setIsMasterActive(settings.is_global_ai_active);
-                    if (settings.is_global_ai_active !== undefined) setIsMasterActive(settings.is_global_ai_active);
                     if (settings.is_followup_active !== undefined) setIsFollowUpActive(settings.is_followup_active);
                     if (settings.is_appointment_confirmation_active !== undefined) setIsConfirmationActive(settings.is_appointment_confirmation_active);
                     if (settings.is_appointment_reminder_active !== undefined) setIsReminderActive(settings.is_appointment_reminder_active);
                 }
+
+                // Fetch Pipeline Config from Company
+                const { data: companyData } = await (supabase.from('companies').select('settings').limit(1).single() as any);
+                if (companyData?.settings && typeof companyData.settings === 'object') {
+                    setBolsaoStages((companyData.settings as any).bolsao_stages || {});
+                }
+
+                // Fetch Pipelines and Stages
+                const { data: pipes } = await supabase.from('pipelines').select('id, name, business_type').order('position');
+                const { data: stgs } = await supabase.from('pipeline_stages').select('id, name, pipeline_id').order('position');
+
+                if (pipes) setPipelines(pipes);
+                if (stgs) setStages(stgs);
+
             } finally {
                 setLoading(false);
             }
@@ -97,43 +96,21 @@ export default function Agents() {
     const saveSettings = async (updates: any) => {
         if (!instanceId) return;
 
-        // Optimistic Update
-        const { error } = await supabase
-            .from('instances')
+        const { error } = await (supabase
+            .from('instances' as any)
             .update({
                 settings: {
-                    active_agent_id: updates.active_agent_id ?? activeAgentId,
-                    is_global_ai_active: updates.is_global_ai_active ?? isMasterActive,
-                    active_agent_id: updates.active_agent_id ?? activeAgentId,
-                    is_global_ai_active: updates.is_global_ai_active ?? isMasterActive,
                     is_followup_active: updates.is_followup_active ?? isFollowUpActive,
                     is_appointment_confirmation_active: updates.is_appointment_confirmation_active ?? isConfirmationActive,
                     is_appointment_reminder_active: updates.is_appointment_reminder_active ?? isReminderActive
                 }
             })
-            .eq('id', instanceId);
+            .eq('id' as any, instanceId) as any);
 
         if (error) {
             toast.error("Falha ao salvar configuração.");
             console.error(error);
         }
-    };
-
-    const handleActivateAgent = (id: number) => {
-        if (activeAgentId === id) return;
-        setActiveAgentId(id);
-        saveSettings({ active_agent_id: id });
-        toast.success(`Agente atualizado!`, {
-            description: `${AGENTS.find(a => a.id === id)?.name} agora está ativo.`
-        });
-    };
-
-    const toggleMasterSwitch = (checked: boolean) => {
-        setIsMasterActive(checked);
-        saveSettings({ is_global_ai_active: checked });
-        toast(checked ? "IA LIGADA" : "IA DESLIGADA", {
-            description: checked ? "O sistema voltará a responder automaticamente." : "O sistema está pausado."
-        });
     };
 
     const toggleFollowUp = (checked: boolean) => {
@@ -153,6 +130,27 @@ export default function Agents() {
         saveSettings({ is_appointment_reminder_active: checked });
         toast(checked ? "Lembretes Automáticos ATIVADOS" : "Lembretes Automáticos DESATIVADOS");
     };
+
+    const saveBolsao = async (pipelineId: string, stageId: string) => {
+        const newBolsao = { ...bolsaoStages, [pipelineId]: stageId };
+        setBolsaoStages(newBolsao);
+        setIsSaving(true);
+
+        try {
+            const { data: currentCompany } = await (supabase.from('companies').select('id, settings').limit(1).single() as any);
+            if (currentCompany) {
+                const settings = { ...((currentCompany as any).settings || {}), bolsao_stages: newBolsao };
+                await supabase.from('companies').update({ settings } as any).eq('id', currentCompany.id);
+                toast.success("Configuração de Bolsão salva!");
+            }
+        } catch (e) {
+            toast.error("Erro ao salvar bolsão.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const filteredPipelines = pipelines.filter(p => !mode || p.business_type === mode);
 
     if (loading) {
         return (
@@ -199,88 +197,13 @@ export default function Agents() {
 
             <div className="grid lg:grid-cols-1 gap-8">
 
-                {/* 1. Master Controls Section (Top of Page) */}
-                <section className="space-y-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-yellow-500" />
-                        1. Ativação Geral (IA de Atendimento)
-                    </h2>
-                    <Card className={`border-l-4 ${isMasterActive ? "border-l-green-500" : "border-l-red-500"}`}>
-                        <div className="flex items-center justify-between p-6">
-                            <div className="space-y-1">
-                                <h3 className="font-medium text-lg">Status da Inteligência Artificial</h3>
-                                <p className="text-sm text-muted-foreground">
-                                    Quando desativado, a IA é totalmente pausada: não responde novos contatos e interrompe todos os follow-ups automáticos.
-                                </p>
-                                <div className="mt-2">
-                                    <Badge variant={isMasterActive ? "default" : "destructive"}>
-                                        {isMasterActive ? "IA LIGADA" : "IA DESLIGADA"}
-                                    </Badge>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={isMasterActive}
-                                onCheckedChange={toggleMasterSwitch}
-                                className="data-[state=checked]:bg-green-500 scale-125"
-                            />
-                        </div>
-                    </Card>
-                </section>
-
                 <div className="grid lg:grid-cols-1 gap-8">
 
-                    {/* 2. Agent Selection */}
-                    <section className="space-y-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2">
-                            <Sparkles className="h-5 w-5 text-purple-500" />
-                            2. Escolha o Perfil do Agente
-                        </h2>
-                        <div className="grid gap-6 md:grid-cols-2">
-                            {AGENTS.map((agent) => {
-                                const isSelected = activeAgentId === agent.id;
-                                return (
-                                    <Card
-                                        key={agent.id}
-                                        className={`relative transition-all duration-300 cursor-pointer overflow-hidden border-2
-                    ${isSelected ? "border-primary shadow-lg scale-[1.01]" : "border-transparent hover:border-muted-foreground/20 text-muted-foreground opacity-80 hover:opacity-100"}
-                  `}
-                                        onClick={() => handleActivateAgent(agent.id)}
-                                    >
-                                        {isSelected && (
-                                            <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-bl-lg">
-                                                ATIVO
-                                            </div>
-                                        )}
-                                        <CardHeader>
-                                            <div className={`h-12 w-12 rounded-lg flex items-center justify-center mb-4 ${agent.color}`}>
-                                                <agent.icon className="h-6 w-6" />
-                                            </div>
-                                            <CardTitle className="text-lg">{agent.name}</CardTitle>
-                                            <CardDescription className="h-10 mt-2">
-                                                {agent.description}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <ul className="space-y-2">
-                                                {agent.features.map((feature, idx) => (
-                                                    <li key={idx} className="text-xs flex items-center gap-2 text-muted-foreground">
-                                                        <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
-                                                        {feature}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    {/* 3. Follow-up Configuration */}
+                    {/* 1. Follow-up Configuration */}
                     <section className="space-y-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2">
                             <Clock className="h-5 w-5 text-blue-500" />
-                            3. Follow-up (Acompanhamento)
+                            1. Follow-up (Acompanhamento)
                         </h2>
 
                         <Card className={`border-l-4 ${isFollowUpActive ? "border-l-green-500" : "border-l-red-500"}`}>
@@ -336,11 +259,11 @@ export default function Agents() {
                         </Card>
                     </section>
 
-                    {/* 4. Appointment Automation */}
+                    {/* 2. Appointment Automation */}
                     <section className="space-y-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2">
                             <Calendar className="h-5 w-5 text-green-600" />
-                            4. Automações de Agenda
+                            2. Automações de Agenda
                         </h2>
 
                         <div className="grid md:grid-cols-2 gap-6">
@@ -390,6 +313,83 @@ export default function Agents() {
                                 </CardContent>
                             </Card>
                         </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold flex items-center gap-2">
+                                <Handshake className="h-5 w-5 text-blue-600" />
+                                3. Canais de Bolsão (Repescagem)
+                            </h2>
+                            <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 font-bold gap-2">
+                                <Zap className="w-4 h-4" />
+                                Adicionar Automação
+                            </Button>
+                        </div>
+
+                        <Card className="border-blue-100">
+                            <CardHeader className="bg-blue-50/30 rounded-t-xl border-b border-blue-50">
+                                <CardTitle className="text-base text-blue-900 font-bold">
+                                    Configurar Etapa de Bolsão ({mode === 'barcos' ? 'Barcos' : 'Imóveis'})
+                                </CardTitle>
+                                <CardDescription className="text-blue-700/70">
+                                    Defina qual coluna funcionará como Bolsão. Leads nestas colunas que ficarem mais de 2 horas sem resposta poderão ser pescados por qualquer corretor.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4 p-6">
+                                {filteredPipelines.length === 0 && (
+                                    <div className="text-center py-8 text-slate-400 text-sm italic">
+                                        Nenhum pipeline encontrado para este modo.
+                                    </div>
+                                )}
+                                {filteredPipelines.map(pipe => (
+                                    <div key={pipe.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all group">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <LayoutDashboard className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-800">{pipe.name}</p>
+                                                <p className="text-xs text-slate-500">Pipeline de Vendas</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="min-w-[200px]">
+                                                <Select
+                                                    value={bolsaoStages[pipe.id] || "none"}
+                                                    onValueChange={(val) => saveBolsao(pipe.id, val)}
+                                                >
+                                                    <SelectTrigger className={`bg-white font-medium ${bolsaoStages[pipe.id] && bolsaoStages[pipe.id] !== 'none' ? 'border-blue-600 text-blue-600 ring-blue-50' : ''}`}>
+                                                        <SelectValue placeholder="Selecione um estágio" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none" className="text-slate-400 italic">Desativado</SelectItem>
+                                                        {stages.filter(s => s.pipeline_id === pipe.id).map(stage => (
+                                                            <SelectItem key={stage.id} value={stage.id}>
+                                                                {stage.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className={`transition-colors ${(!bolsaoStages[pipe.id] || bolsaoStages[pipe.id] === 'none')
+                                                    ? 'text-slate-200 cursor-not-allowed'
+                                                    : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                                                onClick={() => saveBolsao(pipe.id, "none")}
+                                                disabled={!bolsaoStages[pipe.id] || bolsaoStages[pipe.id] === 'none'}
+                                                title="Remover Automação"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
                     </section>
 
                 </div>

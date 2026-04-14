@@ -13,13 +13,14 @@ import {
   UserCheck,
   Smartphone,
   Bot,
-  Target
+  Target,
+  Ship
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { useCrmMode } from "@/contexts/CrmModeContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Separator } from "@/components/ui/separator";
 
 import {
@@ -36,25 +37,19 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Contatos", url: "/contacts", icon: Users },
-  { title: "Kanban", url: "/kanban", icon: Kanban },
-  { title: "Conversas", url: "/conversations", icon: MessageCircle },
-  { title: "Tarefas", url: "/tasks", icon: CheckSquare },
-  { title: "Agendamentos", url: "/schedules", icon: Calendar },
-  { title: "Central IA", url: "/agents", icon: Bot },
-  { title: "Roletas (Distribuição)", url: "/roleta", icon: Target },
-  { title: "WhatsApp", url: "/whatsapp", icon: Smartphone },
-];
-
-const portalItems = [
-  { title: "Imóveis", url: "/properties", icon: Building2 },
-  { title: "Leads Portal", url: "/leads", icon: UserCheck },
-  { title: "Config. Site", url: "/site-settings", icon: Globe },
+  { id: 'dashboard', title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { id: 'contatos', title: "Clientes", url: "/contacts", icon: Users },
+  { id: 'kanban', title: "Kanban", url: "/kanban", icon: Kanban },
+  { id: 'conversas', title: "Conversas", url: "/conversations", icon: MessageCircle },
+  { id: 'tarefas', title: "Tarefas", url: "/tasks", icon: CheckSquare },
+  { id: 'agendamentos', title: "Agendamentos", url: "/schedules", icon: Calendar },
+  { id: 'central_ia', title: "Central IA", url: "/agents", icon: Bot },
+  { id: 'roletas', title: "Roletas (Distribuição)", url: "/roleta", icon: Target },
+  { id: 'whatsapp', title: "WhatsApp", url: "/whatsapp", icon: Smartphone },
 ];
 
 const settingsItems = [
-  { title: "Configurações", url: "/settings", icon: Settings },
+  { id: 'configuracoes', title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -64,6 +59,20 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const currentPath = location.pathname;
   const { profile, signOut } = useAuth();
+  const { mode, setMode } = useCrmMode();
+  const { canAccessImoveis, canAccessBarcos, canAccessMenu } = usePermissions();
+
+  const currentPortalItems = mode === 'barcos'
+    ? [
+        { id: 'embarcacoes', title: 'Embarcações', url: '/barcos', icon: Ship },
+        { id: 'config_site', title: "Config. Site", url: "/site-settings", icon: Globe },
+      ]
+    : [
+        { id: 'imoveis', title: 'Imóveis', url: '/properties', icon: Building2 },
+        { id: 'leads', title: "Leads Portal", url: "/leads", icon: UserCheck },
+        { id: 'config_site', title: "Config. Site", url: "/site-settings", icon: Globe },
+        { id: 'integracoes', title: "Integrações", url: "/integrations", icon: Zap },
+      ];
 
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
 
@@ -72,56 +81,37 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return "U";
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  };
-
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent className="bg-sidebar">
-        {/* Brand Header */}
         <div className={`p-4 ${collapsed ? "px-2" : ""}`}>
-          <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
-            {collapsed ? (
-              <div className="h-9 w-9 rounded-lg flex items-center justify-center">
-                <img src="/pigg-icon.png" alt="Pigg" className="h-8 w-8 object-contain" />
-              </div>
-            ) : (
-              <div className="flex items-center w-full justify-center">
-                <img src="/pigg-logo.png" alt="Pigg" className="w-full h-auto object-contain max-w-[200px]" />
-              </div>
-            )}
-
-            {!collapsed && (
-              <div className="flex flex-col sr-only"> {/* Hide text visually if logo contains text, but keep for screen readers if needed. Or just remove if logo replaces it completely. Logo provided has text 'pigg'. So I should probably hide the text 'CRM Pro'. */}
-                <span className="font-bold text-lg text-sidebar-foreground">Pigg</span>
-                <span className="text-xs text-muted-foreground">Assistente Imobiliário</span>
-              </div>
-            )}
+          <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""}`}>
+            <div className={`flex items-center justify-center shrink-0`}>
+              <img src="/canaa-logo-transparent.png" alt="Canaã imóveis" className={collapsed ? "h-6 w-auto object-contain" : "h-10 w-auto object-contain py-1"} />
+            </div>
           </div>
         </div>
 
         <Separator className="mx-4 w-auto" />
 
-        {/* User Profile Section */}
-        {profile && !collapsed && (
-          <div className="px-4 py-3">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/50 border border-sidebar-border">
-              <Avatar className="h-10 w-10 ring-2 ring-primary/20">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                  {getInitials(profile.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-sidebar-foreground">
-                  {profile.full_name || "Usuário"}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {profile.job_title || "Colaborador"}
-                </p>
-              </div>
+        {/* CRM Mode Toggle */}
+        {!collapsed && canAccessImoveis && canAccessBarcos && (
+          <div className="px-4 py-2">
+            <div className="flex bg-sidebar-accent/50 rounded-lg p-1 border border-sidebar-border">
+              <button
+                onClick={() => setMode('imoveis')}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${mode === 'imoveis' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Building2 className="h-4 w-4 shrink-0" />
+                Imóveis
+              </button>
+              <button
+                onClick={() => setMode('barcos')}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${mode === 'barcos' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Ship className="h-4 w-4 shrink-0" />
+                Barcos
+              </button>
             </div>
           </div>
         )}
@@ -132,7 +122,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="px-2">
-              {menuItems.map((item) => (
+              {menuItems.filter(item => canAccessMenu(item.id)).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -155,15 +145,16 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Separator className="mx-4 w-auto my-2" />
 
+
+        {currentPortalItems.filter(i => canAccessMenu(i.id)).length > 0 && (
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4">
-            Portal Imobiliário
+            {mode === 'barcos' ? 'Site' : 'Portal Imobiliário'}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="px-2">
-              {portalItems.map((item) => (
+              {currentPortalItems.filter(item => canAccessMenu(item.id)).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -185,16 +176,18 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
 
         <Separator className="mx-4 w-auto my-2" />
 
+        {settingsItems.filter(i => canAccessMenu(i.id)).length > 0 && (
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4">
             Sistema
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="px-2">
-              {settingsItems.map((item) => (
+              {settingsItems.filter(item => canAccessMenu(item.id)).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -216,6 +209,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t bg-sidebar p-2">
@@ -233,7 +227,7 @@ export function AppSidebar() {
         </SidebarMenu>
         {!collapsed && (
           <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-            Pigg v1.0.0
+            Canaã imóveis v1.0.0
           </div>
         )}
       </SidebarFooter>

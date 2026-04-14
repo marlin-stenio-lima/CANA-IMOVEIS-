@@ -15,7 +15,9 @@ Deno.serve(async (req) => {
         const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')!
 
         const body = await req.json()
-        const { action, instanceName, text, number, mediaUrl, mediaType, email, userId } = body
+        const { action, instanceName, text, number } = body
+        const mediaUrlRoot = body.mediaUrl;
+        const mediaTypeRoot = body.mediaType;
 
         if (!instanceName && action !== 'debug-db' && action !== 'setup-storage') {
             throw new Error('Instance Name required')
@@ -98,9 +100,71 @@ Deno.serve(async (req) => {
                 method: 'DELETE',
                 headers
             })
+            const data = await res.json().catch(() => ({}));
+            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+
+        // --- NEW DIAGNOSTIC ACTIONS ---
+        if (action === 'list-instances') {
+            const res = await fetch(`${evolutionUrl}/instance/fetchInstances`, { headers })
             const data = await res.json()
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
+
+        if (action === 'sync-webhook') {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+            const webhookUrl = `${supabaseUrl}/functions/v1/webhook-whatsapp`;
+            
+            console.log(`Syncing webhook for ${instanceName} to ${webhookUrl}`);
+            
+            const res = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    enabled: true,
+                    url: webhookUrl,
+                    byEvents: false,
+                    events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "SEND_MESSAGE"]
+                })
+            })
+            const data = await res.json()
+            return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+
+        if (action === 'debug-db') {
+            const table = body.table || 'webhook_logs';
+            const limit = body.limit || 10;
+            const filter = body.filter; // Optional filter string
+
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+            const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
+
+            const filterColumn = body.filterColumn;
+
+            let query = adminSupabase
+                .from(table)
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (filter && filterColumn) {
+                query = query.ilike(filterColumn, `%${filter}%`);
+            } else if (filter) {
+                // Fallback for legacy calls (assuming webhook_logs)
+                query = query.ilike('payload->>event', `%${filter}%`);
+            }
+
+            const { data, error } = await query;
+
+            if (error) {
+                return new Response(JSON.stringify({ error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+            }
+
+            return new Response(JSON.stringify({ data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+
+        throw new Error(`Invalid action: ${action}`)
 
         if (action === 'send-text') {
             const { text } = body;
@@ -220,25 +284,30 @@ Deno.serve(async (req) => {
             const adminSupabase = createClient(supabaseUrl!, supabaseKey!)
 
             // 1. Create Bucket
-            const { data: bucket, error: bucketError } = await adminSupabase
-                .storage
-                .createBucket('chat-media', {
-                    public: true,
-                    fileSizeLimit: 20971520, // 20MB
-                    allowedMimeTypes: ['image/*', 'audio/*', 'video/*', 'application/pdf']
-                });
-
-            let message = 'Bucket chat-media checked/created';
-
-            if (bucketError) {
-                if (bucketError.message.includes('already exists')) {
-                    message = 'Bucket chat-media already exists';
-                } else {
-                    return new Response(JSON.stringify({ error: bucketError }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+            try {
+                const { error: bucketError } = await adminSupabase
+                    .storage
+                    .createBucket('chat-media', {
+                        public: true,
+                        fileSizeLimit: 104857600, // 100MB
+                        allowedMimeTypes: ['image/*', 'audio/*', 'video/*', 'application/pdf']
+                    });
+                
+                if (bucketError && bucketError.message.includes('already exists')) {
+                    // Update if already exists
+                    await adminSupabase.storage.updateBucket('chat-media', {
+                        public: true,
+                        fileSizeLimit: 104857600,
+                        allowedMimeTypes: ['image/*', 'audio/*', 'video/*', 'application/pdf']
+                    });
                 }
+            } catch (err: any) {
+                console.log('Bucket setup note:', err.message);
             }
 
-            return new Response(JSON.stringify({ message, bucket }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+            let message = 'Bucket chat-media checked/created/updated';
+
+            return new Response(JSON.stringify({ message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
 
@@ -353,12 +422,18 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    mediatype: mediaType === 'document' ? 'document' : 'image',
+                    mediatype: (mediaType === 'video' || mediaType === 'audio' || mediaType === 'document' || mediaType === 'image') ? mediaType : 'image',
                     mimetype: mimetype || 'image/jpeg',
                     media: mediaPayload,
                     caption: caption || ""
                 })
             })
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Evolution Media Error:", res.status, errText);
+                throw new Error(`Evolution API Media Error (${res.status}): ${errText}`);
+            }
 
             const data = await res.json()
 
@@ -406,7 +481,7 @@ Deno.serve(async (req) => {
                                 contact_id: contactId,
                                 instance_id: instanceData.id,
                                 channel: 'whatsapp',
-                                last_message: mediaType === 'image' ? 'Imagem' : 'Arquivo',
+                                last_message: mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : mediaType === 'audio' ? 'Áudio' : 'Arquivo',
                                 last_message_at: new Date().toISOString(),
                                 unread_count: 0
                             }).select('id').single();
@@ -414,6 +489,22 @@ Deno.serve(async (req) => {
                         }
 
                         if (conversationId) {
+                            // --- ULTIMATE PERSISTENCE: Generate Signed URL for DB ---
+                            const sourceUrl = mediaUrl || mediaUrlRoot;
+                            let dbMediaUrl = sourceUrl;
+                            try {
+                                if (sourceUrl && sourceUrl.includes('/storage/v')) {
+                                    const pathParts = sourceUrl.split('/chat-media/');
+                                    if (pathParts.length > 1) {
+                                        const storagePath = decodeURIComponent(pathParts[1].split('?')[0]); 
+                                        const { data: signed } = await adminSupabase.storage
+                                            .from('chat-media')
+                                            .createSignedUrl(storagePath, 315360000); // 10 years
+                                        if (signed?.signedUrl) dbMediaUrl = signed.signedUrl;
+                                    }
+                                }
+                            } catch (e) { console.error("Signed URL Gen Error:", e); }
+
                             // 3. Insert Message
                             await adminSupabase.from('messages').upsert({
                                 wamid: wamid,
@@ -421,17 +512,18 @@ Deno.serve(async (req) => {
                                 instance_id: instanceData.id,
                                 contact_id: contactId,
                                 remote_jid: remoteJid,
-                                content: caption || (mediaType === 'image' ? 'Imagem' : 'Arquivo'),
-                                message_type: mediaType === 'document' ? 'document' : mediaType,
+                                content: caption || (mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : mediaType === 'audio' ? 'Áudio' : 'Arquivo'),
+                                message_type: mediaType === 'document' ? 'document' : (mediaType === 'video' || mediaType === 'image' || mediaType === 'audio') ? mediaType : 'text',
+                                mimetype: mimetype,
                                 direction: 'outbound',
                                 status: 'sent',
                                 sender_type: 'user',
-                                media_url: mediaUrl,
+                                media_url: dbMediaUrl,
                                 created_at: new Date().toISOString()
                             }, { onConflict: 'wamid' })
 
                             await adminSupabase.from('conversations').update({
-                                last_message: mediaType === 'image' ? 'Imagem' : 'Arquivo',
+                                last_message: mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : mediaType === 'audio' ? 'Áudio' : 'Arquivo',
                                 last_message_at: new Date().toISOString()
                             }).eq('id', conversationId)
                         }
@@ -444,22 +536,24 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'send-audio') {
-            // Payload: { instanceName, number, mediaUrl, mediaBase64 }
-            const { instanceName, number, mediaUrl, mediaBase64 } = body;
+            // Payload: { instanceName, number, mediaUrl, mediaBase64, mimetype }
+            const { instanceName, number, mediaUrl, mediaBase64, mimetype } = body;
             const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
             const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
 
             console.log(`Sending audio to ${number} via ${instanceName} (V1 API)...`);
 
             // V1 Logic for Audio: Prefer URL, fallback to Base64
-            let audioPayload = mediaUrl || mediaBase64;
+            // Prefer Base64 for audio as it's more reliable for instant delivery without external fetch
+            let audioPayload = mediaBase64 || mediaUrl;
 
             // Strip prefix only if using Base64
             if (!mediaUrl && audioPayload && audioPayload.startsWith('data:')) {
                 audioPayload = audioPayload.split(',')[1];
             }
 
-            const res = await fetch(`${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`, {
+            // Using sendMedia for audio is more robust across Evolution versions and supports URLs better
+            const res = await fetch(`${evolutionUrl}/message/sendMedia/${instanceName}`, {
                 method: 'POST',
                 headers: {
                     'apikey': evolutionKey!,
@@ -467,9 +561,20 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    audio: audioPayload // V1 expects 'audio' field (raw base64)
+                    mediatype: 'audio',
+                    mimetype: mimetype || 'audio/ogg',
+                    media: audioPayload,
+                    options: {
+                        ptt: true
+                    }
                 })
             })
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Evolution Audio Send Error:", res.status, errText);
+                throw new Error(`Evolution API Audio Error (${res.status}): ${errText}`);
+            }
 
             const data = await res.json()
 
@@ -525,6 +630,21 @@ Deno.serve(async (req) => {
                         }
 
                         if (conversationId) {
+                            // --- ULTIMATE PERSISTENCE: Generate Signed URL for DB ---
+                            let dbMediaUrl = mediaUrl;
+                            try {
+                                if (mediaUrl && mediaUrl.includes('/storage/v1/object/public/chat-media/')) {
+                                    const pathParts = mediaUrl.split('/chat-media/');
+                                    if (pathParts.length > 1) {
+                                        const storagePath = pathParts[1].split('?')[0]; 
+                                        const { data: signed } = await adminSupabase.storage
+                                            .from('chat-media')
+                                            .createSignedUrl(storagePath, 315360000); // 10 years
+                                        if (signed?.signedUrl) dbMediaUrl = signed.signedUrl;
+                                    }
+                                }
+                            } catch (e) { console.error("Signed URL Gen Error:", e); }
+
                             // 3. Insert Message
                             await adminSupabase.from('messages').upsert({
                                 wamid: wamid,
@@ -534,10 +654,11 @@ Deno.serve(async (req) => {
                                 remote_jid: remoteJid,
                                 content: 'Áudio',
                                 message_type: 'audio',
+                                mimetype: mimetype || 'audio/ogg',
                                 direction: 'outbound',
                                 status: 'sent',
                                 sender_type: 'user',
-                                media_url: mediaUrl,
+                                media_url: dbMediaUrl,
                                 created_at: new Date().toISOString()
                             }, { onConflict: 'wamid' })
 

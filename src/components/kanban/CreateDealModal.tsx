@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Tables } from "@/integrations/supabase/types";
 import { useTeam } from "@/hooks/useTeam";
 import { useProperties } from "@/hooks/useProperties";
-import { User, Phone, Mail, Building2, Wallet, Users, Target } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { PropertySelect } from "@/components/common/PropertySelect";
+import { User, Phone, Mail, Building2, Wallet, Users, Target } from "lucide-react";
+
 
 type PipelineStage = Tables<"pipeline_stages">;
 
@@ -336,20 +338,13 @@ export function CreateDealModal({
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="property">Imóvel de Interesse</Label>
-                <Select value={propertyId} onValueChange={setPropertyId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um imóvel (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">-- Nenhum --</SelectItem>
-                    {properties.map((prop) => (
-                      <SelectItem key={prop.id} value={prop.id}>
-                        {prop.title} - {prop.city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <PropertySelect 
+                  value={propertyId} 
+                  onValueChange={setPropertyId}
+                  placeholder="Selecione um imóvel (opcional)"
+                />
               </div>
+
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="description">Observações</Label>

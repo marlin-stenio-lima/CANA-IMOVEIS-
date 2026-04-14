@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, FileText, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TagInput } from "@/components/ui/tag-input";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 
 interface ImportContactsWizardProps {
     open: boolean;
@@ -45,6 +46,7 @@ export default function ImportContactsWizard({
 }: ImportContactsWizardProps) {
     const { createContact, contacts } = useContacts({});
     const { profile } = useAuth();
+    const { mode } = useCrmMode();
 
     // Deduce available tags
     const availableTags = Array.from(new Set(contacts?.flatMap(c => c.tags || []) || [])).sort();
@@ -192,6 +194,7 @@ export default function ImportContactsWizard({
                     source: source?.trim() || "Importação",
                     company_id: profile.company_id,
                     tags: tags.length > 0 ? tags : null,
+                    business_type: mode,
                 });
 
                 success++;

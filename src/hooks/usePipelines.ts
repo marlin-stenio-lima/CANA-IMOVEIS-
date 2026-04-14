@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 type Pipeline = Tables<"pipelines">;
@@ -10,35 +12,46 @@ type PipelineUpdate = TablesUpdate<"pipelines">;
 
 export function usePipelines() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const { mode } = useCrmMode();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
 
   const { data: pipelines = [], isLoading } = useQuery({
-    queryKey: ["pipelines"],
+    queryKey: ["pipelines", profile?.company_id, mode],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!profile?.company_id) return [];
+
+      let query = supabase
         .from("pipelines")
         .select("*")
+        .eq("company_id", profile.company_id)
         .order("position", { ascending: true });
+
+      if (mode) {
+        query = query.eq("business_type" as any, mode);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Pipeline[];
     },
+    enabled: !!profile?.company_id,
   });
 
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId) || pipelines.find(p => p.is_default) || pipelines[0];
 
   const createPipeline = useMutation({
-    mutationFn: async (pipeline: Omit<PipelineInsert, "company_id">) => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .single();
-
+    mutationFn: async (pipeline: Omit<PipelineInsert, "company_id" | "business_type">) => {
       if (!profile?.company_id) throw new Error("Company not found");
 
       const { data, error } = await supabase
         .from("pipelines")
-        .insert({ ...pipeline, company_id: profile.company_id })
+        .insert({ 
+          ...pipeline, 
+          company_id: profile.company_id,
+          business_type: mode as any
+        })
         .select()
         .single();
 
@@ -49,7 +62,7 @@ export function usePipelines() {
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
       toast.success("Pipeline criado com sucesso");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error("Erro ao criar pipeline: " + error.message);
     },
   });
@@ -70,7 +83,7 @@ export function usePipelines() {
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
       toast.success("Pipeline atualizado com sucesso");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error("Erro ao atualizar pipeline: " + error.message);
     },
   });
@@ -105,7 +118,7 @@ export function usePipelines() {
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
       toast.success("Pipeline excluído com sucesso");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error("Erro ao excluir pipeline: " + error.message);
     },
   });

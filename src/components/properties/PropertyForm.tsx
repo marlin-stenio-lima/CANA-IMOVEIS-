@@ -26,6 +26,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Property, PropertyFormData } from '@/hooks/useProperties';
+import { useCrmMode } from '@/contexts/CrmModeContext';
 import { ImagePlus, X, Loader2 } from 'lucide-react';
 
 const propertySchema = z.object({
@@ -48,6 +49,11 @@ const propertySchema = z.object({
   status: z.enum(['disponivel', 'vendido', 'alugado', 'reservado', 'inativo']).optional(),
   is_featured: z.boolean().optional(),
   is_published: z.boolean().optional(),
+  condo_fee: z.coerce.number().min(0).optional(),
+  iptu: z.coerce.number().min(0).optional(),
+  year_built: z.coerce.number().min(1800).max(2100).optional(),
+  internal_id: z.string().optional(),
+  portal_config: z.any().optional(),
 });
 
 interface PropertyFormProps {
@@ -72,6 +78,19 @@ const propertyTypeLabels = {
   fazenda: 'Fazenda',
 };
 
+const boatTypeLabels = {
+  apartamento: 'Lancha',
+  casa: 'Iate',
+  comercial: 'Veleiro',
+  terreno: 'Jet Ski',
+  rural: 'Catamarã',
+  cobertura: 'Bote',
+  kitnet: 'Pesca',
+  sala_comercial: 'Esportivo',
+  galpao: 'Offshore',
+  fazenda: 'Outros',
+};
+
 const transactionTypeLabels = {
   venda: 'Venda',
   aluguel: 'Aluguel',
@@ -87,21 +106,24 @@ const statusLabels = {
 };
 
 const availableFeatures = [
-  'Piscina',
-  'Churrasqueira',
-  'Academia',
-  'Salão de Festas',
-  'Playground',
-  'Portaria 24h',
-  'Elevador',
-  'Varanda',
-  'Ar Condicionado',
-  'Aquecimento',
-  'Lareira',
-  'Jardim',
-  'Quintal',
-  'Mobiliado',
-  'Semi-mobiliado',
+  'Piscina', 'Churrasqueira', 'Academia', 'Salão de Festas', 'Playground',
+  'Portaria 24h', 'Elevador', 'Varanda', 'Ar Condicionado', 'Aquecimento',
+  'Lareira', 'Jardim', 'Quintal', 'Mobiliado', 'Semi-mobiliado'
+];
+
+const boatPortalLabels: Record<string, string> = {
+  mercado_livre: 'Mercado Livre',
+  olx: 'OLX',
+  barcos_nautica: 'Barcos Náutica',
+  nautica: 'Náutica',
+  boat_trader: 'Boat Trader',
+  instagram: 'Instagram',
+};
+
+const boatFeatures = [
+  'GPS', 'Sonda', 'Radar', 'Piloto Automático', 'Rádio VHF',
+  'Ar Condicionado', 'Gerador', 'Guincho Elétrico', 'Toldo',
+  'Churrasqueira', 'Som', 'TV', 'Geladeira', 'Micro-ondas', 'Flaps'
 ];
 
 export function PropertyForm({ 
@@ -112,6 +134,11 @@ export function PropertyForm({
   onDeleteImage,
   isSubmitting 
 }: PropertyFormProps) {
+  const { mode } = useCrmMode();
+  const isBoat = mode === 'barcos';
+  const currentTypes = isBoat ? boatTypeLabels : propertyTypeLabels;
+  const currentFeatures = isBoat ? boatFeatures : availableFeatures;
+
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const form = useForm<PropertyFormData>({
@@ -136,6 +163,11 @@ export function PropertyForm({
       status: property?.status || 'disponivel',
       is_featured: property?.is_featured || false,
       is_published: property?.is_published || false,
+      condo_fee: property?.condo_fee || 0,
+      iptu: property?.iptu || 0,
+      year_built: property?.year_built || new Date().getFullYear(),
+      internal_id: property?.internal_id || '',
+      portal_config: property?.portal_config || { zap: true, vivareal: true, imovelweb: true, luxury_estate: true, properstar: true },
     },
   });
 
@@ -162,10 +194,11 @@ export function PropertyForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Dados Básicos</TabsTrigger>
             <TabsTrigger value="details">Características</TabsTrigger>
             <TabsTrigger value="location">Localização</TabsTrigger>
+            <TabsTrigger value="portals">Portais</TabsTrigger>
             <TabsTrigger value="images">Fotos</TabsTrigger>
           </TabsList>
 
@@ -175,9 +208,9 @@ export function PropertyForm({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Título do Imóvel *</FormLabel>
+                  <FormLabel>{isBoat ? 'Nome da Embarcação *' : 'Título do Imóvel *'}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Apartamento 3 quartos no Centro" {...field} />
+                    <Input placeholder={isBoat ? 'Ex: Lancha Focker 280' : 'Ex: Apartamento 3 quartos'} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -190,7 +223,7 @@ export function PropertyForm({
                 name="property_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Imóvel *</FormLabel>
+                    <FormLabel>{isBoat ? 'Tipo de Embarcação *' : 'Tipo de Imóvel *'}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -198,7 +231,7 @@ export function PropertyForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.entries(propertyTypeLabels).map(([value, label]) => (
+                        {Object.entries(currentTypes).map(([value, label]) => (
                           <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -277,7 +310,7 @@ export function PropertyForm({
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Descreva o imóvel em detalhes..."
+                      placeholder={isBoat ? 'Descreva a embarcação em detalhes...' : 'Descreva o imóvel em detalhes...'}
                       className="min-h-32"
                       {...field} 
                     />
@@ -323,7 +356,7 @@ export function PropertyForm({
                 name="bedrooms"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quartos</FormLabel>
+                    <FormLabel>{isBoat ? 'Cabines' : 'Quartos'}</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>
@@ -351,7 +384,7 @@ export function PropertyForm({
                 name="parking_spots"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vagas</FormLabel>
+                    <FormLabel>{isBoat ? 'Motores' : 'Vagas'}</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>
@@ -365,7 +398,7 @@ export function PropertyForm({
                 name="area_total"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Área Total (m²)</FormLabel>
+                    <FormLabel>{isBoat ? 'Tamanho (Pés)' : 'Área Total (m²)'}</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>
@@ -379,9 +412,51 @@ export function PropertyForm({
                 name="area_built"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Área Construída (m²)</FormLabel>
+                    <FormLabel>{isBoat ? 'Boca (m)' : 'Área Construída (m²)'}</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="condo_fee"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isBoat ? 'Marina (R$)' : 'Condomínio (R$)'}</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="iptu"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isBoat ? 'Seguro (R$)' : 'IPTU (R$)'}</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="year_built"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{isBoat ? 'Ano do Casco' : 'Ano de Construção'}</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="1800" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -396,7 +471,7 @@ export function PropertyForm({
                 <FormItem>
                   <FormLabel>Características</FormLabel>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {availableFeatures.map((feature) => (
+                    {currentFeatures.map((feature) => (
                       <div key={feature} className="flex items-center gap-2">
                         <Checkbox
                           id={feature}
@@ -428,9 +503,9 @@ export function PropertyForm({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Endereço</FormLabel>
+                  <FormLabel>{isBoat ? 'Marina / Berço' : 'Endereço'}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Rua, número" {...field} />
+                    <Input placeholder={isBoat ? 'Ex: Marina da Glória, Berço 42' : 'Rua, número'} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -443,9 +518,9 @@ export function PropertyForm({
                 name="neighborhood"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bairro</FormLabel>
+                    <FormLabel>{isBoat ? 'Porto / Bairro' : 'Bairro'}</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder={isBoat ? 'Ex: Porto de Santos' : ''} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -496,11 +571,84 @@ export function PropertyForm({
             </div>
           </TabsContent>
 
+          <TabsContent value="portals" className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="internal_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Código de Referência (REF)</FormLabel>
+                    <FormControl>
+                      <Input placeholder={isBoat ? 'Ex: EMB001' : 'Ex: AP001'} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-xl border bg-secondary/20">
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 text-primary" /> {isBoat ? 'Visibilidade nos Portais Náuticos' : 'Visibilidade nos Portais'}
+                  </h4>
+                  <div className="space-y-3">
+                    {isBoat
+                      ? ['mercado_livre', 'olx', 'barcos_nautica', 'nautica', 'boat_trader', 'instagram'].map((portal) => (
+                          <FormField
+                            key={portal}
+                            control={form.control}
+                            name="portal_config"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between space-x-2 border-b border-white/5 pb-2">
+                                <FormLabel>{boatPortalLabels[portal] ?? portal}</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value?.[portal]}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange({ ...field.value, [portal]: checked });
+                                    }}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        ))
+                      : ['zap', 'vivareal', 'imovelweb', 'luxury_estate', 'properstar', 'olx'].map((portal) => (
+                          <FormField
+                            key={portal}
+                            control={form.control}
+                            name="portal_config"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between space-x-2 border-b border-white/5 pb-2">
+                                <FormLabel className="capitalize">{portal.replace('_', ' ')}</FormLabel>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value?.[portal]}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange({ ...field.value, [portal]: checked });
+                                    }}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                  </div>
+                </div>
+                <div className="p-4 rounded-lg bg-primary/5 text-xs text-muted-foreground space-y-2">
+                  <p className="font-semibold text-primary">Dica:</p>
+                  <p>Marque os portais onde este anúncio deve aparecer. Certifique-se de que {isBoat ? 'a embarcação' : 'o imóvel'} também está marcado como "Publicado no site" na aba básica.</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
           <TabsContent value="images" className="space-y-4 mt-4">
             {property?.id ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Fotos do Imóvel</CardTitle>
+                  <CardTitle className="text-lg">{isBoat ? 'Fotos da Embarcação' : 'Fotos do Imóvel'}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -508,7 +656,7 @@ export function PropertyForm({
                       <div key={image.id} className="relative group aspect-video rounded-lg overflow-hidden border">
                         <img 
                           src={image.url} 
-                          alt="Foto do imóvel" 
+                          alt={isBoat ? 'Foto da embarcação' : 'Foto do imóvel'} 
                           className="w-full h-full object-cover"
                         />
                         {image.is_cover && (
@@ -553,7 +701,7 @@ export function PropertyForm({
               </Card>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                Salve o imóvel primeiro para adicionar fotos.
+                Salve {isBoat ? 'o rascunho da embarcação' : 'o imóvel'} primeiro para adicionar fotos.
               </div>
             )}
           </TabsContent>
@@ -565,7 +713,7 @@ export function PropertyForm({
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {property ? 'Salvar Alterações' : 'Cadastrar Imóvel'}
+            {property ? 'Salvar Alterações' : (isBoat ? 'Cadastrar Embarcação' : 'Cadastrar Imóvel')}
           </Button>
         </div>
       </form>

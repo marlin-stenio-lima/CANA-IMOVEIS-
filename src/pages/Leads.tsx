@@ -250,7 +250,7 @@ export default function Leads() {
                         {inquiry.contact_id && (
                           <DropdownMenuItem>
                             <ExternalLink className="h-4 w-4 mr-2" />
-                            Ver Contato no Pigg
+                            Ver Detalhes do Contato
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem

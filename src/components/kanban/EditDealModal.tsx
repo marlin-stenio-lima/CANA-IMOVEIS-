@@ -11,7 +11,9 @@ import { useProperties } from "@/hooks/useProperties";
 import { User, Phone, Mail, Building2, Wallet, Target, Trash2 } from "lucide-react";
 import { DealWithContact } from "@/hooks/useDeals";
 import { supabase } from "@/integrations/supabase/client";
+import { PropertySelect } from "@/components/common/PropertySelect";
 import { toast } from "sonner";
+
 
 type PipelineStage = Tables<"pipeline_stages">;
 
@@ -230,22 +232,15 @@ export function EditDealModal({
                                 </Select>
                             </div>
 
-                            <div className="space-y-2">
+                             <div className="space-y-2">
                                 <Label htmlFor="property">Imóvel de Interesse</Label>
-                                <Select value={propertyId} onValueChange={setPropertyId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecione o imóvel..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Nenhum</SelectItem>
-                                        {properties.map((property) => (
-                                            <SelectItem key={property.id} value={property.id}>
-                                                {property.title} ({property.code || "S/ Cód"})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <PropertySelect 
+                                    value={propertyId} 
+                                    onValueChange={setPropertyId} 
+                                    placeholder="Selecione o imóvel..."
+                                />
                             </div>
+
 
                             <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="description">Descrição / Notas</Label>

@@ -1,7 +1,10 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet, useLocation, Link } from "react-router-dom";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import { Bell, Search, ChevronRight, LogOut, User, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -24,6 +27,7 @@ const routeNames: Record<string, string> = {
   "/tasks": "Tarefas",
   "/schedules": "Agendamentos",
   "/settings": "Configurações",
+  "/reports": "Relatórios",
 };
 
 export function AppLayout() {
@@ -31,6 +35,15 @@ export function AppLayout() {
   const { profile, signOut } = useAuth();
   const currentPath = location.pathname;
   const routeName = routeNames[currentPath] || "Página";
+
+  const { canAccessImoveis, canAccessBarcos } = usePermissions();
+  const { mode, setMode } = useCrmMode();
+
+  // Force mode if user has restricted access
+  useEffect(() => {
+    if (canAccessImoveis && !canAccessBarcos && mode !== 'imoveis') setMode('imoveis');
+    if (canAccessBarcos && !canAccessImoveis && mode !== 'barcos') setMode('barcos');
+  }, [canAccessImoveis, canAccessBarcos, mode, setMode]);
 
   const getInitials = (name: string | null) => {
     if (!name) return "U";
@@ -44,6 +57,8 @@ export function AppLayout() {
         <main className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
           {/* Professional Header */}
           <header className="h-16 border-b flex items-center px-4 gap-4 bg-card shadow-sm sticky top-0 z-10">
+
+
             <SidebarTrigger className="h-9 w-9" />
 
             {/* Breadcrumb */}
@@ -63,6 +78,8 @@ export function AppLayout() {
                   placeholder="Buscar contatos, negócios..."
                   className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
                 />
+
+
               </div>
             </div>
 
@@ -85,6 +102,8 @@ export function AppLayout() {
                         {getInitials(profile?.full_name || null)}
                       </AvatarFallback>
                     </Avatar>
+
+
                     <div className="hidden md:flex flex-col items-start">
                       <span className="text-sm font-medium leading-none">
                         {profile?.full_name || "Usuário"}
@@ -131,6 +150,8 @@ export function AppLayout() {
           <div className="flex-1 p-6 bg-muted/30 overflow-auto">
             <Outlet />
           </div>
+
+
         </main>
       </div>
     </SidebarProvider>

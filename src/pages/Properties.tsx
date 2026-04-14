@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, Loader2, Building2 } from 'lucide-react';
+import { Plus, Search, Loader2, Building2, Rss, Trash2, X, CheckSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Properties() {
@@ -51,6 +51,31 @@ export default function Properties() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [deletingProperty, setDeletingProperty] = useState<Property | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProperties.length && filteredProperties.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProperties.map(p => p.id)));
+    }
+  };
+
+  const handleToggleSelect = (property: Property, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(property.id);
+    } else {
+      newSelected.delete(property.id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleMassExportToPortals = async (exportStatus: boolean) => {
+    const promises = Array.from(selectedIds).map(id => updateProperty({ id, data: { export_to_portals: exportStatus } }));
+    await Promise.all(promises);
+    setSelectedIds(new Set());
+  };
 
   const filteredProperties = properties.filter((property) => {
     const matchesSearch = 
@@ -121,10 +146,34 @@ export default function Properties() {
             {properties.length} imóveis cadastrados
           </p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Imóvel
-        </Button>
+        
+        {selectedIds.size > 0 ? (
+          <div className="flex items-center gap-2 bg-primary/10 p-2 border border-primary/20 rounded-lg animate-fade-in">
+            <span className="text-sm font-semibold text-primary px-2">
+              {selectedIds.size} selecionados
+            </span>
+            <Button size="sm" variant="default" onClick={() => handleMassExportToPortals(true)} className="gap-2">
+              <Rss className="h-4 w-4" /> Enviar p/ Portais
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleMassExportToPortals(false)} className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10">
+              <X className="h-4 w-4" /> Tirar de Portais
+            </Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8 ml-1" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={toggleSelectAll} title="Selecionar Todos">
+              <CheckSquare className="h-4 w-4 mr-2" />
+              Selecionar
+            </Button>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Imóvel
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -185,9 +234,10 @@ export default function Properties() {
             <PropertyCard
               key={property.id}
               property={property}
+              isSelected={selectedIds.has(property.id)}
+              onToggleSelect={handleToggleSelect}
               onEdit={(p) => setEditingProperty(p)}
               onDelete={(p) => setDeletingProperty(p)}
-              onView={(p) => navigate(`/properties/${p.id}`)}
             />
           ))}
         </div>

@@ -7,9 +7,15 @@ import { Smartphone, RefreshCw, User, Loader2, UserPlus, Trash2, X, Link as Link
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TeamManager } from "./TeamManager";
 import { Badge } from "@/components/ui/badge";
+import { useCrmMode } from "@/contexts/CrmModeContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
+import { Switch } from "@/components/ui/switch";
 
 type InstanceUser = {
-    user: {
+
+    team_member: {
         id: string;
         name: string;
     }
@@ -19,6 +25,8 @@ type Instance = {
     id: string;
     name: string;
     status: string;
+    is_main: boolean;
+    business_type: 'imoveis' | 'barcos';
     members: InstanceUser[];
 }
 
@@ -28,9 +36,12 @@ type Broker = {
 }
 
 export function IntegrationManager() {
+    const { profile } = useAuth();
     const [instances, setInstances] = useState<Instance[]>([]);
     const [brokers, setBrokers] = useState<Broker[]>([]);
     const [loading, setLoading] = useState(false);
+    const userCompanyId = profile?.company_id;
+
 
     // Connection State
     const [connectingInstance, setConnectingInstance] = useState<string | null>(null);
@@ -40,31 +51,89 @@ export function IntegrationManager() {
     const [isNewConnectionOpen, setIsNewConnectionOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState("");
     const [newInstancePhone, setNewInstancePhone] = useState("");
+    const { mode } = useCrmMode();
+    const [newInstanceType, setNewInstanceType] = useState<'imoveis' | 'barcos'>('imoveis');
+    const [isMainInstance, setIsMainInstance] = useState(false);
+
+    // Sync instance type with current mode when opening dialog
+    useEffect(() => {
+        if (isNewConnectionOpen) {
+            setNewInstanceType(mode);
+        }
+    }, [isNewConnectionOpen, mode]);
 
     // Add User Dialog
     const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
     const [userToLink, setUserToLink] = useState("");
 
+    const handleRefreshStatus = async (instance: Instance, silent = false) => {
+        const { data } = await supabase.functions.invoke('evolution-manager', {
+            body: { action: 'status', instanceName: instance.name }
+        });
+        if (data?.instance?.state) {
+            const oldStatus = instance.status;
+            const newStatus = data.instance.state;
+            
+            if (oldStatus !== newStatus) {
+                await supabase.from('instances').update({ status: newStatus }).eq('id', instance.id);
+                fetchData();
+                if (!silent) toast.success("Status: " + newStatus);
+            } else if (!silent) {
+                toast.success("Status: " + newStatus);
+            }
+        }
+    };
+
     const fetchData = async () => {
         setLoading(true);
 
         // 1. Fetch Instances with Members
+        // We select fields individually to handle potential missing column 'is_main' gracefully
         const { data: instanceData, error: instanceError } = await supabase
             .from('instances')
             .select(`
-                id, name, status, phone,
+                id, name, status, phone, business_type, is_main,
                 members:instance_members(
-                    user:team_members(id, name)
+                    team_member:team_members(id, name)
                 )
-            `);
+            `)
+            .eq('created_by_crm', true);
 
-        if (instanceError) console.error("Error fetching instances:", instanceError);
-        else setInstances(instanceData?.map(i => ({
-            ...i,
-            members: i.members || []
-        })) as Instance[] || []);
+        if (instanceError) {
+            console.error("Error fetching instances:", instanceError);
+            
+            // If the error is about 'is_main' column not existing, retry without it
+            if (instanceError.message.includes('is_main') || instanceError.code === '42703') {
+                const { data: retryData, error: retryError } = await supabase
+                    .from('instances')
+                    .select(`
+                        id, name, status, phone, business_type,
+                        members:instance_members(
+                            team_member:team_members(id, name)
+                        )
+                    `)
+                    .eq('created_by_crm', true);
+                
+                if (!retryError) {
+                    setInstances(retryData?.map(i => ({
+                        ...i,
+                        is_main: false, // Default to false if column missing
+                        members: i.members || []
+                    })) as Instance[] || []);
+                    setLoading(false);
+                    return;
+                }
+            }
+        }
+        
+        if (!instanceError) {
+            setInstances(instanceData?.map(i => ({
+                ...i,
+                members: i.members || []
+            })) as Instance[] || []);
+        }
 
-        // 2. Fetch All active Brokers (for dropdowns)
+        // 4. Fetch All active Brokers (for dropdowns)
         const { data: brokerData } = await supabase
             .from('team_members')
             .select('id, name')
@@ -78,6 +147,54 @@ export function IntegrationManager() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Polling global para sincronizar status REAL da API Evolution (a cada 30 segundos)
+    useEffect(() => {
+        const syncAllStatuses = async () => {
+            if (instances.length > 0 && !loading) {
+                console.log("Sincronizando status de todas as instâncias...");
+                for (const inst of instances) {
+                    await handleRefreshStatus(inst, true); // true = silent
+                }
+            }
+        };
+
+        const globalInterval = setInterval(syncAllStatuses, 30000); // 30 segundos
+        
+        // Executa uma vez no início
+        syncAllStatuses();
+
+        return () => clearInterval(globalInterval);
+    }, [instances.length, loading]);
+
+    // Polling rápido para o QR Code (a cada 3 segundos)
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (connectingInstance && qrCode) {
+            interval = setInterval(async () => {
+                const instance = instances.find(i => i.id === connectingInstance);
+                if (!instance) return;
+
+                const { data } = await supabase.functions.invoke('evolution-manager', {
+                    body: { action: 'status', instanceName: instance.name }
+                });
+
+                if (data?.instance?.state === 'open') {
+                    clearInterval(interval);
+                    await supabase.from('instances').update({ status: 'open' }).eq('id', instance.id);
+                    setConnectingInstance(null);
+                    setQrCode(null);
+                    fetchData();
+                    toast.success("Conexão estabelecida com sucesso!");
+                }
+            }, 3000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [connectingInstance, qrCode, instances]);
 
     // --- Actions ---
 
@@ -169,42 +286,65 @@ export function IntegrationManager() {
         }
     };
 
-    const handleRefreshStatus = async (instance: Instance) => {
-        const { data } = await supabase.functions.invoke('evolution-manager', {
-            body: { action: 'status', instanceName: instance.name }
-        });
-        if (data?.instance?.state) {
-            await supabase.from('instances').update({ status: data.instance.state }).eq('id', instance.id);
-            fetchData();
-            toast.success("Status: " + data.instance.state);
-        }
-    };
 
     const handleDeleteInstance = async (id: string, name: string) => {
         if (!confirm(`Tem certeza que deseja EXCLUIR a conexão "${name}"? Isso vai desconectar o WhatsApp.`)) return;
 
-        // Delete from Evolution (Optional - good practice to logout)
-        await supabase.functions.invoke('evolution-manager', {
-            body: { action: 'delete', instanceName: name } // API needs to support DELETE or Logout
-        });
+        try {
+            // Delete from Evolution (Optional - good practice to logout)
+            await supabase.functions.invoke('evolution-manager', {
+                body: { action: 'delete', instanceName: name } // API needs to support DELETE or Logout
+            });
 
-        // Delete from DB (Cascade removes members)
-        const { error } = await supabase.from('instances').delete().eq('id', id);
-        if (error) toast.error("Erro ao excluir");
-        else {
-            toast.success("Conexão excluída");
-            fetchData();
+            // Prevent strict foreign key violations by manually clearing dependencies first
+            // First conversations (and anything cascading from them depending on DB settings)
+            await supabase.from('conversations').delete().eq('instance_id', id);
+            
+            // Then members
+            await supabase.from('instance_members').delete().eq('instance_id', id);
+
+            // Delete from DB
+            const { error } = await supabase.from('instances').delete().eq('id', id);
+            
+            if (error) {
+                console.error("DB Delete Error:", error);
+                toast.error("Erro ao excluir: " + error.message);
+            } else {
+                toast.success("Conexão excluída");
+                fetchData();
+            }
+        } catch (err: any) {
+            console.error("Catch Delete Error:", err);
+            toast.error("Falha ao excluir: " + err.message);
         }
     };
 
     const handleCreateInstance = async () => {
         if (!newInstanceName) return toast.error("Nome obrigatório");
+        if (!userCompanyId) return toast.error("ID da empresa não encontrado. Tente logar novamente.");
+
+        // Rule check: Only one main instance
+        if (isMainInstance) {
+            const { data: existingMain } = await supabase
+                .from('instances')
+                .select('id')
+                .eq('is_main', true)
+                .eq('business_type', newInstanceType)
+                .maybeSingle();
+            
+            if (existingMain) {
+                return toast.error(`Já existe um WhatsApp Principal para a categoria ${newInstanceType === 'imoveis' ? 'Imóveis' : 'Barcos'}.`);
+            }
+        }
 
         const { error } = await supabase.from('instances').insert({
             name: newInstanceName,
             phone: newInstancePhone, // Save phone number
             status: 'closed',
-            company_id: '00000000-0000-0000-0000-000000000000'
+            company_id: userCompanyId,
+            created_by_crm: true,
+            business_type: newInstanceType,
+            is_main: isMainInstance
         });
 
         if (error) toast.error("Erro ao criar: " + error.message);
@@ -213,6 +353,7 @@ export function IntegrationManager() {
             setIsNewConnectionOpen(false);
             setNewInstanceName("");
             setNewInstancePhone("");
+            setIsMainInstance(false);
             fetchData();
         }
     };
@@ -228,20 +369,20 @@ export function IntegrationManager() {
         const { data: existingLinks } = await supabase
             .from('instance_members')
             .select('id, instance_id')
-            .eq('user_id', userToLink);
+            .eq('team_member_id', userToLink);
 
         if (existingLinks && existingLinks.length > 0) {
             const confirmSwitch = confirm("Este usuário já está em outra conexão. Deseja mover ele para cá?");
             if (!confirmSwitch) return;
 
             // Remove from others
-            await supabase.from('instance_members').delete().eq('user_id', userToLink);
+            await supabase.from('instance_members').delete().eq('team_member_id', userToLink);
         }
 
         // 2. Add to this instance
         const { error } = await supabase.from('instance_members').insert({
             instance_id: selectedInstanceId,
-            user_id: userToLink
+            team_member_id: userToLink
         });
 
         if (error) toast.error("Erro ao vincular");
@@ -259,7 +400,7 @@ export function IntegrationManager() {
         const { error } = await supabase
             .from('instance_members')
             .delete()
-            .match({ instance_id: instanceId, user_id: userId });
+            .match({ instance_id: instanceId, team_member_id: userId });
 
         if (error) toast.error("Erro ao desvincular");
         else {
@@ -267,6 +408,8 @@ export function IntegrationManager() {
             fetchData();
         }
     };
+
+    const hasMainInstance = instances.some(inst => inst.is_main && inst.business_type === newInstanceType);
 
     return (
         <div className="space-y-6">
@@ -293,13 +436,44 @@ export function IntegrationManager() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Número do WhatsApp (Com DDD)</label>
+                                    <label className="text-sm font-medium">Número do WhatsApp (Opcional)</label>
                                     <Input
                                         placeholder="Ex: 5511999999999"
                                         value={newInstancePhone}
                                         onChange={e => setNewInstancePhone(e.target.value)}
                                     />
-                                    <p className="text-xs text-muted-foreground">Somente números. Necessário para a API conectar mais rápido.</p>
+                                    <p className="text-[10px] text-muted-foreground">Opcional. Coloque com o código do país (Ex: 55).</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Tipo de Negócio</Label>
+                                    <Select 
+                                        value={newInstanceType} 
+                                        onValueChange={(v: any) => setNewInstanceType(v)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione o tipo..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="imoveis">Imóveis</SelectItem>
+                                            <SelectItem value="barcos">Barcos</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className={`flex items-center space-x-2 border p-3 rounded-md ${hasMainInstance ? 'bg-red-50/50 border-red-100' : 'bg-muted/20'}`}>
+                                    <Switch 
+                                        id="main-whatsapp" 
+                                        checked={isMainInstance} 
+                                        onCheckedChange={setIsMainInstance}
+                                        disabled={hasMainInstance}
+                                    />
+                                    <div className="grid gap-1.5 leading-none">
+                                        <Label htmlFor="main-whatsapp" className={`text-sm font-medium ${hasMainInstance ? 'text-red-900/50' : ''}`}>WhatsApp Principal</Label>
+                                        <p className={`text-xs ${hasMainInstance ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                                            {hasMainInstance 
+                                                ? `⚠️ Bloqueado: Já existe um Principal para ${newInstanceType === 'imoveis' ? 'Imóveis' : 'Barcos'}.` 
+                                                : "Usado para notificações automáticas da imobiliária."}
+                                        </p>
+                                    </div>
                                 </div>
                                 <Button onClick={handleCreateInstance} className="w-full">Criar</Button>
                             </div>
@@ -321,13 +495,6 @@ export function IntegrationManager() {
 
             {loading && <p className="text-muted-foreground text-sm">Carregando equipe...</p>}
 
-            {/* Debug Info */}
-            <div className="p-2 bg-muted/50 rounded text-xs font-mono text-muted-foreground mb-4">
-                <p>Status Debug:</p>
-                <p>Project: {process.env.NODE_ENV === 'development' ? supabase.supabaseUrl : '***'}</p>
-                <p>Function: evolution-manager</p>
-                <p>Verify: {instances.length} connections loaded</p>
-            </div>
 
             <div className="grid gap-4">
                 {instances.map(inst => (
@@ -338,7 +505,26 @@ export function IntegrationManager() {
                                     <Smartphone className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-lg">{inst.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold text-lg">{inst.name}</h3>
+                                        <div className="flex gap-1.5">
+                                            {inst.is_main && (
+                                                <Badge variant="default" className="bg-blue-600 text-[10px] h-5">
+                                                    ⭐ Principal
+                                                </Badge>
+                                            )}
+                                            <Badge variant="outline" className={`text-[10px] h-5 cursor-pointer hover:bg-muted transition-colors`} onClick={async () => {
+                                                const newType = inst.business_type === 'imoveis' ? 'barcos' : 'imoveis';
+                                                const { error } = await supabase.from('instances').update({ business_type: newType }).eq('id', inst.id);
+                                                if (!error) {
+                                                    toast.success(`Categoria alterada para ${newType === 'imoveis' ? 'Imóveis' : 'Barcos'}`);
+                                                    fetchData();
+                                                }
+                                            }}>
+                                                {inst.business_type === 'barcos' ? '🚢 Barcos' : '🏠 Imóveis'}
+                                            </Badge>
+                                        </div>
+                                    </div>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span className={`w-2 h-2 rounded-full ${inst.status === 'open' ? 'bg-green-500' : 'bg-gray-400'}`} />
                                         {inst.status === 'open' ? 'Conectado' : 'Desconectado'}
@@ -424,11 +610,11 @@ export function IntegrationManager() {
                                 ) : (
                                     <div className="flex flex-wrap gap-2">
                                         {inst.members.map(m => (
-                                            <Badge key={m.user.id} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
+                                            <Badge key={m.team_member.id} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1">
                                                 <User className="h-3 w-3" />
-                                                {m.user.name}
+                                                {m.team_member.name}
                                                 <button
-                                                    onClick={() => handleUnlinkUser(inst.id, m.user.id)}
+                                                    onClick={() => handleUnlinkUser(inst.id, m.team_member.id)}
                                                     className="ml-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full p-0.5"
                                                 >
                                                     <X className="h-3 w-3" />

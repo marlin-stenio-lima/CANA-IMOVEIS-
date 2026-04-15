@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 
 // Mock Data for "Visual" feel while DB is offline
 const MOCK_ROULETTES = [
@@ -22,6 +23,13 @@ const MOCK_TRIGGERS = [
 ];
 
 export default function Roleta() {
+    const { mode } = useCrmMode();
+    const isBarcos = mode === "barcos";
+
+    const defaultNotifText = isBarcos 
+        ? "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}"
+        : "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}";
+
     const [automationStep, setAutomationStep] = useState(0); // 0 = List, 1 = Editor
     const [selectedRoulette, setSelectedRoulette] = useState<string>("");
     const [triggerType, setTriggerType] = useState<string>("whatsapp");
@@ -30,12 +38,12 @@ export default function Roleta() {
     const [priceMin, setPriceMin] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
     const [pipelineStage, setPipelineStage] = useState("novo_lead");
-    const [notificationText, setNotificationText] = useState("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
+    const [notificationText, setNotificationText] = useState(defaultNotifText);
     const [triggerName, setTriggerName] = useState("");
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
 
     const [triggersList, setTriggersList] = useState<any[]>(() => {
-        const saved = localStorage.getItem("crm_triggers_v3");
+        const saved = localStorage.getItem(`crm_triggers_v4_${mode}`);
         return saved ? JSON.parse(saved) : [];
     });
 
@@ -50,21 +58,40 @@ export default function Roleta() {
     }, []);
 
     useEffect(() => {
-        localStorage.setItem("crm_triggers_v3", JSON.stringify(triggersList));
-    }, [triggersList]);
+        if (triggersList.length > 0 || localStorage.getItem(`crm_triggers_v4_${mode}`)) {
+            localStorage.setItem(`crm_triggers_v4_${mode}`, JSON.stringify(triggersList));
+        }
+    }, [triggersList, mode]);
 
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
     const [roulettesList, setRoulettesList] = useState<any[]>(() => {
-        const saved = localStorage.getItem("crm_roulettes_v3");
+        const saved = localStorage.getItem(`crm_roulettes_v4_${mode}`);
         return saved ? JSON.parse(saved) : [];
     });
     const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
     const [editingRouletteId, setEditingRouletteId] = useState<string | null>(null);
 
     useEffect(() => {
-        localStorage.setItem("crm_roulettes_v3", JSON.stringify(roulettesList));
-    }, [roulettesList]);
+        if (roulettesList.length > 0 || localStorage.getItem(`crm_roulettes_v4_${mode}`)) {
+            localStorage.setItem(`crm_roulettes_v4_${mode}`, JSON.stringify(roulettesList));
+        }
+    }, [roulettesList, mode]);
+
+    // Refresh state when mode changes
+    useEffect(() => {
+        const savedTriggers = localStorage.getItem(`crm_triggers_v4_${mode}`);
+        setTriggersList(savedTriggers ? JSON.parse(savedTriggers) : []);
+        
+        const savedRoulettes = localStorage.getItem(`crm_roulettes_v4_${mode}`);
+        setRoulettesList(savedRoulettes ? JSON.parse(savedRoulettes) : []);
+        
+        setNotificationText(defaultNotifText);
+        setAutomationStep(0);
+        setConfigStep(0);
+        setEditingTriggerId(null);
+        setEditingRouletteId(null);
+    }, [mode]);
 
     const handleSave = () => {
         if (!triggerName) {
@@ -93,13 +120,13 @@ export default function Roleta() {
             setTriggersList([...triggersList, newTrigger]);
         }
 
-        toast.success("Automação salva com sucesso!");
+        toast.success(`Automação salva (${isBarcos ? 'Barcos' : 'Imóveis'})!`);
         setAutomationStep(0);
         setTriggerName("");
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
-        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
+        setNotificationText(defaultNotifText);
         setEditingTriggerId(null);
     };
 
@@ -108,7 +135,7 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
-        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
+        setNotificationText(defaultNotifText);
         setEditingTriggerId(null);
         setAutomationStep(1);
     };
@@ -116,9 +143,19 @@ export default function Roleta() {
     const handleEditTrigger = (trigger: any) => {
         setTriggerName(trigger.name);
         setTriggerType(trigger.source);
+        if (trigger.source === 'portal' && trigger.condition) {
+            // Very simple parser for edit mode
+            const p = trigger.condition.replace('Portal: ', '');
+            setPortalUrl(p);
+        }
+        if (trigger.source === 'whatsapp' && trigger.condition && trigger.condition.includes('Texto: ')) {
+            const m = trigger.condition.replace('Texto: ', '');
+            setMatchText(m);
+        }
+
         setSelectedRoulette(trigger.rouletteId || "");
         setPipelineStage(trigger.pipelineStage || "novo_lead");
-        setNotificationText(trigger.notificationText || "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
+        setNotificationText(trigger.notificationText || defaultNotifText);
         setEditingTriggerId(trigger.id);
         setAutomationStep(1);
     };
@@ -266,7 +303,7 @@ export default function Roleta() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-4 space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className={`grid grid-cols-1 gap-4 ${isBarcos ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                                             <div
                                                 className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'whatsapp' ? 'border-primary bg-primary/5' : ''}`}
                                                 onClick={() => setTriggerType('whatsapp')}
@@ -281,6 +318,15 @@ export default function Roleta() {
                                                 <Zap className="h-6 w-6" />
                                                 <span className="text-sm font-medium text-center">Meta Ads<br/><span className="text-xs font-normal opacity-80">(Formulários)</span></span>
                                             </div>
+                                            {!isBarcos && (
+                                                <div
+                                                    className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'portal' ? 'border-primary bg-primary/5' : ''}`}
+                                                    onClick={() => setTriggerType('portal')}
+                                                >
+                                                    <Target className="h-6 w-6" />
+                                                    <span className="text-sm font-medium text-center">Portais<br/><span className="text-xs font-normal opacity-80">(Zap/Viva/Etc)</span></span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {triggerType === 'whatsapp' && (
@@ -306,6 +352,22 @@ export default function Roleta() {
                                                 </Select>
                                             </div>
                                         )}
+                                        {triggerType === 'portal' && !isBarcos && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-sm font-medium">Selecione o Portal de Origem:</label>
+                                                <Select value={portalUrl} onValueChange={setPortalUrl}>
+                                                    <SelectTrigger><SelectValue placeholder="Escolha o portal..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="zap_imoveis">Zap Imóveis</SelectItem>
+                                                        <SelectItem value="vivareal">VivaReal</SelectItem>
+                                                        <SelectItem value="imovelweb">ImóvelWeb</SelectItem>
+                                                        <SelectItem value="chaves_na_mao">Chaves na Mão</SelectItem>
+                                                        <SelectItem value="mercado_livre">Mercado Livre Imóveis</SelectItem>
+                                                        <SelectItem value="olx">OLX Imóveis</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
 
 
                                         <div className="pt-6 border-t mt-6 space-y-4">
@@ -313,7 +375,7 @@ export default function Roleta() {
                                                 <h4 className="text-sm font-semibold flex items-center gap-2 text-primary">
                                                     <Filter className="h-4 w-4"/> Filtros Inteligentes (Smart Routing)
                                                 </h4>
-                                                <p className="text-xs text-muted-foreground">O lead só entrará nesta roleta se a embarcação de interesse se encaixar nesses parâmetros opcionais.</p>
+                                                <p className="text-xs text-muted-foreground">O lead só entrará nesta roleta se {isBarcos ? 'a embarcação' : 'o imóvel'} de interesse se encaixar nesses parâmetros opcionais.</p>
                                             </div>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-muted/20 p-4 rounded-lg border border-border/50">
@@ -329,22 +391,37 @@ export default function Roleta() {
 
                                                 {/* Localização */}
                                                 <div className="space-y-2">
-                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/> Marina ou Região</label>
-                                                    <Input className="bg-background" placeholder="Ex: Marina da Glória, Angra..." value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/> {isBarcos ? 'Marina ou Região' : 'Bairro ou Região'}</label>
+                                                    <Input className="bg-background" placeholder={isBarcos ? "Ex: Marina da Glória, Angra..." : "Ex: Angra dos Reis, Jardins..."} value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
                                                     <p className="text-[10px] text-muted-foreground leading-tight">Ative especialistas regionais ao invés da geral.</p>
                                                 </div>
 
                                                 {/* Tipo de Imóvel */}
                                                 <div className="space-y-2 md:col-span-2">
-                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><Target className="h-3 w-3"/> Categoria da Embarcação</label>
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                                        {isBarcos ? <Target className="h-3 w-3"/> : <Home className="h-3 w-3"/>} 
+                                                        {isBarcos ? 'Categoria da Embarcação' : 'Categoria do Produto'}
+                                                    </label>
                                                     <Select>
                                                         <SelectTrigger className="bg-background"><SelectValue placeholder="Qualquer Segmentação..." /></SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="todos">Qualquer Barco (Geral)</SelectItem>
-                                                            <SelectItem value="lancha">Lanchas (Motor)</SelectItem>
-                                                            <SelectItem value="iate">Iates / Superiates</SelectItem>
-                                                            <SelectItem value="veleiro">Veleiros / Catamarãs</SelectItem>
-                                                            <SelectItem value="jet">Jet Skis</SelectItem>
+                                                            {isBarcos ? (
+                                                                <>
+                                                                    <SelectItem value="todos">Qualquer Barco (Geral)</SelectItem>
+                                                                    <SelectItem value="lancha">Lanchas (Motor)</SelectItem>
+                                                                    <SelectItem value="iate">Iates / Superiates</SelectItem>
+                                                                    <SelectItem value="veleiro">Veleiros / Catamarãs</SelectItem>
+                                                                    <SelectItem value="jet">Jet Skis</SelectItem>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <SelectItem value="todos">Qualquer Imóvel (Geral)</SelectItem>
+                                                                    <SelectItem value="apartamentos">Apartamentos e Flats</SelectItem>
+                                                                    <SelectItem value="casas">Casas e Sobrados</SelectItem>
+                                                                    <SelectItem value="alto_padrao">Coberturas e Mansões</SelectItem>
+                                                                    <SelectItem value="terrenos">Terrenos em Condomínio</SelectItem>
+                                                                </>
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                     <p className="text-[10px] text-muted-foreground">A roleta filtrará o produto antes de designar ao corretor.</p>
@@ -457,7 +534,7 @@ export default function Roleta() {
                                                     <Badge variant="outline" className="cursor-pointer">{'{nome}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{telefone}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{email}'}</Badge>
-                                                    <Badge variant="outline" className="cursor-pointer">{'{embarcacao}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{isBarcos ? '{embarcacao}' : '{imovel}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{observacao}'}</Badge>
                                                 </div>
                                             </div>

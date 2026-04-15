@@ -33,9 +33,9 @@ export default function Roleta() {
     const [triggerName, setTriggerName] = useState("");
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
 
-    const [triggersList, setTriggersList] = useState(() => {
-        const saved = localStorage.getItem("crm_triggers_v2");
-        return saved ? JSON.parse(saved) : MOCK_TRIGGERS;
+    const [triggersList, setTriggersList] = useState<any[]>(() => {
+        const saved = localStorage.getItem("crm_triggers_v3");
+        return saved ? JSON.parse(saved) : [];
     });
 
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -49,20 +49,20 @@ export default function Roleta() {
     }, []);
 
     useEffect(() => {
-        localStorage.setItem("crm_triggers_v2", JSON.stringify(triggersList));
+        localStorage.setItem("crm_triggers_v3", JSON.stringify(triggersList));
     }, [triggersList]);
 
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
-    const [roulettesList, setRoulettesList] = useState(() => {
-        const saved = localStorage.getItem("crm_roulettes_v2");
-        return saved ? JSON.parse(saved) : MOCK_ROULETTES;
+    const [roulettesList, setRoulettesList] = useState<any[]>(() => {
+        const saved = localStorage.getItem("crm_roulettes_v3");
+        return saved ? JSON.parse(saved) : [];
     });
     const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
     const [editingRouletteId, setEditingRouletteId] = useState<string | null>(null);
 
     useEffect(() => {
-        localStorage.setItem("crm_roulettes_v2", JSON.stringify(roulettesList));
+        localStorage.setItem("crm_roulettes_v3", JSON.stringify(roulettesList));
     }, [roulettesList]);
 
     const handleSave = () => {

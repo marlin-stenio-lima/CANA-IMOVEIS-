@@ -27,8 +27,8 @@ export default function Roleta() {
     const isBarcos = mode === "barcos";
 
     const defaultNotifText = isBarcos 
-        ? "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}"
-        : "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}";
+        ? "Olá! Você tem um novo lead \n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: Mova o lead para Mensagem e inicie o atendimento para evitar o Bolsão "
+        : "Olá! Você tem um novo lead \n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: Mova o lead para Mensagem e inicie o atendimento para evitar o Bolsão ";
 
     const [automationStep, setAutomationStep] = useState(0); // 0 = List, 1 = Editor
     const [selectedRoulette, setSelectedRoulette] = useState<string>("");

@@ -30,7 +30,7 @@ export default function Roleta() {
     const [priceMin, setPriceMin] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
     const [pipelineStage, setPipelineStage] = useState("novo_lead");
-    const [notificationText, setNotificationText] = useState("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
+    const [notificationText, setNotificationText] = useState("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
     const [triggerName, setTriggerName] = useState("");
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
 
@@ -80,7 +80,7 @@ export default function Roleta() {
             id: editingTriggerId || String(Date.now()),
             name: triggerName,
             source: triggerType,
-            condition: triggerType === 'whatsapp' ? (matchText ? `Texto: ${matchText}` : 'Todos os leads (sem filtro)') : triggerType === 'portal' ? `Portal: ${portalUrl}` : 'Formulário',
+            condition: triggerType === 'whatsapp' ? (matchText ? `Texto: ${matchText}` : 'Todos os leads (sem filtro)') : 'Formulário',
             rouletteId: selectedRoulette,
             pipelineStage,
             notificationText,
@@ -99,7 +99,7 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
-        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
+        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
         setEditingTriggerId(null);
     };
 
@@ -108,7 +108,7 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
-        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
+        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
         setEditingTriggerId(null);
         setAutomationStep(1);
     };
@@ -118,7 +118,7 @@ export default function Roleta() {
         setTriggerType(trigger.source);
         setSelectedRoulette(trigger.rouletteId || "");
         setPipelineStage(trigger.pipelineStage || "novo_lead");
-        setNotificationText(trigger.notificationText || "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
+        setNotificationText(trigger.notificationText || "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🚤 Embarcação: {embarcacao}\n📌 Observação: {observacao}");
         setEditingTriggerId(trigger.id);
         setAutomationStep(1);
     };
@@ -266,7 +266,7 @@ export default function Roleta() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-4 space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div
                                                 className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'whatsapp' ? 'border-primary bg-primary/5' : ''}`}
                                                 onClick={() => setTriggerType('whatsapp')}
@@ -280,13 +280,6 @@ export default function Roleta() {
                                             >
                                                 <Zap className="h-6 w-6" />
                                                 <span className="text-sm font-medium text-center">Meta Ads<br/><span className="text-xs font-normal opacity-80">(Formulários)</span></span>
-                                            </div>
-                                            <div
-                                                className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'portal' ? 'border-primary bg-primary/5' : ''}`}
-                                                onClick={() => setTriggerType('portal')}
-                                            >
-                                                <Target className="h-6 w-6" />
-                                                <span className="text-sm font-medium text-center">Portais<br/><span className="text-xs font-normal opacity-80">(Zap/Viva/Etc)</span></span>
                                             </div>
                                         </div>
 
@@ -313,29 +306,14 @@ export default function Roleta() {
                                                 </Select>
                                             </div>
                                         )}
-                                        {triggerType === 'portal' && (
-                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-sm font-medium">Selecione o Portal de Origem:</label>
-                                                <Select value={portalUrl} onValueChange={setPortalUrl}>
-                                                    <SelectTrigger><SelectValue placeholder="Escolha o portal..." /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="zap_imoveis">Zap Imóveis</SelectItem>
-                                                        <SelectItem value="vivareal">VivaReal</SelectItem>
-                                                        <SelectItem value="imovelweb">ImóvelWeb</SelectItem>
-                                                        <SelectItem value="chaves_na_mao">Chaves na Mão</SelectItem>
-                                                        <SelectItem value="mercado_livre">Mercado Livre Imóveis</SelectItem>
-                                                        <SelectItem value="olx">OLX Imóveis</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
+
 
                                         <div className="pt-6 border-t mt-6 space-y-4">
                                             <div className="space-y-1">
                                                 <h4 className="text-sm font-semibold flex items-center gap-2 text-primary">
                                                     <Filter className="h-4 w-4"/> Filtros Inteligentes (Smart Routing)
                                                 </h4>
-                                                <p className="text-xs text-muted-foreground">O lead só entrará nesta roleta se o imóvel de interesse se encaixar nesses parâmetros opcionais.</p>
+                                                <p className="text-xs text-muted-foreground">O lead só entrará nesta roleta se a embarcação de interesse se encaixar nesses parâmetros opcionais.</p>
                                             </div>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-muted/20 p-4 rounded-lg border border-border/50">
@@ -351,25 +329,25 @@ export default function Roleta() {
 
                                                 {/* Localização */}
                                                 <div className="space-y-2">
-                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/> Bairro ou Região</label>
-                                                    <Input className="bg-background" placeholder="Ex: Angra dos Reis, Jardins..." value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/> Marina ou Região</label>
+                                                    <Input className="bg-background" placeholder="Ex: Marina da Glória, Angra..." value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
                                                     <p className="text-[10px] text-muted-foreground leading-tight">Ative especialistas regionais ao invés da geral.</p>
                                                 </div>
 
                                                 {/* Tipo de Imóvel */}
                                                 <div className="space-y-2 md:col-span-2">
-                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><Home className="h-3 w-3"/> Categoria do Produto</label>
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><Target className="h-3 w-3"/> Categoria da Embarcação</label>
                                                     <Select>
                                                         <SelectTrigger className="bg-background"><SelectValue placeholder="Qualquer Segmentação..." /></SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="todos">Qualquer Imóvel (Geral)</SelectItem>
-                                                            <SelectItem value="apartamentos">Apartamentos e Flats</SelectItem>
-                                                            <SelectItem value="casas">Casas e Sobrados</SelectItem>
-                                                            <SelectItem value="alto_padrao">Coberturas e Mansões</SelectItem>
-                                                            <SelectItem value="terrenos">Terrenos em Condomínio</SelectItem>
+                                                            <SelectItem value="todos">Qualquer Barco (Geral)</SelectItem>
+                                                            <SelectItem value="lancha">Lanchas (Motor)</SelectItem>
+                                                            <SelectItem value="iate">Iates / Superiates</SelectItem>
+                                                            <SelectItem value="veleiro">Veleiros / Catamarãs</SelectItem>
+                                                            <SelectItem value="jet">Jet Skis</SelectItem>
                                                         </SelectContent>
                                                     </Select>
-                                                    <p className="text-[10px] text-muted-foreground">A roleta filtrará o imóvel antes de designar ao corretor.</p>
+                                                    <p className="text-[10px] text-muted-foreground">A roleta filtrará o produto antes de designar ao corretor.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -479,7 +457,7 @@ export default function Roleta() {
                                                     <Badge variant="outline" className="cursor-pointer">{'{nome}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{telefone}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{email}'}</Badge>
-                                                    <Badge variant="outline" className="cursor-pointer">{'{imovel}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{'{embarcacao}'}</Badge>
                                                     <Badge variant="outline" className="cursor-pointer">{'{observacao}'}</Badge>
                                                 </div>
                                             </div>

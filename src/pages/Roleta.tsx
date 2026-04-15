@@ -225,12 +225,18 @@ export default function Roleta() {
                                         )}
                                         {triggerType === 'portal' && (
                                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-sm font-medium">Link Webhook / Integração do Portal:</label>
-                                                <Input
-                                                    placeholder="Ex: ID do anúncio ou Integração Portal 1234"
-                                                    value={portalUrl}
-                                                    onChange={(e) => setPortalUrl(e.target.value)}
-                                                />
+                                                <label className="text-sm font-medium">Selecione o Portal de Origem:</label>
+                                                <Select value={portalUrl} onValueChange={setPortalUrl}>
+                                                    <SelectTrigger><SelectValue placeholder="Escolha o portal..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="zap_imoveis">Zap Imóveis</SelectItem>
+                                                        <SelectItem value="vivareal">VivaReal</SelectItem>
+                                                        <SelectItem value="imovelweb">ImóvelWeb</SelectItem>
+                                                        <SelectItem value="chaves_na_mao">Chaves na Mão</SelectItem>
+                                                        <SelectItem value="mercado_livre">Mercado Livre Imóveis</SelectItem>
+                                                        <SelectItem value="olx">OLX Imóveis</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                         )}
 
@@ -266,8 +272,9 @@ export default function Roleta() {
                                                     <Select>
                                                         <SelectTrigger className="bg-background"><SelectValue placeholder="Qualquer Segmentação..." /></SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="todos">Qualquer imóvel</SelectItem>
-                                                            <SelectItem value="lancha">Somente Lanchas / Náutico</SelectItem>
+                                                            <SelectItem value="todos">Qualquer Imóvel (Geral)</SelectItem>
+                                                            <SelectItem value="apartamentos">Apartamentos e Flats</SelectItem>
+                                                            <SelectItem value="casas">Casas e Sobrados</SelectItem>
                                                             <SelectItem value="alto_padrao">Coberturas e Mansões</SelectItem>
                                                             <SelectItem value="terrenos">Terrenos em Condomínio</SelectItem>
                                                         </SelectContent>
@@ -301,9 +308,9 @@ export default function Roleta() {
                                             <Select value={selectedRoulette} onValueChange={setSelectedRoulette}>
                                                 <SelectTrigger><SelectValue placeholder="Escolha a equipe..." /></SelectTrigger>
                                                 <SelectContent>
-                                                    {MOCK_ROULETTES.map(r => (
+                                                    {roulettesList.map(r => (
                                                         <SelectItem key={r.id} value={r.id}>
-                                                            {r.name} ({r.type})
+                                                            {r.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

@@ -33,6 +33,7 @@ type Instance = {
 type Broker = {
     id: string;
     name: string;
+    user_id?: string;
 }
 
 export function IntegrationManager() {
@@ -41,6 +42,7 @@ export function IntegrationManager() {
     const [brokers, setBrokers] = useState<Broker[]>([]);
     const [loading, setLoading] = useState(false);
     const userCompanyId = profile?.company_id;
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
 
 
     // Connection State
@@ -136,7 +138,7 @@ export function IntegrationManager() {
         // 4. Fetch All active Brokers (for dropdowns)
         const { data: brokerData } = await supabase
             .from('team_members')
-            .select('id, name')
+            .select('id, name, user_id')
             .eq('active', true);
 
         if (brokerData) setBrokers(brokerData);
@@ -337,7 +339,7 @@ export function IntegrationManager() {
             }
         }
 
-        const { error } = await supabase.from('instances').insert({
+        const { data: insertedData, error } = await supabase.from('instances').insert({
             name: newInstanceName,
             phone: newInstancePhone, // Save phone number
             status: 'closed',
@@ -345,10 +347,28 @@ export function IntegrationManager() {
             created_by_crm: true,
             business_type: newInstanceType,
             is_main: isMainInstance
-        });
+        }).select('id').single();
 
         if (error) toast.error("Erro ao criar: " + error.message);
         else {
+            if (!isAdmin) {
+                const currentUserBroker = brokers.find(b => b.user_id === profile?.id);
+                if (currentUserBroker) {
+                    const { error: linkError } = await supabase.from('instance_members').insert({
+                        instance_id: insertedData.id,
+                        team_member_id: currentUserBroker.id
+                    });
+                    if (linkError) {
+                        toast.error("Erro ao vincular: " + linkError.message);
+                    } else {
+                        toast.success("Corretor vinculado automaticamente!");
+                    }
+                } else {
+                    toast.error("Não foi possível achar seu usuário na lista de corretores: " + profile?.id);
+                    console.log("Current brokers:", brokers);
+                }
+            }
+
             toast.success("Conexão criada!");
             setIsNewConnectionOpen(false);
             setNewInstanceName("");
@@ -444,53 +464,59 @@ export function IntegrationManager() {
                                     />
                                     <p className="text-[10px] text-muted-foreground">Opcional. Coloque com o código do país (Ex: 55).</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Tipo de Negócio</Label>
-                                    <Select 
-                                        value={newInstanceType} 
-                                        onValueChange={(v: any) => setNewInstanceType(v)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecione o tipo..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="imoveis">Imóveis</SelectItem>
-                                            <SelectItem value="barcos">Barcos</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className={`flex items-center space-x-2 border p-3 rounded-md ${hasMainInstance ? 'bg-red-50/50 border-red-100' : 'bg-muted/20'}`}>
-                                    <Switch 
-                                        id="main-whatsapp" 
-                                        checked={isMainInstance} 
-                                        onCheckedChange={setIsMainInstance}
-                                        disabled={hasMainInstance}
-                                    />
-                                    <div className="grid gap-1.5 leading-none">
-                                        <Label htmlFor="main-whatsapp" className={`text-sm font-medium ${hasMainInstance ? 'text-red-900/50' : ''}`}>WhatsApp Principal</Label>
-                                        <p className={`text-xs ${hasMainInstance ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-                                            {hasMainInstance 
-                                                ? `⚠️ Bloqueado: Já existe um Principal para ${newInstanceType === 'imoveis' ? 'Imóveis' : 'Barcos'}.` 
-                                                : "Usado para notificações automáticas da imobiliária."}
-                                        </p>
-                                    </div>
-                                </div>
+                                {isAdmin && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-medium">Tipo de Negócio</Label>
+                                            <Select 
+                                                value={newInstanceType} 
+                                                onValueChange={(v: any) => setNewInstanceType(v)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecione o tipo..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="imoveis">Imóveis</SelectItem>
+                                                    <SelectItem value="barcos">Barcos</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className={`flex items-center space-x-2 border p-3 rounded-md ${hasMainInstance ? 'bg-red-50/50 border-red-100' : 'bg-muted/20'}`}>
+                                            <Switch 
+                                                id="main-whatsapp" 
+                                                checked={isMainInstance} 
+                                                onCheckedChange={setIsMainInstance}
+                                                disabled={hasMainInstance}
+                                            />
+                                            <div className="grid gap-1.5 leading-none">
+                                                <Label htmlFor="main-whatsapp" className={`text-sm font-medium ${hasMainInstance ? 'text-red-900/50' : ''}`}>WhatsApp Principal</Label>
+                                                <p className={`text-xs ${hasMainInstance ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                                                    {hasMainInstance 
+                                                        ? `⚠️ Bloqueado: Já existe um Principal para ${newInstanceType === 'imoveis' ? 'Imóveis' : 'Barcos'}.` 
+                                                        : "Usado para notificações automáticas da imobiliária."}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                                 <Button onClick={handleCreateInstance} className="w-full">Criar</Button>
                             </div>
                         </DialogContent>
                     </Dialog>
                 </div>
 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                            <UserPlus className="h-4 w-4 mr-2" /> Gerenciar Equipe
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <TeamManager onUpdate={fetchData} />
-                    </DialogContent>
-                </Dialog>
+                {isAdmin && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <UserPlus className="h-4 w-4 mr-2" /> Gerenciar Equipe
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <TeamManager onUpdate={fetchData} />
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
 
             {loading && <p className="text-muted-foreground text-sm">Carregando equipe...</p>}

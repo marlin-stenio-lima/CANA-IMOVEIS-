@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { UserPlus, Shield, Copy, Check } from "lucide-react";
+import { UserPlus, Shield, Copy, Check, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
     Dialog,
@@ -60,6 +60,25 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
         
         setGeneratedLink(url.toString());
         setCopied(false);
+    };
+
+    const handleDeleteMember = async (memberId: string, memberName: string) => {
+        if (!confirm(`Tem certeza que deseja remover ${memberName} da equipe?`)) return;
+        
+        try {
+            await supabase.from('team_members').delete().eq('user_id', memberId);
+            const { error } = await supabase.from('profiles').delete().eq('id', memberId);
+            
+            if (error) {
+                toast.error("Erro ao remover usuário: " + error.message);
+            } else {
+                toast.success("Usuário removido da equipe!");
+                fetchTeam();
+                if (onUpdate) onUpdate();
+            }
+        } catch (e: any) {
+            toast.error("Falha ao remover: " + e.message);
+        }
     };
 
     const copyToClipboard = () => {
@@ -177,10 +196,17 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {!isSuper ? (
-                                            <Button variant="outline" size="sm" onClick={() => setPermissionsMember(m)} className="h-8 gap-1 text-xs">
-                                                <Shield className="h-3 w-3" />
-                                                Gerenciar
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="outline" size="sm" onClick={() => setPermissionsMember(m)} className="h-8 gap-1 text-xs">
+                                                    <Shield className="h-3 w-3" />
+                                                    Gerenciar
+                                                </Button>
+                                                {m.role !== 'admin' && m.role !== 'owner' && (
+                                                    <Button variant="outline" size="sm" onClick={() => handleDeleteMember(m.id, m.full_name || m.email)} className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         ) : (
                                             <span className="text-xs text-muted-foreground">Master</span>
                                         )}

@@ -64,7 +64,9 @@ export default function Settings() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get("tab") || "company";
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
+  const defaultTab = isAdmin ? "company" : "profile";
+  const currentTab = searchParams.get("tab") || defaultTab;
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -79,12 +81,12 @@ export default function Settings() {
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="company" className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
+          {isAdmin && <TabsTrigger value="company" className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>}
           <TabsTrigger value="profile" className="flex items-center gap-2"><User className="h-4 w-4" /> Perfil</TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center gap-2"><Users className="h-4 w-4" /> Minha Equipe</TabsTrigger>
+          {isAdmin && <TabsTrigger value="team" className="flex items-center gap-2"><Users className="h-4 w-4" /> Minha Equipe</TabsTrigger>}
 
           <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notificações</TabsTrigger>
-          {(profile?.id === profile?.company_id || profile?.job_title?.toLowerCase().includes('admin') || profile?.job_title?.toLowerCase().includes('diretor')) && (
+          {isAdmin && (
             <TabsTrigger value="ai" className="flex items-center gap-2 text-indigo-600 font-bold"><Bot className="h-4 w-4" /> Inteligência Artificial</TabsTrigger>
           )}
           <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
@@ -92,81 +94,87 @@ export default function Settings() {
 
 
 
-        <TabsContent value="team">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerenciamento de Equipe</CardTitle>
-              <CardDescription>Adicione, remova e gerencie permissões dos corretores.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TeamManager />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="team">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciamento de Equipe</CardTitle>
+                <CardDescription>Adicione, remova e gerencie permissões dos corretores.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TeamManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
-        <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <CardTitle>Informações da Empresa</CardTitle>
-              <CardDescription>Dados cadastrais da empresa principal</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="company-name">Nome da Empresa</Label>
-                  <Input id="company-name" placeholder="Sua Empresa Ltda" />
+        {isAdmin && (
+          <TabsContent value="company">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da Empresa</CardTitle>
+                <CardDescription>Dados cadastrais da empresa principal</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Nome da Empresa</Label>
+                    <Input id="company-name" placeholder="Sua Empresa Ltda" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cnpj">CNPJ</Label>
+                    <Input id="cnpj" placeholder="00.000.000/0001-00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" placeholder="contato@empresa.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input id="phone" placeholder="(11) 0000-0000" />
+                  </div>
                 </div>
+                <Separator />
                 <div className="space-y-2">
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input id="cnpj" placeholder="00.000.000/0001-00" />
+                  <Label htmlFor="address">Endereço</Label>
+                  <Input id="address" placeholder="Rua, número, bairro" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="contato@empresa.com" />
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Cidade</Label>
+                    <Input id="city" placeholder="São Paulo" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">Estado</Label>
+                    <Input id="state" placeholder="SP" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cep">CEP</Label>
+                    <Input id="cep" placeholder="00000-000" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" placeholder="(11) 0000-0000" />
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label htmlFor="address">Endereço</Label>
-                <Input id="address" placeholder="Rua, número, bairro" />
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" placeholder="São Paulo" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">Estado</Label>
-                  <Input id="state" placeholder="SP" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cep">CEP</Label>
-                  <Input id="cep" placeholder="00000-000" />
-                </div>
-              </div>
-              <Button>Salvar Alterações</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <Button>Salvar Alterações</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
-        <TabsContent value="ai">
-          <Card className="border-indigo-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-indigo-600" />
-                Inteligência Artificial
-              </CardTitle>
-              <CardDescription>Configure o motor de IA para automação e análise de leads.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AiSettings />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="ai">
+            <Card className="border-indigo-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-indigo-600" />
+                  Inteligência Artificial
+                </CardTitle>
+                <CardDescription>Configure o motor de IA para automação e análise de leads.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AiSettings />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="profile">
           <Card>

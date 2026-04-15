@@ -123,19 +123,20 @@ export function AppLayout() {
                       </span>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link to="/settings" className="cursor-pointer">
+                    <Link to="/settings?tab=profile" className="cursor-pointer">
                       <User className="mr-2 h-4 w-4" />
                       Meu Perfil
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Configurações
-                    </Link>
-                  </DropdownMenuItem>
+                  {(profile?.role === 'admin' || profile?.role === 'owner') && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings?tab=company" className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Configurações
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />

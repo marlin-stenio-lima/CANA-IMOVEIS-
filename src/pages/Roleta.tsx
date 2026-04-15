@@ -30,7 +30,14 @@ export default function Roleta() {
     const [priceMin, setPriceMin] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
     const [pipelineStage, setPipelineStage] = useState("novo_lead");
-    const [triggersList, setTriggersList] = useState(MOCK_TRIGGERS);
+    const [triggerName, setTriggerName] = useState("");
+    const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
+
+    const [triggersList, setTriggersList] = useState(() => {
+        const saved = localStorage.getItem("crm_triggers_v2");
+        return saved ? JSON.parse(saved) : MOCK_TRIGGERS;
+    });
+
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
     useEffect(() => {
@@ -41,16 +48,72 @@ export default function Roleta() {
         fetchTeam();
     }, []);
 
+    useEffect(() => {
+        localStorage.setItem("crm_triggers_v2", JSON.stringify(triggersList));
+    }, [triggersList]);
+
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
-    const [roulettesList, setRoulettesList] = useState(MOCK_ROULETTES);
+    const [roulettesList, setRoulettesList] = useState(() => {
+        const saved = localStorage.getItem("crm_roulettes_v2");
+        return saved ? JSON.parse(saved) : MOCK_ROULETTES;
+    });
     const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
+    const [editingRouletteId, setEditingRouletteId] = useState<string | null>(null);
+
+    useEffect(() => {
+        localStorage.setItem("crm_roulettes_v2", JSON.stringify(roulettesList));
+    }, [roulettesList]);
 
     const handleSave = () => {
-        toast.success("Automação salva com sucesso!", {
-            description: "O fluxo foi validado e está ativo."
-        });
+        if (!triggerName) {
+            toast.error("Vazio: Insira um nome para a automação.");
+            return;
+        }
+        if (!selectedRoulette) {
+            toast.error("Vazio: Selecione uma roleta de destino.");
+            return;
+        }
+
+        const newTrigger = {
+            id: editingTriggerId || String(Date.now()),
+            name: triggerName,
+            source: triggerType,
+            condition: triggerType === 'whatsapp' ? (matchText ? `Texto: ${matchText}` : 'Todos os leads (sem filtro)') : triggerType === 'portal' ? `Portal: ${portalUrl}` : 'Formulário',
+            rouletteId: selectedRoulette,
+            active: true
+        };
+
+        if (editingTriggerId) {
+            setTriggersList(triggersList.map(t => t.id === editingTriggerId ? newTrigger : t));
+        } else {
+            setTriggersList([...triggersList, newTrigger]);
+        }
+
+        toast.success("Automação salva com sucesso!");
         setAutomationStep(0);
+        setTriggerName("");
+        setMatchText("");
+        setPortalUrl("");
+        setSelectedRoulette("");
+        setEditingTriggerId(null);
+    };
+
+    const handleNewTrigger = () => {
+        setTriggerName("");
+        setMatchText("");
+        setPortalUrl("");
+        setSelectedRoulette("");
+        setEditingTriggerId(null);
+        setAutomationStep(1);
+    };
+
+    const handleEditTrigger = (trigger: any) => {
+        setTriggerName(trigger.name);
+        setTriggerType(trigger.source);
+        setSelectedRoulette(trigger.rouletteId || "");
+        setEditingTriggerId(trigger.id);
+        setAutomationStep(1);
     };
 
     const handleDeleteTrigger = (id: string) => {
@@ -63,20 +126,35 @@ export default function Roleta() {
         toast.success("Roleta excluída com sucesso!");
     };
 
+    const handleEditRoulette = (roleta: any) => {
+        setNewRoulette({ name: roleta.name, type: "round_robin", slaTime: "5" });
+        setEditingRouletteId(roleta.id);
+        setConfigStep(1);
+    };
+
     const handleSaveRoulette = () => {
         if (!newRoulette.name) {
             toast.error("Vazio: Insira um nome para a roleta.");
             return;
         }
-        setRoulettesList([...roulettesList, { 
-            id: String(Date.now()), 
+
+        const savedObject = { 
+            id: editingRouletteId || String(Date.now()), 
             name: newRoulette.name, 
-            type: newRoulette.type === "round_robin" ? "Round Robin" : newRoulette.type === "shark_tank" ? "Shark Tank" : "Timeout SLA", 
+            type: "Round Robin", 
             members: 0 
-        }]);
-        toast.success("Roleta criada com sucesso!");
+        };
+
+        if (editingRouletteId) {
+            setRoulettesList(roulettesList.map(r => r.id === editingRouletteId ? savedObject : r));
+        } else {
+            setRoulettesList([...roulettesList, savedObject]);
+        }
+
+        toast.success("Roleta salva com sucesso!");
         setConfigStep(0);
         setNewRoulette({ name: "", type: "round_robin", slaTime: "5" });
+        setEditingRouletteId(null);
     };
 
     return (
@@ -92,7 +170,7 @@ export default function Roleta() {
                     </p>
                 </div>
                 {automationStep === 0 && (
-                    <Button onClick={() => setAutomationStep(1)} className="gap-2">
+                    <Button onClick={handleNewTrigger} className="gap-2">
                         <Plus className="h-4 w-4" /> Nova Automação
                     </Button>
                 )}
@@ -122,7 +200,7 @@ export default function Roleta() {
                                                 {trigger.active ? "Ativo" : "Pausado"}
                                             </Badge>
                                             <div className="flex gap-1">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8"><Settings2 className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEditTrigger(trigger); }}><Settings2 className="h-4 w-4" /></Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(trigger.id); }}><Trash2 className="h-4 w-4" /></Button>
                                             </div>
                                         </div>
@@ -139,14 +217,14 @@ export default function Roleta() {
                                         </div>
                                         <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                             <ArrowDown className="h-4 w-4" />
-                                            Envia para: {MOCK_ROULETTES.find(r => r.id === trigger.rouletteId)?.name}
+                                            Envia para: {roulettesList.find(r => r.id === trigger.rouletteId)?.name || "Roleta Excluída"}
                                         </div>
                                     </CardContent>
                                 </Card>
                             ))}
 
                             {/* Empty State Card */}
-                            <Card className="border-dashed flex flex-col items-center justify-center p-8 cursor-pointer hover:bg-muted/10" onClick={() => setAutomationStep(1)}>
+                            <Card className="border-dashed flex flex-col items-center justify-center p-8 cursor-pointer hover:bg-muted/10" onClick={handleNewTrigger}>
                                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
                                     <Plus className="h-6 w-6 text-muted-foreground" />
                                 </div>
@@ -159,6 +237,11 @@ export default function Roleta() {
                     ) : (
                         // EDITOR VISUAL (FLUXO)
                         <div className="max-w-3xl mx-auto space-y-2 pb-20">
+
+                            <div className="mb-6 space-y-2">
+                                <label className="text-sm font-semibold">Nome da Automação:</label>
+                                <Input placeholder="Ex: Leads de Alta Renda FDS" className="bg-background max-w-sm outline-none border-primary/50 text-base" value={triggerName} onChange={e => setTriggerName(e.target.value)} />
+                            </div>
 
                             {/* STEP 1: TRIGGER */}
                             <div className="relative pl-8 border-l-2 border-primary/20 pb-12">
@@ -379,7 +462,7 @@ export default function Roleta() {
                                         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                                             <CardTitle className="text-base font-semibold">{r.name}</CardTitle>
                                             <div className="flex gap-1">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleEditRoulette(r)}>
                                                     <Settings2 className="h-4 w-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteRoulette(r.id); }}>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save, Clock, Users, ArrowRight, ShieldCheck, AlertTriangle, Bot, CheckCircle2 } from "lucide-react";
@@ -30,6 +31,15 @@ export default function Roleta() {
     const [locationFilter, setLocationFilter] = useState("");
     const [pipelineStage, setPipelineStage] = useState("novo_lead");
     const [triggersList, setTriggersList] = useState(MOCK_TRIGGERS);
+    const [teamMembers, setTeamMembers] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchTeam = async () => {
+            const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
+            if (data) setTeamMembers(data);
+        };
+        fetchTeam();
+    }, []);
 
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
@@ -410,18 +420,16 @@ export default function Roleta() {
                                                 </label>
                                                 <p className="text-sm text-muted-foreground">Marque os corretores que receberão os leads desta roleta:</p>
                                                 <div className="border rounded-md p-2 space-y-1 bg-muted/20">
-                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
-                                                        <input type="checkbox" className="h-4 w-4" />
-                                                        <span className="font-medium text-sm">Tatiana (Diretora)</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
-                                                        <input type="checkbox" className="h-4 w-4" />
-                                                        <span className="font-medium text-sm">Stenio Lima</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
-                                                        <input type="checkbox" className="h-4 w-4" />
-                                                        <span className="font-medium text-sm">João Silva (Plantão Imóveis)</span>
-                                                    </label>
+                                                    {teamMembers.map(member => (
+                                                        <label key={member.id} className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
+                                                            <input type="checkbox" className="h-4 w-4" />
+                                                            <span className="font-medium text-sm">{member.full_name || member.email || 'Usuário'}</span>
+                                                            {member.role && <span className="text-xs text-muted-foreground ml-auto uppercase px-2 py-1 bg-muted rounded">{member.role}</span>}
+                                                        </label>
+                                                    ))}
+                                                    {teamMembers.length === 0 && (
+                                                        <p className="text-sm text-muted-foreground p-4 text-center">Nenhum membro encontrado ou carregando...</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

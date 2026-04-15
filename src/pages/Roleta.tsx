@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save } from "lucide-react";
+import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save, Clock, Users, ArrowRight, ShieldCheck, AlertTriangle, Bot, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -26,11 +26,32 @@ export default function Roleta() {
     const [triggerType, setTriggerType] = useState<string>("whatsapp");
     const [matchText, setMatchText] = useState("");
 
+    // Config Tab States
+    const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
+    const [roulettesList, setRoulettesList] = useState(MOCK_ROULETTES);
+    const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
+
     const handleSave = () => {
         toast.success("Automação salva com sucesso!", {
             description: "O fluxo foi validado e está ativo."
         });
         setAutomationStep(0);
+    };
+
+    const handleSaveRoulette = () => {
+        if (!newRoulette.name) {
+            toast.error("Vazio: Insira um nome para a roleta.");
+            return;
+        }
+        setRoulettesList([...roulettesList, { 
+            id: String(Date.now()), 
+            name: newRoulette.name, 
+            type: newRoulette.type === "round_robin" ? "Round Robin" : newRoulette.type === "shark_tank" ? "Shark Tank" : "Timeout SLA", 
+            members: 0 
+        }]);
+        toast.success("Roleta criada com sucesso!");
+        setConfigStep(0);
+        setNewRoulette({ name: "", type: "round_robin", slaTime: "5" });
     };
 
     return (
@@ -236,25 +257,147 @@ export default function Roleta() {
                 </TabsContent>
 
                 {/* CONFIG ROULETTES TAB */}
-                <TabsContent value="config">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Gerenciar Roletas</CardTitle>
-                            <CardDescription>Crie grupos de corretores e defina regras de plantão.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground text-sm">
-                                (Funcionalidade de gerenciamento de membros será implementada quando o banco de dados retornar).
-                                <br />
-                                Você poderá definir: Round Robin, Plantão por Horário e Roleta por Imóvel.
-                            </p>
-                        </CardContent>
-                    </Card>
+                <TabsContent value="config" className="mt-6">
+                    {configStep === 0 ? (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-semibold">Suas Roletas</h2>
+                                    <p className="text-sm text-muted-foreground">Grupos e regras de distribuição cadastradas.</p>
+                                </div>
+                                <Button onClick={() => setConfigStep(1)} className="gap-2"><Plus className="h-4 w-4" /> Criar Roleta</Button>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {roulettesList.map(r => (
+                                    <Card key={r.id}>
+                                        <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                                            <CardTitle className="text-base font-semibold">{r.name}</CardTitle>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                                <Settings2 className="h-4 w-4" />
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="outline" className="bg-muted/50">{r.type}</Badge>
+                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <Users className="h-3 w-3" /> {r.members} corretores
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="max-w-2xl mx-auto">
+                            <Card className="border-t-4 border-t-primary shadow-md">
+                                <CardHeader className="border-b bg-muted/10 pb-6">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-2xl">Nova Roleta de Distribuição</CardTitle>
+                                        <Button variant="ghost" size="sm" onClick={() => setConfigStep(0)}>Voltar</Button>
+                                    </div>
+                                    <CardDescription>Defina as regras de entrega para este grupo de corretores.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-8 pt-6">
+                                    {/* Name string */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold flex items-center gap-2">
+                                            1. Nomeclatura
+                                        </label>
+                                        <Input 
+                                            placeholder="Ex: Equipe Lançamentos SC" 
+                                            value={newRoulette.name}
+                                            onChange={(e) => setNewRoulette({...newRoulette, name: e.target.value})}
+                                            className="text-lg py-6 bg-muted/30"
+                                        />
+                                    </div>
+
+                                    {/* Tipo de Roleta */}
+                                    <div className="space-y-4">
+                                        <label className="text-sm font-semibold flex items-center gap-2">
+                                            2. Dinâmica de Distribuição
+                                        </label>
+                                        <div className="grid gap-3">
+                                            {/* Round Robin */}
+                                            <label 
+                                                className={`relative flex cursor-pointer rounded-xl border p-4 hover:bg-accent/50 transition-all ${newRoulette.type === 'round_robin' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className="mt-1 bg-blue-100 p-2 rounded-full text-blue-600">
+                                                        <Target className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="font-semibold text-foreground">Distribuição Equitativa (Round Robin)</p>
+                                                        <p className="text-sm text-muted-foreground leading-snug">O lead é entregue estritamente um para cada. Corretor A, depois Corretor B, depois C, garantindo igualdade matemática na fila de leads.</p>
+                                                    </div>
+                                                </div>
+                                                <input type="radio" name="roulette-type" value="round_robin" className="absolute opacity-0" checked={newRoulette.type === 'round_robin'} onChange={() => setNewRoulette({...newRoulette, type: 'round_robin'})} />
+                                            </label>
+
+                                            {/* Shark Tank */}
+                                            <label 
+                                                className={`relative flex cursor-pointer rounded-xl border p-4 hover:bg-accent/50 transition-all ${newRoulette.type === 'shark_tank' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className="mt-1 bg-red-100 p-2 rounded-full text-red-600">
+                                                        <Zap className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="font-semibold text-foreground">Modo Caçador (Shark Tank)</p>
+                                                        <p className="text-sm text-muted-foreground leading-snug">O lead notifica todos da equipe simultaneamente no painel. O primeiro corretor que abri-lo toma posse imediata, gerando alta competitividade.</p>
+                                                    </div>
+                                                </div>
+                                                <input type="radio" name="roulette-type" value="shark_tank" className="absolute opacity-0" checked={newRoulette.type === 'shark_tank'} onChange={() => setNewRoulette({...newRoulette, type: 'shark_tank'})} />
+                                            </label>
+
+                                            {/* Timeout SLA */}
+                                            <label 
+                                                className={`relative flex cursor-pointer rounded-xl border p-4 hover:bg-accent/50 transition-all ${newRoulette.type === 'sla' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className="mt-1 bg-orange-100 p-2 rounded-full text-orange-600">
+                                                        <Clock className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="font-semibold text-foreground">Roleta por Tempo (SLA Escalonado)</p>
+                                                        <p className="text-sm text-muted-foreground leading-snug">Se o corretor não visualizar o lead no prazo estipulado, a roleta toma o lead dele e repassa automaticamente pro próximo da fila.</p>
+                                                        
+                                                        {newRoulette.type === 'sla' && (
+                                                            <div className="pt-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2" onClick={(e) => e.preventDefault()}>
+                                                                <span className="text-sm font-medium">Tempo limite (SLA):</span>
+                                                                <Select value={newRoulette.slaTime} onValueChange={(val) => setNewRoulette({...newRoulette, slaTime: val})}>
+                                                                    <SelectTrigger className="w-[140px] h-8 bg-background"><SelectValue /></SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="3">3 Minutos</SelectItem>
+                                                                        <SelectItem value="5">5 Minutos</SelectItem>
+                                                                        <SelectItem value="15">15 Minutos</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                <span className="text-xs text-muted-foreground">antes de pular.</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <input type="radio" name="roulette-type" value="sla" className="absolute opacity-0" checked={newRoulette.type === 'sla'} onChange={() => setNewRoulette({...newRoulette, type: 'sla'})} />
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Botão Salvar */}
+                                    <div className="pt-4 border-t flex justify-end">
+                                        <Button size="lg" className="px-8 gap-2" onClick={handleSaveRoulette}>
+                                            <Save className="h-4 w-4" /> Salvar Definições
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
                 </TabsContent>
             </Tabs>
         </div>
     );
 }
-
-// Additional imports needed for the mocks setup above to work perfectly
-import { Bot, CheckCircle2 } from "lucide-react";

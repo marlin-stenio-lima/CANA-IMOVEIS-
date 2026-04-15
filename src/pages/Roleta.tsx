@@ -43,7 +43,7 @@ export default function Roleta() {
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
 
     const [triggersList, setTriggersList] = useState<any[]>(() => {
-        const saved = localStorage.getItem(`crm_triggers_v4_${mode}`);
+        const saved = localStorage.getItem(`crm_triggers_v5_${mode}`);
         return saved ? JSON.parse(saved) : [];
     });
 
@@ -58,10 +58,10 @@ export default function Roleta() {
     }, []);
 
     useEffect(() => {
-        const savedTriggers = localStorage.getItem(`crm_triggers_v4_${mode}`);
+        const savedTriggers = localStorage.getItem(`crm_triggers_v5_${mode}`);
         setTriggersList(savedTriggers ? JSON.parse(savedTriggers) : []);
         
-        const savedRoulettes = localStorage.getItem(`crm_roulettes_v4_${mode}`);
+        const savedRoulettes = localStorage.getItem(`crm_roulettes_v5_${mode}`);
         setRoulettesList(savedRoulettes ? JSON.parse(savedRoulettes) : []);
         
         setNotificationText(defaultNotifText);
@@ -74,7 +74,7 @@ export default function Roleta() {
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
     const [roulettesList, setRoulettesList] = useState<any[]>(() => {
-        const saved = localStorage.getItem(`crm_roulettes_v4_${mode}`);
+        const saved = localStorage.getItem(`crm_roulettes_v5_${mode}`);
         return saved ? JSON.parse(saved) : [];
     });
     const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
@@ -111,7 +111,7 @@ export default function Roleta() {
             updatedTriggers = [...triggersList, newTrigger];
             setTriggersList(updatedTriggers);
         }
-        localStorage.setItem(`crm_triggers_v4_${mode}`, JSON.stringify(updatedTriggers));
+        localStorage.setItem(`crm_triggers_v5_${mode}`, JSON.stringify(updatedTriggers));
 
         toast.success(`Automação salva (${isBarcos ? 'Barcos' : 'Imóveis'})!`);
         setAutomationStep(0);
@@ -156,14 +156,14 @@ export default function Roleta() {
     const handleDeleteTrigger = (id: string) => {
         const updatedTriggers = triggersList.filter(t => t.id !== id);
         setTriggersList(updatedTriggers);
-        localStorage.setItem(`crm_triggers_v4_${mode}`, JSON.stringify(updatedTriggers));
+        localStorage.setItem(`crm_triggers_v5_${mode}`, JSON.stringify(updatedTriggers));
         toast.success("Automação excluída!");
     };
 
     const handleDeleteRoulette = (id: string) => {
         const updated = roulettesList.filter(r => r.id !== id);
         setRoulettesList(updated);
-        localStorage.setItem(`crm_roulettes_v4_${mode}`, JSON.stringify(updated));
+        localStorage.setItem(`crm_roulettes_v5_${mode}`, JSON.stringify(updated));
         toast.success("Roleta excluída com sucesso!");
     };
 
@@ -193,7 +193,7 @@ export default function Roleta() {
             updated = [...roulettesList, savedObject];
         }
         setRoulettesList(updated);
-        localStorage.setItem(`crm_roulettes_v4_${mode}`, JSON.stringify(updated));
+        localStorage.setItem(`crm_roulettes_v5_${mode}`, JSON.stringify(updated));
 
         toast.success("Roleta salva com sucesso!");
         setConfigStep(0);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save, Clock, Users, ArrowRight, ShieldCheck, AlertTriangle, Bot, CheckCircle2 } from "lucide-react";
+import { Plus, Target, Zap, MessageSquare, ArrowDown, Settings2, Trash2, Save, Clock, Users, ArrowRight, ShieldCheck, AlertTriangle, Bot, CheckCircle2, Filter, DollarSign, MapPin, Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -234,19 +234,47 @@ export default function Roleta() {
                                             </div>
                                         )}
 
-                                        <div className="pt-4 border-t mt-4 space-y-4">
-                                            <h4 className="text-sm font-semibold flex items-center gap-2 text-primary"><Target className="h-4 w-4"/> Filtros Inteligentes (Smart Routing)</h4>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium">Preço Mínimo (Alto Padrão)</label>
-                                                    <Input placeholder="Ex: 3000000" value={priceMin} onChange={e=>setPriceMin(e.target.value)} />
+                                        <div className="pt-6 border-t mt-6 space-y-4">
+                                            <div className="space-y-1">
+                                                <h4 className="text-sm font-semibold flex items-center gap-2 text-primary">
+                                                    <Filter className="h-4 w-4"/> Filtros Inteligentes (Smart Routing)
+                                                </h4>
+                                                <p className="text-xs text-muted-foreground">O lead só entrará nesta roleta se o imóvel de interesse se encaixar nesses parâmetros opcionais.</p>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-muted/20 p-4 rounded-lg border border-border/50">
+                                                {/* Preço */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><DollarSign className="h-3 w-3"/> Faixa de Valor (Mínimo)</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-medium">R$</span>
+                                                        <Input className="pl-8 bg-background" placeholder="Ex: 1.000.000" value={priceMin} onChange={e=>setPriceMin(e.target.value)} />
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground leading-tight">Direciona leads de ticket alto para corretores sêniors.</p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium">Localização do Imóvel</label>
-                                                    <Input placeholder="Ex: Angra dos Reis" value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
+
+                                                {/* Localização */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/> Bairro ou Região</label>
+                                                    <Input className="bg-background" placeholder="Ex: Angra dos Reis, Jardins..." value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
+                                                    <p className="text-[10px] text-muted-foreground leading-tight">Ative especialistas regionais ao invés da geral.</p>
+                                                </div>
+
+                                                {/* Tipo de Imóvel */}
+                                                <div className="space-y-2 md:col-span-2">
+                                                    <label className="text-xs font-semibold text-foreground flex items-center gap-1"><Home className="h-3 w-3"/> Categoria do Produto</label>
+                                                    <Select>
+                                                        <SelectTrigger className="bg-background"><SelectValue placeholder="Qualquer Segmentação..." /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="todos">Qualquer imóvel</SelectItem>
+                                                            <SelectItem value="lancha">Somente Lanchas / Náutico</SelectItem>
+                                                            <SelectItem value="alto_padrao">Coberturas e Mansões</SelectItem>
+                                                            <SelectItem value="terrenos">Terrenos em Condomínio</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <p className="text-[10px] text-muted-foreground">A roleta filtrará o imóvel antes de designar ao corretor.</p>
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">Configurações opcionais. Utilizado para direcionar para a roleta específica.</p>
                                         </div>
                                     </CardContent>
                                 </Card>

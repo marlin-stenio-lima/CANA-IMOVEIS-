@@ -25,6 +25,11 @@ export default function Roleta() {
     const [selectedRoulette, setSelectedRoulette] = useState<string>("");
     const [triggerType, setTriggerType] = useState<string>("whatsapp");
     const [matchText, setMatchText] = useState("");
+    const [portalUrl, setPortalUrl] = useState("");
+    const [priceMin, setPriceMin] = useState("");
+    const [locationFilter, setLocationFilter] = useState("");
+    const [pipelineStage, setPipelineStage] = useState("novo_lead");
+    const [triggersList, setTriggersList] = useState(MOCK_TRIGGERS);
 
     // Config Tab States
     const [configStep, setConfigStep] = useState(0); // 0 = List, 1 = Create/Edit
@@ -36,6 +41,11 @@ export default function Roleta() {
             description: "O fluxo foi validado e está ativo."
         });
         setAutomationStep(0);
+    };
+
+    const handleDeleteTrigger = (id: string) => {
+        setTriggersList(triggersList.filter(t => t.id !== id));
+        toast.success("Automação excluída!");
     };
 
     const handleSaveRoulette = () => {
@@ -89,14 +99,17 @@ export default function Roleta() {
                 <TabsContent value="fluxos" className="mt-6">
                     {automationStep === 0 ? (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {MOCK_TRIGGERS.map((trigger) => (
+                            {triggersList.map((trigger) => (
                                 <Card key={trigger.id} className="cursor-pointer hover:border-primary/50 transition-all">
                                     <CardHeader className="pb-3">
                                         <div className="flex justify-between items-start">
                                             <Badge variant={trigger.active ? "default" : "secondary"}>
                                                 {trigger.active ? "Ativo" : "Pausado"}
                                             </Badge>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8"><Settings2 className="h-4 w-4" /></Button>
+                                            <div className="flex gap-1">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><Settings2 className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteTrigger(trigger.id); }}><Trash2 className="h-4 w-4" /></Button>
+                                            </div>
                                         </div>
                                         <CardTitle className="text-lg mt-2">{trigger.name}</CardTitle>
                                         <CardDescription className="flex items-center gap-1">
@@ -148,32 +161,39 @@ export default function Roleta() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-4 space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div
                                                 className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'whatsapp' ? 'border-primary bg-primary/5' : ''}`}
                                                 onClick={() => setTriggerType('whatsapp')}
                                             >
                                                 <MessageSquare className="h-6 w-6" />
-                                                <span className="text-sm font-medium">Campanha WhatsApp</span>
+                                                <span className="text-sm font-medium text-center">WhatsApp<br/><span className="text-xs font-normal opacity-80">(Central)</span></span>
                                             </div>
                                             <div
                                                 className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'facebook' ? 'border-primary bg-primary/5' : ''}`}
                                                 onClick={() => setTriggerType('facebook')}
                                             >
                                                 <Zap className="h-6 w-6" />
-                                                <span className="text-sm font-medium">Facebook Form</span>
+                                                <span className="text-sm font-medium text-center">Meta Ads<br/><span className="text-xs font-normal opacity-80">(Formulários)</span></span>
+                                            </div>
+                                            <div
+                                                className={`p-4 border rounded-lg cursor-pointer flex flex-col items-center gap-2 hover:bg-accent ${triggerType === 'portal' ? 'border-primary bg-primary/5' : ''}`}
+                                                onClick={() => setTriggerType('portal')}
+                                            >
+                                                <Target className="h-6 w-6" />
+                                                <span className="text-sm font-medium text-center">Portais<br/><span className="text-xs font-normal opacity-80">(Zap/Viva/Etc)</span></span>
                                             </div>
                                         </div>
 
                                         {triggerType === 'whatsapp' && (
                                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-sm font-medium">Se a mensagem do cliente contiver:</label>
+                                                <label className="text-sm font-medium">Filtro de Mensagem (Opcional):</label>
                                                 <Input
-                                                    placeholder="Ex: olá vim do anúncio da casa sobrado"
+                                                    placeholder="Ex: 1 - Quero ver Lanchas"
                                                     value={matchText}
                                                     onChange={(e) => setMatchText(e.target.value)}
                                                 />
-                                                <p className="text-xs text-muted-foreground">O sistema buscará esse trecho exato na primeira mensagem.</p>
+                                                <p className="text-xs text-orange-600 font-medium">Se deixar vazio, TODOS os leads gerados via WhatsApp entrarão nesta roleta.</p>
                                             </div>
                                         )}
                                         {triggerType === 'facebook' && (
@@ -188,6 +208,31 @@ export default function Roleta() {
                                                 </Select>
                                             </div>
                                         )}
+                                        {triggerType === 'portal' && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-sm font-medium">Link Webhook / Integração do Portal:</label>
+                                                <Input
+                                                    placeholder="Ex: ID do anúncio ou Integração Portal 1234"
+                                                    value={portalUrl}
+                                                    onChange={(e) => setPortalUrl(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="pt-4 border-t mt-4 space-y-4">
+                                            <h4 className="text-sm font-semibold flex items-center gap-2 text-primary"><Target className="h-4 w-4"/> Filtros Inteligentes (Smart Routing)</h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium">Preço Mínimo (Alto Padrão)</label>
+                                                    <Input placeholder="Ex: 3000000" value={priceMin} onChange={e=>setPriceMin(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium">Localização do Imóvel</label>
+                                                    <Input placeholder="Ex: Angra dos Reis" value={locationFilter} onChange={e=>setLocationFilter(e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">Configurações opcionais. Utilizado para direcionar para a roleta específica.</p>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -228,25 +273,35 @@ export default function Roleta() {
                                 </Card>
                             </div>
 
-                            {/* STEP 3: AI Activation */}
+                            {/* STEP 3: Pipeline Mover */}
                             <div className="relative pl-8">
                                 <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold">3</div>
                                 <Card className="border-green-500 bg-green-50/50 shadow-sm">
                                     <CardHeader className="pb-3">
                                         <div className="flex items-center gap-2">
                                             <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                                                <Bot className="h-5 w-5" /> {/* Note: Bot needs import */}
+                                                <Target className="h-5 w-5" />
                                             </div>
                                             <div>
-                                                <CardTitle className="text-base">Ativação da IA</CardTitle>
-                                                <CardDescription>Ação Final</CardDescription>
+                                                <CardTitle className="text-base">Mover para o Pipeline (Kanban)</CardTitle>
+                                                <CardDescription>Onde o novo lead deve ser armazenado?</CardDescription>
                                             </div>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-2">
-                                        <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
-                                            <CheckCircle2 className="h-4 w-4" /> {/* Note: CheckCircle2 needs import */}
-                                            O Agente Virtual será ativado automaticamente após a distribuição.
+                                        <div className="space-y-3">
+                                            <Select value={pipelineStage} onValueChange={setPipelineStage}>
+                                                <SelectTrigger className="bg-background"><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="novo_lead">Novo Lead</SelectItem>
+                                                    <SelectItem value="atendimento">Em Atendimento</SelectItem>
+                                                    <SelectItem value="visita">Visita Agendada</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                O lead e a conversa serão associados a este estágio imediatamente.
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -331,58 +386,34 @@ export default function Roleta() {
                                                     </div>
                                                     <div className="space-y-1">
                                                         <p className="font-semibold text-foreground">Distribuição Equitativa (Round Robin)</p>
-                                                        <p className="text-sm text-muted-foreground leading-snug">O lead é entregue estritamente um para cada. Corretor A, depois Corretor B, depois C, garantindo igualdade matemática na fila de leads.</p>
+                                                        <p className="text-sm text-muted-foreground leading-snug">O lead é entregue estritamente um para cada componente selecioando. Corretor A, depois Corretor B, depois C, garantindo total igualdade matemática.</p>
                                                     </div>
                                                 </div>
                                                 <input type="radio" name="roulette-type" value="round_robin" className="absolute opacity-0" checked={newRoulette.type === 'round_robin'} onChange={() => setNewRoulette({...newRoulette, type: 'round_robin'})} />
                                             </label>
 
-                                            {/* Shark Tank */}
-                                            <label 
-                                                className={`relative flex cursor-pointer rounded-xl border p-4 hover:bg-accent/50 transition-all ${newRoulette.type === 'shark_tank' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
-                                            >
-                                                <div className="flex items-start gap-4">
-                                                    <div className="mt-1 bg-red-100 p-2 rounded-full text-red-600">
-                                                        <Zap className="h-5 w-5" />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="font-semibold text-foreground">Modo Caçador (Shark Tank)</p>
-                                                        <p className="text-sm text-muted-foreground leading-snug">O lead notifica todos da equipe simultaneamente no painel. O primeiro corretor que abri-lo toma posse imediata, gerando alta competitividade.</p>
-                                                    </div>
+                                            {/* Corretor Selection */}
+                                            <div className="pt-6 mt-4 space-y-3">
+                                                <label className="text-sm font-semibold flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-primary" />
+                                                    3. Integrantes da Roleta
+                                                </label>
+                                                <p className="text-sm text-muted-foreground">Marque os corretores que receberão os leads desta roleta:</p>
+                                                <div className="border rounded-md p-2 space-y-1 bg-muted/20">
+                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
+                                                        <input type="checkbox" className="h-4 w-4" />
+                                                        <span className="font-medium text-sm">Tatiana (Diretora)</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
+                                                        <input type="checkbox" className="h-4 w-4" />
+                                                        <span className="font-medium text-sm">Stenio Lima</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
+                                                        <input type="checkbox" className="h-4 w-4" />
+                                                        <span className="font-medium text-sm">João Silva (Plantão Imóveis)</span>
+                                                    </label>
                                                 </div>
-                                                <input type="radio" name="roulette-type" value="shark_tank" className="absolute opacity-0" checked={newRoulette.type === 'shark_tank'} onChange={() => setNewRoulette({...newRoulette, type: 'shark_tank'})} />
-                                            </label>
-
-                                            {/* Timeout SLA */}
-                                            <label 
-                                                className={`relative flex cursor-pointer rounded-xl border p-4 hover:bg-accent/50 transition-all ${newRoulette.type === 'sla' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
-                                            >
-                                                <div className="flex items-start gap-4">
-                                                    <div className="mt-1 bg-orange-100 p-2 rounded-full text-orange-600">
-                                                        <Clock className="h-5 w-5" />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="font-semibold text-foreground">Roleta por Tempo (SLA Escalonado)</p>
-                                                        <p className="text-sm text-muted-foreground leading-snug">Se o corretor não visualizar o lead no prazo estipulado, a roleta toma o lead dele e repassa automaticamente pro próximo da fila.</p>
-                                                        
-                                                        {newRoulette.type === 'sla' && (
-                                                            <div className="pt-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2" onClick={(e) => e.preventDefault()}>
-                                                                <span className="text-sm font-medium">Tempo limite (SLA):</span>
-                                                                <Select value={newRoulette.slaTime} onValueChange={(val) => setNewRoulette({...newRoulette, slaTime: val})}>
-                                                                    <SelectTrigger className="w-[140px] h-8 bg-background"><SelectValue /></SelectTrigger>
-                                                                    <SelectContent>
-                                                                        <SelectItem value="3">3 Minutos</SelectItem>
-                                                                        <SelectItem value="5">5 Minutos</SelectItem>
-                                                                        <SelectItem value="15">15 Minutos</SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                                <span className="text-xs text-muted-foreground">antes de pular.</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <input type="radio" name="roulette-type" value="sla" className="absolute opacity-0" checked={newRoulette.type === 'sla'} onChange={() => setNewRoulette({...newRoulette, type: 'sla'})} />
-                                            </label>
+                                            </div>
                                         </div>
                                     </div>
 

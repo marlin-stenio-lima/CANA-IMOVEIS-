@@ -30,6 +30,7 @@ export default function Roleta() {
     const [priceMin, setPriceMin] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
     const [pipelineStage, setPipelineStage] = useState("novo_lead");
+    const [notificationText, setNotificationText] = useState("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
     const [triggerName, setTriggerName] = useState("");
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
 
@@ -81,6 +82,8 @@ export default function Roleta() {
             source: triggerType,
             condition: triggerType === 'whatsapp' ? (matchText ? `Texto: ${matchText}` : 'Todos os leads (sem filtro)') : triggerType === 'portal' ? `Portal: ${portalUrl}` : 'Formulário',
             rouletteId: selectedRoulette,
+            pipelineStage,
+            notificationText,
             active: true
         };
 
@@ -96,6 +99,7 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
+        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
         setEditingTriggerId(null);
     };
 
@@ -104,6 +108,7 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
+        setNotificationText("Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
         setEditingTriggerId(null);
         setAutomationStep(1);
     };
@@ -112,6 +117,8 @@ export default function Roleta() {
         setTriggerName(trigger.name);
         setTriggerType(trigger.source);
         setSelectedRoulette(trigger.rouletteId || "");
+        setPipelineStage(trigger.pipelineStage || "novo_lead");
+        setNotificationText(trigger.notificationText || "Olá! Você tem um novo lead atribuído via roleta:\n\n👤 Nome: {nome}\n📱 Telefone: {telefone}\n📧 Email: {email}\n🏠 Imóvel: {imovel}\n📌 Observação: {observacao}");
         setEditingTriggerId(trigger.id);
         setAutomationStep(1);
     };
@@ -407,7 +414,7 @@ export default function Roleta() {
                             </div>
 
                             {/* STEP 3: Pipeline Mover */}
-                            <div className="relative pl-8">
+                            <div className="relative pl-8 border-l-2 border-green-600/20 pb-12">
                                 <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold">3</div>
                                 <Card className="border-green-500 bg-green-50/50 shadow-sm">
                                     <CardHeader className="pb-3">
@@ -433,10 +440,55 @@ export default function Roleta() {
                                             </Select>
                                             <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                O lead e a conversa serão associados a este estágio imediatamente.
+                                                O lead será movido a este estágio do bolsão instantaneamente.
                                             </div>
                                         </div>
                                     </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* STEP 4: Notificação e Distribuição do WhatsApp */}
+                            <div className="relative pl-8 pb-4">
+                                <div className="absolute -left-3 top-0 h-6 w-6 rounded-full bg-purple-600 flex items-center justify-center text-white text-xs font-bold">4</div>
+                                <Card className="border-purple-300 bg-purple-50/40 shadow-sm hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+                                                <Bot className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-base flex items-center gap-2">Disparo de Notificação (Notificar Corretor) <Badge variant="secondary" className="bg-purple-100 text-purple-700 border-none">Obrigatório</Badge></CardTitle>
+                                                <CardDescription>O que a Central de WhatsApp deve enviar para o celular do Corretor Atribuído?</CardDescription>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-2">
+                                        <div className="space-y-4">
+                                            <div className="bg-background p-4 rounded-lg border border-purple-200">
+                                                <p className="text-xs text-muted-foreground mb-3 font-medium">Corpo da Mensagem:</p>
+                                                <textarea 
+                                                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[140px] resize-y"
+                                                    value={notificationText} 
+                                                    onChange={e => setNotificationText(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground border-t pt-3">
+                                                <div><strong className="text-foreground">Legendas Disponíveis:</strong></div>
+                                                <div className="text-right">Apenas clique para copiar ou digite manualmente</div>
+                                                <div className="col-span-2 flex flex-wrap gap-2 mt-1">
+                                                    <Badge variant="outline" className="cursor-pointer">{'{nome}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{'{telefone}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{'{email}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{'{imovel}'}</Badge>
+                                                    <Badge variant="outline" className="cursor-pointer">{'{observacao}'}</Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                    <div className="bg-purple-100/50 p-3 rounded-b-xl border-t border-purple-100 text-xs text-purple-900 font-medium flex gap-2 items-center">
+                                        <CheckCircle2 className="h-4 w-4 text-purple-600" />
+                                        Essa notificação força o lead a associar-se ao WhatsApp do corretor para evitar perdas no bolsão geral.
+                                    </div>
                                 </Card>
                             </div>
 

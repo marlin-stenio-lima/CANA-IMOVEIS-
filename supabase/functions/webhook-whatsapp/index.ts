@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
             senderNumber = participant.split('@')[0];
             remoteJid = `${senderNumber}@s.whatsapp.net`;
         }
-        const pushName = data.pushName || sender?.name || senderNumber;
+        const pushName = data.pushName || senderNumber;
 
         // Correctly handle contact name: only update if it's an inbound message
         const contactPayload: any = {

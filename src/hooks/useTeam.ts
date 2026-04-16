@@ -15,12 +15,9 @@ export function useTeam() {
     return useQuery({
         queryKey: ['team', profile?.company_id],
         queryFn: async () => {
-            if (!profile?.company_id) return [];
-
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, full_name, avatar_url, job_title')
-                .eq('company_id', profile.company_id);
+                .select('id, full_name, avatar_url, job_title');
 
             if (error) {
                 console.error("Error fetching team:", error);
@@ -40,6 +37,6 @@ export function useTeam() {
 
             return members;
         },
-        enabled: !!profile?.company_id,
+        enabled: true,
     });
 }

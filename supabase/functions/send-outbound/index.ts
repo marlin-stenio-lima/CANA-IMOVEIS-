@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
         const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')!
 
         const supabase = createClient(supabaseUrl, supabaseKey)
-        const { message, conversation_id } = await req.json()
+        const { message, conversation_id, media_url, media_type } = await req.json()
 
         // 1. Get Conversation details (Phone AND Instance Name)
         const { data: conversation } = await supabase
@@ -42,18 +42,42 @@ Deno.serve(async (req) => {
         }
 
         // 2. Send via Evolution
-        const sendUrl = `${evolutionUrl}/message/sendText/${instanceName}`
+        let sendUrl = `${evolutionUrl}/message/sendText/${instanceName}`
+        let outBody: any = {
+            number: phone,
+            options: { delay: 0 },
+            textMessage: { text: message || "" }
+        }
+
+        if (media_url) {
+            if (media_type === 'audio') {
+                sendUrl = `${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`
+                outBody = {
+                    number: phone,
+                    options: { delay: 0, presence: "recording", encoding: true },
+                    audioMessage: { audio: media_url }
+                }
+            } else {
+                sendUrl = `${evolutionUrl}/message/sendMedia/${instanceName}`
+                outBody = {
+                    number: phone,
+                    options: { delay: 0 },
+                    mediaMessage: {
+                        mediatype: media_type || 'document',
+                        media: media_url,
+                        caption: message || undefined
+                    }
+                }
+            }
+        }
+
         const evoRes = await fetch(sendUrl, {
             method: 'POST',
             headers: {
                 'apikey': evolutionKey,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                number: phone,
-                options: { delay: 0 },
-                textMessage: { text: message }
-            })
+            body: JSON.stringify(outBody)
         })
 
         if (!evoRes.ok) {
@@ -68,7 +92,10 @@ Deno.serve(async (req) => {
             .insert({
                 conversation_id: conversation_id,
                 sender_type: 'user',
-                content: message,
+                content: message || '[Mídia enviada]',
+                message_type: media_url ? (media_type || 'document') : 'text',
+                media_url: media_url || null,
+                status: 'sent',
                 metadata: { via: 'crm_ui', instance: instanceName }
             })
             .select()

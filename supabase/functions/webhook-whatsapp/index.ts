@@ -67,25 +67,51 @@ Deno.serve(async (req) => {
         const pushName = data.pushName || senderNumber;
 
         // Correctly handle contact name: only update if it's an inbound message
-        const contactPayload: any = {
-            remote_jid: remoteJid, 
-            phone: senderNumber, 
-            company_id: instanceData.company_id, 
-            updated_at: new Date().toISOString()
-        };
-        
-        // Only update the name if it's NOT from me (it's from the contact)
+        let updateName = false;
         if (!fromMe && pushName && pushName !== senderNumber) {
-            contactPayload.name = pushName;
+            updateName = true;
         }
 
-        const { data: contact } = await supabase.from('contacts').upsert(
-            contactPayload, 
-            { onConflict: 'remote_jid' }
-        ).select().single();
+        // 2a. Find existing contact by remote_jid OR phone
+        const { data: existingContacts } = await supabase.from('contacts')
+            .select('id, name, remote_jid, phone')
+            .or(`remote_jid.eq.${remoteJid},phone.eq.${senderNumber}`)
+            .eq('company_id', instanceData.company_id)
+            .order('created_at', { ascending: true })
+            .limit(1);
+
+        let contactId;
+
+        if (existingContacts && existingContacts.length > 0) {
+            const existing = existingContacts[0];
+            contactId = existing.id;
+            
+            // If the contact exists but lacks remote_jid, or we need to update the name (only if current name is generic)
+            const updates: any = { updated_at: new Date().toISOString() };
+            if (!existing.remote_jid) updates.remote_jid = remoteJid;
+            
+            // Only update name if it's currently generic (like a phone number) or empty
+            if (updateName && (!existing.name || existing.name === existing.phone)) {
+                updates.name = pushName;
+            }
+
+            if (Object.keys(updates).length > 1) { // More than just updated_at
+                await supabase.from('contacts').update(updates).eq('id', contactId);
+            }
+        } else {
+            // 2b. Create new contact
+            const contactPayload: any = {
+                remote_jid: remoteJid, 
+                phone: senderNumber, 
+                company_id: instanceData.company_id, 
+                name: updateName ? pushName : senderNumber,
+                updated_at: new Date().toISOString()
+            };
+            const { data: newContact } = await supabase.from('contacts').insert(contactPayload).select('id').single();
+            if (newContact) contactId = newContact.id;
+        }
         
-        if (!contact) return new Response('Contact error', { status: 500 });
-        const contactId = contact.id;
+        if (!contactId) return new Response('Contact error', { status: 500 });
 
         // 3. Extract Message Content & Media (Fixed Labels & Download)
         let content = ""
@@ -120,59 +146,118 @@ Deno.serve(async (req) => {
                     }
                 }
 
+                let rawBase64 = data.base64 || messageData.base64 || (media && media.base64);
+
                 // Fallback: Robust download and upload
-                if (!mediaUrl && cleanSourceUrl && !fromMe) {
+                if (!mediaUrl && (cleanSourceUrl || rawBase64)) {
                     try {
                         const evoKey = Deno.env.get('EVOLUTION_API_KEY');
                         const evoUrl = Deno.env.get('EVOLUTION_API_URL');
                         
-                        let finalDownloadUrl = cleanSourceUrl;
-                        if (cleanSourceUrl.startsWith('/') && evoUrl) {
-                            const baseUrl = evoUrl.endsWith('/') ? evoUrl.slice(0, -1) : evoUrl;
-                            finalDownloadUrl = `${baseUrl}${cleanSourceUrl}`;
+                        let arrayBuffer: ArrayBuffer | null = null;
+                        let downloadError = "";
+
+                        // Try base64 natively first if provided seamlessly by Evolution Webhook!
+                        if (rawBase64) {
+                            try {
+                                const b64Data = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64;
+                                const byteCharacters = atob(b64Data);
+                                const byteArray = new Uint8Array(byteCharacters.length);
+                                for (let i = 0; i < byteCharacters.length; i++) {
+                                    byteArray[i] = byteCharacters.charCodeAt(i);
+                                }
+                                arrayBuffer = byteArray.buffer;
+                                console.log(`Successfully decoded Base64 directly from Webhook payload (length: ${arrayBuffer.byteLength}).`);
+                            } catch (e: any) {
+                                console.error("Error decoding base64:", e.message);
+                            }
                         }
 
-                        console.log(`Downloading inbound media from: ${finalDownloadUrl}`);
-                        const res = await fetch(finalDownloadUrl, { headers: { 'apikey': evoKey! } });
-                        
-                        if (res.ok) {
-                            const blob = await res.blob();
-                            if (blob.size > 10) { // Some small files might be valid placeholders
-                                const extMap: Record<string, string> = { 
-                                    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 
-                                    'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 
-                                    'video/mp4': 'mp4' 
-                                };
-                                const ext = extMap[mime] || mime.split('/')[1] || 'bin';
-                                const d = new Date();
-                                const fileDir = `${instanceData.id}/${d.getFullYear()}${d.getMonth()+1}`;
-                                const fileName = `${fileDir}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-                                
-                                const { error: upErr } = await supabase.storage.from('chat-media').upload(fileName, blob, { contentType: mime, upsert: true });
-                                
-                                if (!upErr) {
-                                    const { data: signedData } = await supabase.storage.from('chat-media').createSignedUrl(fileName, 315360000);
-                                    if (signedData?.signedUrl) {
-                                         mediaUrl = signedData.signedUrl;
-                                         console.log(`Successfully persisted and signed inbound media: ${fileName}`);
-                                    } else {
-                                        // Fallback to public URL if signing fails
-                                        const { data: pData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
-                                        mediaUrl = pData?.publicUrl;
-                                    }
-                                } else {
-                                    console.error("Storage upload error:", upErr);
-                                    await supabase.from('webhook_logs').insert({ 
-                                        payload: { error: "Storage Upload Failed", details: upErr, fileName } 
-                                    });
-                                }
+                        // If no base64, use Evolution API's dedicated decryption endpoint!
+                        if (!arrayBuffer) {
+                            console.log(`Asking Evolution API to decrypt media message via /chat/getBase64FromMediaMessage...`);
+                            const baseUrl = evoUrl!.endsWith('/') ? evoUrl!.slice(0, -1) : evoUrl!;
+                            
+                            const res = await fetch(`${baseUrl}/chat/getBase64FromMediaMessage/${instance}`, { 
+                                method: 'POST',
+                                headers: { 
+                                    'apikey': evoKey!,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ message: data })
+                            });
 
+                            if (res.ok) {
+                                const apiData = await res.json();
+                                let apiBase64 = apiData.base64 || apiData.data || null;
+                                
+                                if (apiBase64) {
+                                    apiBase64 = apiBase64.includes(',') ? apiBase64.split(',')[1] : apiBase64;
+                                    const byteCharacters = atob(apiBase64);
+                                    const byteArray = new Uint8Array(byteCharacters.length);
+                                    for (let i = 0; i < byteCharacters.length; i++) {
+                                        byteArray[i] = byteCharacters.charCodeAt(i);
+                                    }
+                                    arrayBuffer = byteArray.buffer;
+                                    console.log(`Successfully decoded Base64 from Evolution API Decrypter (length: ${arrayBuffer.byteLength})!`);
+                                } else {
+                                    downloadError = "Evolution API returned success but empty base64 data.";
+                                }
+                            } else {
+                                downloadError = await res.text().catch(() => "N/A");
+                                console.error(`Evolution Decryption API failed: ${res.status} ${downloadError}`);
                             }
-                        } else {
-                            const errText = await res.text().catch(() => "N/A");
-                            console.error(`Download failed: ${res.status} ${errText}`);
+                        }
+
+                        // Third Fallback: Assume it's a direct S3 or public URL!
+                        if (!arrayBuffer && cleanSourceUrl && cleanSourceUrl.startsWith('http')) {
+                             console.log(`Attempting direct download from assumed S3/Public URL: ${cleanSourceUrl}`);
+                             let fetchHeaders: any = {};
+                             if (cleanSourceUrl.includes(evoUrl!)) {
+                                 fetchHeaders = { 'apikey': evoKey! };
+                             }
+                             const res = await fetch(cleanSourceUrl, { headers: fetchHeaders });
+                             if (res.ok) {
+                                 const blob = await res.blob();
+                                 arrayBuffer = await blob.arrayBuffer();
+                                 console.log(`Successfully downloaded media directly from URL (length: ${arrayBuffer.byteLength})`);
+                             } else {
+                                 const rTxt = await res.text().catch(() => "N/A");
+                                 console.error(`S3/Public fetch failed: ${res.status} ${rTxt}`);
+                             }
+                        }
+                        
+                        if (arrayBuffer && arrayBuffer.byteLength > 10) { 
+                            const extMap: Record<string, string> = { 
+                                'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 
+                                'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 
+                                'video/mp4': 'mp4' 
+                            };
+                            const ext = extMap[mime] || mime.split('/')[1] || 'bin';
+                            const d = new Date();
+                            const fileDir = `${instanceData.id}/${d.getFullYear()}${d.getMonth()+1}`;
+                            const fileName = `${fileDir}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                            
+                            const { error: upErr } = await supabase.storage.from('chat-media').upload(fileName, arrayBuffer, { contentType: mime, upsert: true });
+                            
+                            if (!upErr) {
+                                const { data: signedData } = await supabase.storage.from('chat-media').createSignedUrl(fileName, 315360000);
+                                if (signedData?.signedUrl) {
+                                     mediaUrl = signedData.signedUrl;
+                                     console.log(`Successfully persisted and signed inbound media: ${fileName}`);
+                                } else {
+                                    const { data: pData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+                                    mediaUrl = pData?.publicUrl;
+                                }
+                            } else {
+                                console.error("Storage upload error:", upErr);
+                                await supabase.from('webhook_logs').insert({ 
+                                    payload: { error: "Storage Upload Failed", details: upErr, fileName } 
+                                });
+                            }
+                        } else if (!arrayBuffer) {
                             await supabase.from('webhook_logs').insert({ 
-                                payload: { error: "Media Download Failed", status: res.status, url: finalDownloadUrl, details: errText } 
+                                payload: { error: "Media Download Failed", details: downloadError } 
                             });
                         }
                     } catch (e: any) { 

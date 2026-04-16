@@ -31,10 +31,15 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
     const [imageSalts, setImageSalts] = useState<Record<string, number>>({});
     const [sending, setSending] = useState(false);
 
-    // Store assigned instance info
     const [instanceName, setInstanceName] = useState<string | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         fetchConversation();
@@ -49,7 +54,6 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
     const fetchConversation = async () => {
         setLoading(true);
         try {
-            // 1. Find conversation
             const { data: conv, error } = await supabase
                 .from('conversations')
                 .select('id, instance_id')
@@ -63,13 +67,11 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
             if (conv) {
                 setConversationId(conv.id);
 
-                // Fetch instance name for this conversation
                 if (conv.instance_id) {
                     const { data: inst } = await supabase.from('instances').select('name').eq('id', conv.instance_id).single();
                     if (inst) setInstanceName(inst.name);
                 }
 
-                // 2. Fetch messages
                 const { data: msgs, error: msgError } = await supabase
                     .from('messages')
                     .select('*')
@@ -79,7 +81,6 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 if (msgError) throw msgError;
                 setMessages(msgs as Message[]);
 
-                // 3. Subscribe to real-time
                 const channel = supabase
                     .channel(`chat_modal:${conv.id}`)
                     .on('postgres_changes', {
@@ -92,6 +93,20 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                         if (payload.eventType === 'INSERT') {
                             setMessages(prev => {
                                 if (newMessage.wamid && prev.some(m => m.wamid === newMessage.wamid)) return prev;
+                                
+                                if (newMessage.direction === 'outbound' || newMessage.sender_type === 'user') {
+                                    const optimisticIndex = prev.findIndex(m => 
+                                        !m.wamid && 
+                                        m.content === newMessage.content && 
+                                        m.message_type === newMessage.message_type
+                                    );
+                                    if (optimisticIndex !== -1) {
+                                        const newArray = [...prev];
+                                        newArray[optimisticIndex] = newMessage;
+                                        return newArray;
+                                    }
+                                }
+
                                 return [...prev, newMessage];
                             });
                         } else if (payload.eventType === 'UPDATE') {
@@ -113,7 +128,6 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 setMessages([]);
                 setConversationId(null);
 
-                // Pre-fetch assigned instance for this contact if exists
                 const { data: contact } = await supabase.from('contacts').select('assigned_to').eq('id', contactId).single();
                 if (contact?.assigned_to) {
                     const { data: inst } = await supabase.from('instances').select('name').eq('assigned_to', contact.assigned_to).maybeSingle();
@@ -138,22 +152,26 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
             let currentConvId = conversationId;
             let currentInstanceName = instanceName;
 
-            // Resolve Instance if not yet known
             if (!currentInstanceName) {
-                // 1. Try Contact Assigned (again, just in case)
                 const { data: contact } = await supabase.from('contacts').select('assigned_to').eq('id', contactId).single();
                 if (contact?.assigned_to) {
-                    const { data: inst } = await supabase.from('instances').select('id, name').eq('assigned_to', contact.assigned_to).maybeSingle();
-                    if (inst) {
-                        currentInstanceName = inst.name;
+                    const { data: memberLink } = await supabase.from('instance_members').select('instance_id').eq('team_member_id', contact.assigned_to).maybeSingle();
+                    if (memberLink?.instance_id) {
+                        const { data: inst } = await supabase.from('instances').select('id, name').eq('id', memberLink.instance_id).maybeSingle();
+                        if (inst) {
+                            currentInstanceName = inst.name;
+                        }
                     }
                 }
 
-                // 2. Fallback: Any connected instance (Company default)
                 if (!currentInstanceName) {
-                    const { data: inst } = await supabase.from('instances').select('id, name').eq('status', 'connected').limit(1).maybeSingle();
-                    if (inst) {
-                        currentInstanceName = inst.name;
+                    const { data: insts } = await supabase.from('instances')
+                        .select('id, name')
+                        .eq('status', 'open')
+                        .order('is_main', { ascending: false })
+                        .limit(1);
+                    if (insts && insts.length > 0) {
+                        currentInstanceName = insts[0].name;
                     }
                 }
 
@@ -161,9 +179,8 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 setInstanceName(currentInstanceName);
             }
 
-            // Create conversation if needed
             if (!currentConvId) {
-                const { data: instObj } = await supabase.from('instances').select('id').eq('name', currentInstanceName).single();
+                const { data: instObj } = await supabase.from('instances').select('id, company_id').eq('name', currentInstanceName).single();
                 if (!instObj) throw new Error("Instância não encontrada no banco.");
 
                 const { data: newConv, error: createError } = await supabase
@@ -171,6 +188,7 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                     .insert({
                         contact_id: contactId,
                         instance_id: instObj.id,
+                        company_id: instObj.company_id,
                         last_message: messageInput,
                         unread_count: 0,
                         channel: 'whatsapp'
@@ -183,40 +201,185 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                 setConversationId(newConv.id);
             }
 
-            // Optimistic Update
             const newMessage: Message = {
-                id: optimisticId, // Temporary ID
+                id: optimisticId,
                 conversation_id: currentConvId!,
                 sender_type: 'user',
                 content: messageInput,
                 created_at: new Date().toISOString(),
-                status: 'sent', // Initially sent
+                status: 'sent',
                 message_type: 'text'
             };
             setMessages(prev => [...prev, newMessage]);
             setMessageInput("");
 
-            // Send via Edge Function
-            await supabase.functions.invoke('evolution-manager', {
+            const { data, error } = await supabase.functions.invoke('evolution-manager', {
                 body: {
                     action: 'send-text',
                     instanceName: currentInstanceName,
                     number: contactPhone,
-                    text: newMessage.content
+                    text: newMessage.content,
+                    contactId: contactId,
+                    conversationId: currentConvId
                 }
             });
-            // We rely on Webhook to replace this message or update status. 
-            // Since we use random ID, the webhook insert will have a different ID.
-            // But we filter duplicates in the subscription.
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
         } catch (err: any) {
             console.error(err);
             toast.error("Erro ao enviar: " + err.message);
-            // Mark optimistic message as failed
             setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, status: 'failed' } : m));
         } finally {
             setSending(false);
         }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
+        const file = (e.target as any).files?.[0];
+        if (!file || !contactPhone) return;
+
+        setSending(true);
+        const optimisticId = Math.random().toString();
+        let currentInstanceName = instanceName;
+        let currentConvId = conversationId;
+
+        if (!currentInstanceName) {
+            toast.error("Mande um 'Oi' antes de anexar mídias para abrir a conexão.");
+            setSending(false);
+            return;
+        }
+
+        try {
+            const localUrl = URL.createObjectURL(file);
+            let mediaType = 'document';
+            if (file.type.startsWith('image/')) mediaType = 'image';
+            if (file.type.startsWith('video/')) mediaType = 'video';
+            if (file.type.startsWith('audio/')) mediaType = 'audio';
+
+            const translatedLabel = mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : mediaType === 'audio' ? 'Áudio' : file.name;
+            const newMessage: Message = {
+                id: optimisticId,
+                conversation_id: currentConvId!,
+                sender_type: 'user',
+                content: translatedLabel,
+                created_at: new Date().toISOString(),
+                status: 'sent',
+                message_type: mediaType as any,
+                media_url: localUrl
+            };
+            setMessages(prev => [...prev, newMessage]);
+
+            let finalMediaUrl = '';
+            let base64Fallback = '';
+
+            // Always embed base64 for audio to guarantee Evolution processes it regardless of WebM URL issues
+            if (mediaType === 'audio') {
+                const reader = new FileReader();
+                base64Fallback = await new Promise<string>((resolve) => {
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            try {
+                const ext = file.name.split('.').pop();
+                const safeName = Math.random().toString(36).substring(7);
+                const fileName = `outbound/${Date.now()}_${safeName}.${ext}`;
+                const { error: uploadError } = await supabase.storage.from('chat-media').upload(fileName, file);
+                
+                if (!uploadError) {
+                    const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+                    finalMediaUrl = publicUrlData.publicUrl;
+                } else {
+                    throw uploadError;
+                }
+            } catch (storageErr) {
+                console.log("Storage upload failed, falling back to Base64", storageErr);
+                const reader = new FileReader();
+                base64Fallback = await new Promise<string>((resolve) => {
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            const { data, error } = await supabase.functions.invoke('evolution-manager', {
+                body: {
+                    action: mediaType === 'audio' ? 'send-audio' : 'send-media',
+                    instanceName: currentInstanceName,
+                    number: contactPhone,
+                    mediaType: mediaType,
+                    mimetype: file.type,
+                    mediaUrl: finalMediaUrl || undefined,
+                    mediaBase64: base64Fallback || undefined,
+                    caption: '',
+                    contactId: contactId,
+                    conversationId: currentConvId
+                }
+            });
+
+            if (error) throw error;
+            if (data?.error) throw new Error(data?.error);
+
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        } catch (err: any) {
+            console.error(err);
+            toast.error("Erro ao enviar mídia: " + err.message);
+            setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, status: 'failed' } : m));
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                stream.getTracks().forEach(track => track.stop());
+                clearInterval(recordingIntervalRef.current!);
+                setRecordingTime(0);
+                setIsRecording(false);
+                
+                // Construct a File object from the blob to reuse the file uploading logic
+                const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
+                
+                // Mock an event to utilize existing handleFileChange logic
+                const syntheticEvent = { target: { files: [audioFile] } };
+                handleFileChange(syntheticEvent as any);
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingTime(0);
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+            
+        } catch (err) {
+            console.error("Microphone access denied or error:", err);
+            toast.error("Erro ao acessar o microfone. Verifique as permissões do navegador.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const formatRecordingTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
     };
 
     const formatTime = (dateStr: string) => {
@@ -301,6 +464,18 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
                                         )}
                                     </div>
                                 )}
+                                {msg.message_type === 'video' && msg.media_url && (
+                                    <div className="mb-1 rounded-lg overflow-hidden relative min-h-[100px] bg-black flex items-center justify-center">
+                                        <video 
+                                            src={msg.media_url} 
+                                            controls 
+                                            className="max-w-full max-h-60 object-contain rounded-md" 
+                                            preload="metadata"
+                                        >
+                                            Seu navegador não suporta a visualização desse vídeo.
+                                        </video>
+                                    </div>
+                                )}
 
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
                                 <div className="flex justify-end items-center gap-1 mt-1">
@@ -316,23 +491,57 @@ export default function ContactChat({ contactId, contactName, contactPhone, cont
             </div>
 
             {/* Input Area */}
-            <div className="bg-[#f0f2f5] p-3 flex items-center gap-2 border-t z-20">
-                <Button variant="ghost" size="icon" className="shrink-0 text-gray-500">
+            <div className="bg-[#f0f2f5] p-3 flex items-center gap-2 border-t z-20 relative">
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    onChange={handleFileChange}
+                    accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                />
+                <Button variant="ghost" size="icon" className="shrink-0 text-gray-500" onClick={() => fileInputRef.current?.click()} disabled={sending || isRecording}>
                     <Paperclip className="h-5 w-5" />
                 </Button>
-                <Input
-                    className="flex-1 bg-white border-none focus-visible:ring-0"
-                    placeholder="Digite uma mensagem"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
+                
+                {isRecording ? (
+                    <div className="flex-1 bg-red-50 text-red-600 rounded-md px-4 py-2 flex items-center justify-between border border-red-100 animate-pulse">
+                        <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 bg-red-600 rounded-full"></div>
+                            <span className="text-sm font-medium">Gravando... {formatRecordingTime(recordingTime)}</span>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-100 h-6 px-2" onClick={() => {
+                             // Cancel recording silently
+                             if (mediaRecorderRef.current) {
+                                  mediaRecorderRef.current.onstop = () => {}; // Neutralize send
+                                  mediaRecorderRef.current.stop();
+                                  mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+                                  clearInterval(recordingIntervalRef.current!);
+                                  setIsRecording(false);
+                                  setRecordingTime(0);
+                             }
+                        }}>Cancelar</Button>
+                    </div>
+                ) : (
+                    <Input
+                        className="flex-1 bg-white border-none focus-visible:ring-0"
+                        placeholder="Digite uma mensagem"
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        disabled={sending}
+                    />
+                )}
+
                 {messageInput.trim() ? (
-                    <Button onClick={handleSendMessage} disabled={sending} size="icon" className="shrink-0">
+                    <Button onClick={handleSendMessage} disabled={sending || isRecording} size="icon" className="shrink-0">
                         <Send className="h-5 w-5" />
                     </Button>
+                ) : isRecording ? (
+                    <Button onClick={stopRecording} variant="default" size="icon" className="shrink-0 bg-red-600 hover:bg-red-700 text-white rounded-full">
+                        <Send className="h-4 w-4 ml-1" />
+                    </Button>
                 ) : (
-                    <Button variant="ghost" size="icon" className="shrink-0 text-gray-500">
+                    <Button onClick={startRecording} variant="ghost" size="icon" className="shrink-0 text-gray-500 hover:text-blue-500 transition-colors">
                         <Mic className="h-5 w-5" />
                     </Button>
                 )}

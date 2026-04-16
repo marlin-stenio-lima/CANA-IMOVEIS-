@@ -164,10 +164,8 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
-        throw new Error(`Invalid action: ${action}`)
-
         if (action === 'send-text') {
-            const { text } = body;
+            const { text, number, contactId: bodyContactId, conversationId: bodyConversationId } = body;
 
             if (!text || !number) {
                 throw new Error('Text and Number are required for send-text');
@@ -205,44 +203,46 @@ Deno.serve(async (req) => {
                     if (instanceData) {
                         let remoteJid = number.includes('@') ? number : `${number}@s.whatsapp.net`
 
-                        // 1. Ensure Contact Exists
-                        const { data: contact } = await adminSupabase.from('contacts').select('id, name').eq('remote_jid', remoteJid).single()
-                        let contactId = contact?.id
-
+                        let contactId = bodyContactId;
+                        // 1. Ensure Contact Exists if not provided
                         if (!contactId) {
-                            console.log(`Contact not found for ${remoteJid}, creating...`);
-                            const { data: newContact, error: createContactError } = await adminSupabase.from('contacts').insert({
-                                remote_jid: remoteJid,
-                                name: number, // Default name is number until we get info
-                                company_id: instanceData.company_id,
-                                profile_pic_url: null,
-                                updated_at: new Date().toISOString()
-                            }).select().single();
+                            const { data: contact } = await adminSupabase.from('contacts').select('id, name').eq('remote_jid', remoteJid).single()
+                            contactId = contact?.id
 
-                            if (newContact) {
-                                contactId = newContact.id;
-                            } else {
-                                console.error("Failed to create contact on send:", createContactError);
+                            if (!contactId) {
+                                console.log(`Contact not found for ${remoteJid}, creating...`);
+                                const { data: newContact, error: createContactError } = await adminSupabase.from('contacts').insert({
+                                    remote_jid: remoteJid,
+                                    name: number,
+                                    company_id: instanceData.company_id,
+                                    profile_pic_url: null,
+                                    updated_at: new Date().toISOString()
+                                }).select().single();
+
+                                if (newContact) contactId = newContact.id;
                             }
                         }
 
                         if (contactId) {
-                            // 2. Ensure Conversation Exists
-                            const { data: existingConv } = await adminSupabase.from('conversations')
-                                .select('id, unread_count').eq('contact_id', contactId).eq('instance_id', instanceData.id).single()
-
-                            let conversationId = existingConv?.id
+                            let conversationId = bodyConversationId;
+                            // 2. Ensure Conversation Exists if not provided
                             if (!conversationId) {
-                                const { data: newConv } = await adminSupabase.from('conversations').insert({
-                                    company_id: instanceData.company_id,
-                                    contact_id: contactId,
-                                    instance_id: instanceData.id,
-                                    channel: 'whatsapp',
-                                    last_message: text,
-                                    last_message_at: new Date().toISOString(),
-                                    unread_count: 0
-                                }).select().single();
-                                conversationId = newConv?.id;
+                                const { data: existingConv } = await adminSupabase.from('conversations')
+                                    .select('id, unread_count').eq('contact_id', contactId).eq('instance_id', instanceData.id).single()
+
+                                conversationId = existingConv?.id
+                                if (!conversationId) {
+                                    const { data: newConv } = await adminSupabase.from('conversations').insert({
+                                        company_id: instanceData.company_id,
+                                        contact_id: contactId,
+                                        instance_id: instanceData.id,
+                                        channel: 'whatsapp',
+                                        last_message: text,
+                                        last_message_at: new Date().toISOString(),
+                                        unread_count: 0
+                                    }).select().single();
+                                    conversationId = newConv?.id;
+                                }
                             }
 
                             if (conversationId) {
@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
             let mediaPayload = mediaUrl || mediaBase64;
 
             // Only strip prefix if we are actually using Base64
-            if (!mediaUrl && mediaPayload && mediaPayload.startsWith('data:')) {
+            if (mediaPayload && typeof mediaPayload === 'string' && mediaPayload.startsWith('data:')) {
                 mediaPayload = mediaPayload.split(',')[1];
             }
 
@@ -543,17 +543,18 @@ Deno.serve(async (req) => {
 
             console.log(`Sending audio to ${number} via ${instanceName} (V1 API)...`);
 
-            // V1 Logic for Audio: Prefer URL, fallback to Base64
-            // Prefer Base64 for audio as it's more reliable for instant delivery without external fetch
+            // V1/V2 Logic for Audio: Prefer Base64, fallback to URL
+            // Prefer Base64 for audio as it's more reliable for instant delivery without external fetch and avoids WEBM to OGG transcoding URL issues
             let audioPayload = mediaBase64 || mediaUrl;
 
             // Strip prefix only if using Base64
-            if (!mediaUrl && audioPayload && audioPayload.startsWith('data:')) {
+            if (audioPayload && typeof audioPayload === 'string' && audioPayload.startsWith('data:')) {
                 audioPayload = audioPayload.split(',')[1];
             }
 
-            // Using sendMedia for audio is more robust across Evolution versions and supports URLs better
-            const res = await fetch(`${evolutionUrl}/message/sendMedia/${instanceName}`, {
+            // Using sendWhatsAppAudio for audio is the native method in Evolution and handles .webm / PTT perfectly!
+            const endpoint = `${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`;
+            const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'apikey': evolutionKey!,
@@ -561,17 +562,18 @@ Deno.serve(async (req) => {
                 },
                 body: JSON.stringify({
                     number,
-                    mediatype: 'audio',
-                    mimetype: mimetype || 'audio/ogg',
-                    media: audioPayload,
+                    audio: audioPayload,
+                    mimetype: mimetype || 'audio/webm',
                     options: {
-                        ptt: true
+                        ptt: true,
+                        encoding: true
                     }
                 })
             })
 
             if (!res.ok) {
                 const errText = await res.text();
+                // Attempt fallback to base64 or basic media API
                 console.error("Evolution Audio Send Error:", res.status, errText);
                 throw new Error(`Evolution API Audio Error (${res.status}): ${errText}`);
             }
@@ -738,10 +740,10 @@ Deno.serve(async (req) => {
 
         return new Response(
             JSON.stringify({
-                error: error.message,
+                error: error.message || "Unknown error inside Edge Function",
                 details: error.stack
             }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

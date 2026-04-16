@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Filter, Search, Columns3, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface ContactsFilterBarProps {
   searchTerm: string;
@@ -38,6 +39,15 @@ export default function ContactsFilterBar({
   owners,
   properties,
 }: ContactsFilterBarProps) {
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onSearchChange(localSearch);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [localSearch]);
+  
   return (
     <div className="flex flex-col gap-4 py-3">
       <div className="flex items-center gap-3">
@@ -45,8 +55,8 @@ export default function ContactsFilterBar({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Pesquisar Contatos (Nome, Email, Telefone)"
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="pl-9"
           />
         </div>

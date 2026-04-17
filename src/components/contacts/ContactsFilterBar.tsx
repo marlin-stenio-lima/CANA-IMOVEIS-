@@ -50,8 +50,8 @@ export default function ContactsFilterBar({
   
   return (
     <div className="flex flex-col gap-4 py-3">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Pesquisar Contatos (Nome, Email, Telefone)"

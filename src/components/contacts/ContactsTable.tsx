@@ -132,7 +132,7 @@ export default function ContactsTable({ contacts, selectedIds, onSelectionChange
   const isIndeterminate = selectedIds.length > 0 && !isAllSelected;
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-lg border bg-card overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">

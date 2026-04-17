@@ -148,7 +148,7 @@ export function AppLayout() {
           </header>
 
           {/* Main Content */}
-          <div className="flex-1 p-6 bg-muted/30 overflow-auto">
+          <div className="flex-1 p-2 sm:p-4 md:p-6 bg-muted/30 overflow-x-hidden overflow-y-auto">
             <Outlet />
           </div>
 

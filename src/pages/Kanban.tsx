@@ -395,8 +395,8 @@ export default function Kanban() {
   return (
     <div className="flex flex-col h-[calc(100vh-8.5rem)] w-full max-w-full overflow-hidden space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between shrink-0 px-1">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between shrink-0 px-1 gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <PipelineSelector
             pipelines={pipelines}
             selectedPipeline={selectedPipeline}

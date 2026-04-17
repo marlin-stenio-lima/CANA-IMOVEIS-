@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Send, Users, Mail, Clock, FileText, 
   Settings2, AlignLeft, Bold, Italic, 
-  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target
+  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +60,28 @@ const Broadcasts = () => {
 
   const [isSending, setIsSending] = useState(false);
 
+  // Seleção de Contatos Modal
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [contactsList, setContactsList] = useState<{id: string, name: string, email: string}[]>([]);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [contactSearch, setContactSearch] = useState("");
+
+  const loadContacts = async () => {
+    const { data } = await supabase.from('contacts').select('id, name, email').not('email', 'is', null).neq('email', '');
+    if (data) setContactsList(data);
+  };
+
+  useEffect(() => {
+    if (isContactModalOpen && contactsList.length === 0) {
+      loadContacts();
+    }
+  }, [isContactModalOpen]);
+
+  const toggleEmailSelection = (email: string) => {
+    setSelectedEmails(prev => 
+      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+    );
+  };
   // Simulação de quantidade
   const getCount = () => {
     if (audienceType === "todos") return 1245;
@@ -105,7 +129,7 @@ const Broadcasts = () => {
     try {
       // Obter lista real de emails do banco
       if (audienceType === "manual") {
-        targetEmails = audienceValue.split('\n').map(e => e.trim()).filter(e => e && e.includes('@'));
+        targetEmails = selectedEmails;
       } else {
         // Query de contatos que tem email válido
         let query = supabase.from('contacts').select('email').not('email', 'is', null).neq('email', '');
@@ -425,13 +449,16 @@ const Broadcasts = () => {
 
                 {audienceType === "manual" && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-medium">Cole os E-mails (Um por linha)</label>
-                    <Textarea 
-                      value={audienceValue} 
-                      onChange={e => setAudienceValue(e.target.value)} 
-                      placeholder="joao@teste.com&#10;maria@email.com" 
-                      className="min-h-[100px]"
-                    />
+                    <label className="text-sm font-medium">Selecione da Base de Clientes</label>
+                    <div className="p-4 border rounded-md bg-background/50 flex flex-col gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        {selectedEmails.length} cliente(s) selecionado(s).
+                      </p>
+                      <Button onClick={() => setIsContactModalOpen(true)} variant="outline" className="w-full">
+                        <Users className="w-4 h-4 mr-2" />
+                        Abrir Seleção de Clientes
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -517,6 +544,71 @@ const Broadcasts = () => {
             <Button onClick={() => handleSaveAndSend(true)} disabled={isSending}>
               Confirmar Agendamento
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Seleção de Clientes */}
+      <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Selecionar Clientes</DialogTitle>
+            <DialogDescription>
+              Marque os clientes da sua base que deverão receber este disparo manual.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou e-mail..."
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <ScrollArea className="h-[300px] border rounded-md p-4 bg-muted/20">
+              {contactsList.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                  Carregando contatos com e-mail...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {contactsList
+                    .filter(c => c.name?.toLowerCase().includes(contactSearch.toLowerCase()) || c.email?.toLowerCase().includes(contactSearch.toLowerCase()))
+                    .map((contact) => (
+                    <div key={contact.id} className="flex items-start space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors cursor-pointer" onClick={() => toggleEmailSelection(contact.email)}>
+                      <Checkbox 
+                        checked={selectedEmails.includes(contact.email)}
+                        onCheckedChange={() => toggleEmailSelection(contact.email)}
+                        id={`contact-${contact.id}`} 
+                        className="mt-1"
+                      />
+                      <div className="flex flex-col">
+                        <label htmlFor={`contact-${contact.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                          {contact.name || 'Cliente Sem Nome'}
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {contact.email}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          <DialogFooter className="sm:justify-between">
+            <span className="text-sm font-medium text-muted-foreground my-auto">
+              {selectedEmails.length} selecionado(s)
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsContactModalOpen(false)}>Cancelar</Button>
+              <Button onClick={() => setIsContactModalOpen(false)}>Confirmar Seleção</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

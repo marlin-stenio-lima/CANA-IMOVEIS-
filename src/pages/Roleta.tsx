@@ -202,26 +202,26 @@ export default function Roleta() {
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <Target className="h-8 w-8 text-primary" />
-                        Distribuição de Leads (Roleta)
+                    <h1 className="text-2xl sm:text-3xl font-bold flex items-start sm:items-center gap-2">
+                        <Target className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0 mt-1 sm:mt-0" />
+                        <span>Distribuição de Leads<br className="sm:hidden" /> (Roleta)</span>
                     </h1>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-sm sm:text-base text-muted-foreground mt-2 sm:mt-1">
                         Crie regras visuais para distribuir seus leads automaticamente entre os corretores.
                     </p>
                 </div>
                 {automationStep === 0 && (
-                    <Button onClick={handleNewTrigger} className="gap-2">
+                    <Button onClick={handleNewTrigger} className="gap-2 w-full sm:w-auto">
                         <Plus className="h-4 w-4" /> Nova Automação
                     </Button>
                 )}
                 {automationStep === 1 && (
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setAutomationStep(0)}>Cancelar</Button>
-                        <Button onClick={handleSave} className="gap-2"><Save className="h-4 w-4" /> Salvar Fluxo</Button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <Button variant="outline" onClick={() => setAutomationStep(0)} className="w-full sm:w-auto">Cancelar</Button>
+                        <Button onClick={handleSave} className="gap-2 w-full sm:w-auto"><Save className="h-4 w-4" /> Salvar Fluxo</Button>
                     </div>
                 )}
             </div>
@@ -555,12 +555,12 @@ export default function Roleta() {
                 <TabsContent value="config" className="mt-6">
                     {configStep === 0 ? (
                         <div className="space-y-6">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
                                     <h2 className="text-xl font-semibold">Suas Roletas</h2>
                                     <p className="text-sm text-muted-foreground">Grupos e regras de distribuição cadastradas.</p>
                                 </div>
-                                <Button onClick={() => setConfigStep(1)} className="gap-2"><Plus className="h-4 w-4" /> Criar Roleta</Button>
+                                <Button onClick={() => setConfigStep(1)} className="gap-2 w-full sm:w-auto"><Plus className="h-4 w-4" /> Criar Roleta</Button>
                             </div>
 
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -595,9 +595,9 @@ export default function Roleta() {
                         <div className="max-w-2xl mx-auto">
                             <Card className="border-t-4 border-t-primary shadow-md">
                                 <CardHeader className="border-b bg-muted/10 pb-6">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-2xl">Nova Roleta de Distribuição</CardTitle>
-                                        <Button variant="ghost" size="sm" onClick={() => setConfigStep(0)}>Voltar</Button>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <CardTitle className="text-xl sm:text-2xl">Nova Roleta de Distribuição</CardTitle>
+                                        <Button variant="ghost" size="sm" onClick={() => setConfigStep(0)} className="w-full sm:w-auto text-muted-foreground hover:text-foreground">Voltar</Button>
                                     </div>
                                     <CardDescription>Defina as regras de entrega para este grupo de corretores.</CardDescription>
                                 </CardHeader>

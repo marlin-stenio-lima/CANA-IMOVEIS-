@@ -59,6 +59,7 @@ export default function ContactInfo({ contact }: ContactInfoProps) {
         phone: initialNum,
         email: contact.email || "",
         source: contact.source || "",
+        assigned_to: contact.assigned_to || "",
     });
 
     // Fetch Stages
@@ -103,11 +104,6 @@ export default function ContactInfo({ contact }: ContactInfoProps) {
                 .single();
 
             if (error) throw error;
-            
-            // Also update the contact owner to match the new deal owner
-            if (data.ownerId) {
-                await supabase.from('contacts').update({ assigned_to: data.ownerId }).eq('id', contact.id);
-            }
 
             return newDeal;
         },

@@ -46,8 +46,8 @@ const portals: Portal[] = [
   },
   {
     id: "imovelweb",
-    name: "Imovelweb",
-    description: "Portal líder com suporte a Webhook direto no seu CRM.",
+    name: "Imovelweb & Casa Mineira",
+    description: "Portais do Grupo Navent com suporte a Webhook direto no seu CRM.",
     status: "disponivel",
     color: "from-orange-600 to-orange-400",
     icon: ExternalLink,
@@ -275,15 +275,17 @@ const Integrations = () => {
                     <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-3 italic text-sm text-muted-foreground">
                       <Info className="h-5 w-5 text-primary shrink-0 not-italic" />
                       <p>
-                        Para receber leads, cole esta URL no campo "Webhook" ou "URL de Destino" nas configurações do seu portal {selectedPortal?.name}.
+                        {selectedPortal?.id === "imovelweb" 
+                         ? "No Imovelweb/Casa Mineira, em 'Integrador', selecione a opção 'Zapier'. Isso irá liberar o campo 'URL de Callback' embaixo para você colar nosso link!"
+                         : `Para receber leads, cole esta URL no campo "Webhook" ou "URL de Destino" nas configurações do seu portal ${selectedPortal?.name}.`}
                       </p>
                     </div>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Link do Webhook para Leads</label>
                       <div className="flex gap-2">
-                        <Input readOnly value={webhookUrl} className="bg-secondary/30 border-none font-mono text-xs" />
-                        <Button variant="secondary" onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}>
+                        <Input readOnly value={selectedPortal?.id === "imovelweb" ? webhookUrl + "&source=imovelweb" : webhookUrl} className="bg-secondary/30 border-none font-mono text-xs" />
+                        <Button variant="secondary" onClick={() => copyToClipboard(selectedPortal?.id === "imovelweb" ? webhookUrl + "&source=imovelweb" : webhookUrl, "Webhook URL")}>
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>

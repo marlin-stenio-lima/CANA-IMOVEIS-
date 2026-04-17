@@ -77,10 +77,10 @@ export default function Leads() {
 
   const filteredInquiries = inquiries.filter((inquiry) => {
     const matchesSearch =
-      inquiry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inquiry.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inquiry.phone.includes(searchTerm) ||
-      inquiry.property?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+      inquiry.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inquiry.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inquiry.phone?.includes(searchTerm) ||
+      (inquiry.property?.title && inquiry.property.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || inquiry.status === statusFilter;
     const matchesSource = sourceFilter === 'all' || inquiry.source === sourceFilter || inquiry.source?.includes(sourceFilter);
@@ -263,7 +263,7 @@ export default function Leads() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
                           <a
-                            href={`https://wa.me/${inquiry.phone.replace(/\D/g, '')}`}
+                            href={`https://wa.me/${inquiry.phone?.replace(/\D/g, '') || ''}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

@@ -87,18 +87,18 @@ export default function Tasks() {
             </div>
             <div className="flex bg-slate-100 p-1 rounded-lg border">
               <Button
-                variant={filter === "all" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setFilter("all")}
-                className={filter === "all" ? "bg-white shadow-sm" : ""}
+                className={filter === "all" ? "bg-white text-slate-800 shadow-sm font-bold" : "text-slate-500 hover:text-slate-700"}
               >
                 Todas
               </Button>
               <Button
-                variant={filter === "pending" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setFilter("pending")}
-                className={filter === "pending" ? "bg-white shadow-sm" : ""}
+                className={filter === "pending" ? "bg-white text-slate-800 shadow-sm font-bold" : "text-slate-500 hover:text-slate-700"}
               >
                 Pendentes
                 {(tasks || []).filter(t => t?.status === 'pending').length > 0 && (
@@ -108,10 +108,10 @@ export default function Tasks() {
                 )}
               </Button>
               <Button
-                variant={filter === "completed" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setFilter("completed")}
-                className={filter === "completed" ? "bg-white shadow-sm" : ""}
+                className={filter === "completed" ? "bg-white text-slate-800 shadow-sm font-bold" : "text-slate-500 hover:text-slate-700"}
               >
                 Concluídas
               </Button>

@@ -4,7 +4,7 @@ import { X, Activity, CheckSquare, Calendar, ChevronRight, ChevronLeft, Plus } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, isAfter, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ContactChat from "./ContactChat";

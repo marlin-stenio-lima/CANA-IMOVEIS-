@@ -399,7 +399,8 @@ export function KanbanCard({
               size="sm"
               className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-center hover:bg-muted ${isWaitingTooLong && isChatStage ? 'text-red-600 font-bold animate-pulse ring-1 ring-red-100' : 'text-muted-foreground opacity-60'}`}
               onClick={handleChat}
-              title="Abrir Conversa"
+              disabled={isBolsaoActive}
+              title={isBolsaoActive ? "Assuma o lead primeiro" : "Abrir Conversa"}
             >
               <MessageSquare className={`w-3 h-3 ${(isWaitingTooLong && isChatStage) ? 'animate-bounce fill-red-600/20' : ''}`} />
               Chat {isChatStage && hoursWaiting > 0 ? `${hoursWaiting}h` : ''}
@@ -409,10 +410,10 @@ export function KanbanCard({
             <Button
               variant="ghost"
               size="sm"
-              className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-end ${(localAiStatus === 'active' || localAiStatus === 'scheduled') ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300' : 'text-muted-foreground hover:bg-muted'}`}
+              className={`h-6 px-1.5 gap-1 text-[10px] flex-1 justify-end ${(localAiStatus === 'active' || localAiStatus === 'scheduled') ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300' : 'text-muted-foreground hover:bg-muted'} ${isBolsaoActive ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={handleToggleFollowUp}
-              disabled={isFollowUpLoading}
-              title="Pausar/Retomar Follow-up"
+              disabled={isFollowUpLoading || isBolsaoActive}
+              title={isBolsaoActive ? "Assuma o lead para controlar follow-up" : "Pausar/Retomar Follow-up"}
             >
               {(localAiStatus === 'active' || localAiStatus === 'scheduled') ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               <span className="truncate">{contact?.follow_up_step ? `Etapa ${contact.follow_up_step}` : 'Manual'}</span>

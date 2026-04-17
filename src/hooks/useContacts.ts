@@ -221,6 +221,12 @@ export function useContacts(filters?: ContactsFilter) {
                     .single();
 
                 if (error) throw error;
+                
+                // Sync deals if assigned_to is being updated
+                if (updates.assigned_to !== undefined) {
+                    await supabase.from("deals").update({ assigned_to: updates.assigned_to }).eq("contact_id", id);
+                }
+
                 return data;
             } catch (err: any) {
                 console.error("Primary update failed:", err);

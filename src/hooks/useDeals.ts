@@ -155,6 +155,12 @@ export function useDeals(pipelineId: string | null) {
         .single();
 
       if (error) throw error;
+      
+      // Bi-directional sync: If deal owner changed, ensure contact owner matches
+      if (updates.assigned_to !== undefined && data?.contact_id) {
+          await supabase.from("contacts").update({ assigned_to: updates.assigned_to }).eq("id", data.contact_id);
+      }
+
       return data;
     },
     onSuccess: () => {

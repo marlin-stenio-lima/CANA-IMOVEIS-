@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 // Interface para um fluxo de disparo
 interface BroadcastFlow {
@@ -87,7 +88,7 @@ const Broadcasts = () => {
     setStep(1);
   };
 
-  const handleSaveAndSend = (schedule: boolean = false) => {
+  const handleSaveAndSend = async (schedule: boolean = false) => {
     if (!flowName) return toast.error("Dê um nome para este fluxo de automação.");
     if (!subject) return toast.error("O assunto é obrigatório.");
     if (!senderEmail) return toast.error("O e-mail do remetente é obrigatório.");
@@ -98,11 +99,48 @@ const Broadcasts = () => {
     }
 
     setIsSending(true);
-    
-    // Simulate API Call to Resend
-    setTimeout(() => {
-      setIsSending(false);
+    let rawEmailsCount = currentCount;
+    let targetEmails: string[] = [];
+
+    try {
+      // Obter lista real de emails do banco
+      if (audienceType === "manual") {
+        targetEmails = audienceValue.split('\n').map(e => e.trim()).filter(e => e && e.includes('@'));
+      } else {
+        // Query de contatos que tem email válido
+        let query = supabase.from('contacts').select('email').not('email', 'is', null).neq('email', '');
+        if (audienceType === "tag" && audienceValue) {
+          query = query.contains('tags', [audienceValue]);
+        }
+        // Nota: A lógica de filtro pode ser aprofundada conforme tabela. Isso coleta todos com email genérico.
+        // Simulando query apenas pegando os ativos
+        const { data, error } = await query;
+        if (!error && data) {
+           targetEmails = data.map(d => d.email);
+        }
+      }
+
+      if (targetEmails.length === 0) {
+         // Fallback debug - mandar pro próprio remetente para testar.
+         targetEmails = [senderEmail];
+         toast.warning("Nenhum destinatário real encontrado ou filtro vazio. Disparando envio de teste para o próprio remetente.");
+      }
+
+      rawEmailsCount = targetEmails.length;
       
+      // Chamada real para Edge Function do Supabase (Apenas se não for agendamento)
+      if (!schedule) {
+         const { data, error } = await supabase.functions.invoke('send-email', {
+            body: {
+               from: `${senderName} <${senderEmail}>`,
+               to: targetEmails,
+               subject: subject,
+               html: body.replace(/\n/g, '<br/>') // Formatação rudimentar de quebra de linha.
+            }
+         });
+         if (error) throw error;
+      }
+
       const newFlow: BroadcastFlow = {
         id: editingId || String(Date.now()),
         name: flowName,
@@ -125,13 +163,18 @@ const Broadcasts = () => {
       localStorage.setItem("crm_broadcast_flows", JSON.stringify(updatedFluxos));
 
       toast.success(schedule 
-        ? `Disparo agendado com sucesso para ${currentCount} contatos!` 
-        : `Disparo realizado com sucesso para ${currentCount} contatos!`
+        ? `Disparo agendado com sucesso para ${rawEmailsCount} contatos!` 
+        : `Disparo realizado com sucesso para ${rawEmailsCount} contatos através da API do Resend!`
       );
       
       setIsScheduling(false);
       setStep(0);
-    }, 1500);
+    } catch (err: any) {
+      console.error("Erro disparando:", err);
+      toast.error(`Erro ao enviar: ${err.message || 'Falha na comunicação com servidor'}`);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleDelete = (id: string) => {

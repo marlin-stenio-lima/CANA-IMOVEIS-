@@ -161,12 +161,9 @@ export function KanbanCard({
     setIsFollowUpLoading(true);
     const oldStatus = localAiStatus;
 
-    // Logic: 
-    // If Active (Full) -> Scheduled (Follow-up Only)
-    // If Scheduled (Follow-up Only) -> Paused (Off)
-    // If Paused (Off) -> Scheduled (Follow-up Only)
-    let newStatus = 'scheduled';
-    if (oldStatus === 'scheduled') newStatus = 'paused';
+    // Toggle logic: Active <-> Paused
+    let newStatus = 'active';
+    if (oldStatus === 'active') newStatus = 'paused';
 
     // Optimistic Update
     setLocalAiStatus(newStatus);

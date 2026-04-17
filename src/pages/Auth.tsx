@@ -41,16 +41,22 @@ export default function Auth() {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn(loginEmail, loginPassword);
-    setIsLoading(false);
+    try {
+      const { error } = await signIn(loginEmail, loginPassword);
+      
+      if (error) {
+        toast.error(error.message === "Invalid login credentials" ? "Email ou senha incorretos" : error.message);
+        return;
+      }
 
-    if (error) {
-      toast.error(error.message === "Invalid login credentials" ? "Email ou senha incorretos" : error.message);
-      return;
+      toast.success("Bem-vindo ao CRM!");
+      navigate("/dashboard");
+    } catch (err: any) {
+      console.error("Login crashed:", err);
+      toast.error("Ocorreu um erro interno inesperado ao tentar fazer login.");
+    } finally {
+      setIsLoading(false);
     }
-
-    toast.success("Bem-vindo ao CRM!");
-    navigate("/dashboard");
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {

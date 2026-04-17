@@ -113,9 +113,25 @@ Deno.serve(async (req) => {
       let finalPropertyId = leadData.property_id;
       if (!finalPropertyId) {
          try {
-           const { data: fProp } = await supabase.from('properties').select('id').eq('company_id', company_id).limit(1).single();
-           if (fProp) finalPropertyId = fProp.id;
-         } catch(e) {}
+           let theId = null;
+           // 1. Tentar achar pelo internal_id (clientListingId) enviado pelo portal
+           const listingRef = payload.clientListingId || payload.listing_id || payload.codigo;
+           if (listingRef) {
+               const { data: matchedProp } = await supabase.from('properties')
+                  .select('id').eq('company_id', company_id).eq('internal_id', String(listingRef)).limit(1).single();
+               if (matchedProp) theId = matchedProp.id;
+           }
+           
+           // 2. Se não achar, cair no fallback genérico para não perder o lead
+           if (!theId) {
+              const { data: fProp } = await supabase.from('properties').select('id').eq('company_id', company_id).limit(1).single();
+              if (fProp) theId = fProp.id;
+           }
+
+           finalPropertyId = theId;
+         } catch(e) {
+           console.warn('Error matching property ID', e);
+         }
       }
 
       try {

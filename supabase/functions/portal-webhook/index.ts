@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
           message: leadData.message,
           status: 'novo',
           source: portalSrc,
-          property_id: leadData.property_id || '00000000-0000-0000-0000-000000000000' // fallback if not supplied
+          property_id: leadData.property_id || null
         });
       } catch (e) {
         console.warn('Could not insert in property_inquiries', e);

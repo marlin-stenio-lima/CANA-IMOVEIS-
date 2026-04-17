@@ -32,7 +32,13 @@ interface ContactDetailsModalProps {
 
 export default function ContactDetailsModal({ contact, open, onOpenChange }: ContactDetailsModalProps) {
     const [activeTab, setActiveTab] = useState("activity");
-    const [viewMode, setViewMode] = useState<'details' | 'chat'>('details');
+    const [viewMode, setViewMode] = useState<'info' | 'details' | 'chat'>('details');
+
+    useEffect(() => {
+        if (open) {
+            setViewMode(window.innerWidth < 768 ? 'info' : 'details');
+        }
+    }, [open]);
 
     if (!contact) return null;
 
@@ -68,12 +74,21 @@ export default function ContactDetailsModal({ contact, open, onOpenChange }: Con
                     <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 w-full md:w-auto">
                         <div className="flex flex-1 md:flex-none items-center bg-slate-100 p-1 rounded-lg border">
                             <Button
+                                variant={viewMode === 'info' ? "default" : "ghost"}
+                                size="sm"
+                                onClick={() => setViewMode('info')}
+                                className={`md:hidden flex-1 ${viewMode === 'info' ? "bg-white shadow-sm text-blue-600 font-bold" : "text-slate-500"}`}
+                            >
+                                Lead
+                            </Button>
+                            <Button
                                 variant={viewMode === 'details' ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setViewMode('details')}
                                 className={`flex-1 md:flex-none ${viewMode === 'details' ? "bg-white shadow-sm text-indigo-600 font-bold" : "text-slate-500"}`}
                             >
-                                Info
+                                <span className="md:hidden">Negócios</span>
+                                <span className="hidden md:inline">Informações</span>
                             </Button>
                             <Button
                                 variant={viewMode === 'chat' ? "default" : "ghost"}
@@ -92,12 +107,12 @@ export default function ContactDetailsModal({ contact, open, onOpenChange }: Con
 
                 <div className="flex flex-col md:grid md:grid-cols-12 flex-1 overflow-hidden">
                     {/* Left Column: Contact Info (25%) */}
-                    <div className="md:col-span-4 lg:col-span-3 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 md:p-6 scrollbar-thin scrollbar-thumb-gray-200">
+                    <div className={`${viewMode === 'info' ? 'flex' : 'hidden'} md:flex flex-col md:col-span-4 lg:col-span-3 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 md:p-6 scrollbar-thin scrollbar-thumb-gray-200`}>
                         <ContactInfo contact={contact} />
                     </div>
 
                     {/* Right Column: Dynamic Panel (75%) */}
-                    <div className="md:col-span-8 lg:col-span-9 bg-white overflow-hidden flex flex-col md:border-l relative shadow-inner flex-1">
+                    <div className={`${viewMode === 'info' ? 'hidden' : 'flex'} md:flex flex-col md:col-span-8 lg:col-span-9 bg-white overflow-hidden md:border-l relative shadow-inner flex-1`}>
                         {viewMode === 'details' ? (
                             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-100 p-0">
                                 <ContactDetailsTabs contact={contact} />

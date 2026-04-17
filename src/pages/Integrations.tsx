@@ -388,21 +388,6 @@ const Integrations = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-none shadow-none p-8 rounded-3xl overflow-hidden relative">
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-4 text-center md:text-left">
-            <h2 className="text-3xl font-bold">Solicitar Novo Portal</h2>
-            <p className="max-w-md text-muted-foreground">
-              Não encontrou o portal que você utiliza? Nossa equipe pode desenvolver uma integração personalizada para sua imobiliária.
-            </p>
-          </div>
-          <Button size="lg" className="rounded-full px-8 bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 shadow-2xl">
-            Falar com Suporte
-          </Button>
-        </div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50 blur-3xl pointer-events-none" />
-      </Card>
     </div>
   );
 };

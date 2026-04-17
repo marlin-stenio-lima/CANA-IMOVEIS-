@@ -108,6 +108,22 @@ Deno.serve(async (req) => {
           property_id: leadData.property_id
         }
       })
+      // 4. Inserir em property_inquiries para aparecer no painel de Leads do CRM
+      const portalSrc = leadData.portal || url.searchParams.get('source') || 'webhook';
+      try {
+        await supabase.from('property_inquiries').insert({
+          company_id,
+          name: leadData.name,
+          email: leadData.email,
+          phone: leadData.phone,
+          message: leadData.message,
+          status: 'novo',
+          source: portalSrc,
+          property_id: leadData.property_id || '00000000-0000-0000-0000-000000000000' // fallback if not supplied
+        });
+      } catch (e) {
+        console.warn('Could not insert in property_inquiries', e);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, lead_id: leadRecord.id }), { status: 200 })

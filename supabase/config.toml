@@ -14,3 +14,12 @@ verify_jwt = true
 
 [functions.send-outbound]
 verify_jwt = true
+
+[functions.portal-webhook]
+verify_jwt = false
+
+[functions.email-parser]
+verify_jwt = false
+
+[functions.property-xml-feed]
+verify_jwt = false

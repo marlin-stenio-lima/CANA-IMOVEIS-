@@ -58,12 +58,12 @@ Deno.serve(async (req) => {
     } else {
       // Generic fallback
       leadData = {
-        portal: payload.portal || 'generic',
-        name: payload.name || payload.client?.name,
-        email: payload.email || payload.client?.email,
-        phone: payload.phone || payload.client?.phone,
-        message: payload.message || payload.comments,
-        property_id: payload.property_id || payload.listing_id
+        portal: payload.portal || payload.leadOrigin || url.searchParams.get('source') || 'canal_pro',
+        name: payload.name || payload.client?.name || payload.nome || 'Cliente do Portal',
+        email: payload.email || payload.client?.email || payload.emailCliente || 'sem-email@portal.com',
+        phone: payload.phone || payload.client?.phone || payload.telefone || 'Sem telefone',
+        message: payload.message || payload.comments || payload.mensagem || JSON.stringify(payload),
+        property_id: payload.property_id || payload.listing_id || payload.clientListingId
       }
     }
 

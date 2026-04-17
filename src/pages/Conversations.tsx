@@ -234,7 +234,7 @@ const AudioPlayer = ({ src, id }: { src: string, id: string }) => {
   };
 
   const formatSecs = (s: number) => {
-    if (!s || isNaN(s)) return "0:00";
+    if (!s || isNaN(s) || s === Infinity) return "0:00";
     const mins = Math.floor(s / 60);
     const secs = Math.floor(s % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -996,38 +996,38 @@ function ConversationsContent() {
           <div className="absolute inset-0 opacity-40 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d93ea9372bd.png')] pointer-events-none" />
 
           {/* Header */}
-          <div className="h-[70px] bg-white/80 dark:bg-[#202c33]/80 backdrop-blur-md flex items-center px-6 py-2 justify-between z-20 border-l border-slate-200 dark:border-gray-700 w-full shrink-0 shadow-sm">
-            <div className="flex items-center cursor-pointer" onClick={() => { }}>
+          <div className="h-[70px] bg-white/80 dark:bg-[#202c33]/80 backdrop-blur-md flex items-center px-2 sm:px-6 py-2 justify-between z-20 border-l border-slate-200 dark:border-gray-700 w-full shrink-0 shadow-sm">
+            <div className="flex items-center cursor-pointer overflow-hidden flex-1" onClick={() => { }}>
               {/* Back button for mobile */}
-              <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={() => setSelectedConversation(null)}>
+              <Button variant="ghost" size="icon" className="md:hidden mr-0.5 shrink-0 h-8 w-8" onClick={() => setSelectedConversation(null)}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
 
-              <div className="relative group mr-4">
-                <Avatar className="h-12 w-12 border-2 border-indigo-100 shadow-sm group-hover:border-indigo-300 transition-all">
+              <div className="relative group mr-2 sm:mr-4 shrink-0">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2 border-indigo-100 shadow-sm group-hover:border-indigo-300 transition-all">
                   <AvatarImage src={selectedConversation.contact.profile_pic_url} />
                   <AvatarFallback className="bg-indigo-50 text-indigo-600 font-bold">{getInitials(selectedConversation.contact.name)}</AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]" />
+                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]" />
               </div>
 
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg text-[#111b21] dark:text-[#e9edef] font-semibold tracking-tight">
+              <div className="flex flex-col overflow-hidden">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-base sm:text-lg text-[#111b21] dark:text-[#e9edef] font-semibold tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {selectedConversation.contact.name}
                   </span>
-                  <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider h-5">
+                  <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider h-5 px-1.5 shrink-0">
                     Lead
                   </Badge>
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500">
-                    <Globe className="w-3 h-3" />
-                    <span>Conectado via WhatsApp</span>
+                <div className="flex items-center gap-1 sm:gap-2 text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                    <Globe className="w-3 h-3 shrink-0" />
+                    <span className="truncate">Conectado via WhatsApp</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-4 text-[#54656f] dark:text-[#aebac1] items-center">
+            <div className="flex gap-1 sm:gap-4 text-[#54656f] dark:text-[#aebac1] items-center shrink-0">
               {/* Agent Settings Trigger */}
               <Dialog open={isAgentDialogOpen} onOpenChange={setIsAgentDialogOpen}>
                 <DialogTrigger asChild>
@@ -1204,9 +1204,9 @@ function ConversationsContent() {
                           )
                         ) : msg.message_type === 'audio' ? (
                           msg.media_url ? (
-                            <div className="flex items-center gap-3 min-w-[280px] p-2">
-                              <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-                                <Avatar className="w-10 h-10">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-[200px] sm:min-w-[280px] p-1 sm:p-2">
+                              <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center shrink-0">
+                                <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
                                   <AvatarImage src={isUser ? undefined : selectedConversation.contact.profile_pic_url} />
                                   <AvatarFallback>{isUser ? 'EU' : getInitials(selectedConversation.contact.name)}</AvatarFallback>
                                 </Avatar>
@@ -1283,7 +1283,7 @@ function ConversationsContent() {
           </div>
 
           {/* Input Area (Sticky Footer) */}
-          <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-4 py-2 gap-3 z-20 border-t border-[#d1d7db] dark:border-gray-700 shrink-0">
+          <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-2 sm:px-4 py-2 gap-1.5 sm:gap-3 z-20 border-t border-[#d1d7db] dark:border-gray-700 shrink-0">
             {/* Hidden Input for Files */}
             <input
               type="file"
@@ -1295,8 +1295,8 @@ function ConversationsContent() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
-                  <Paperclip className="w-6 h-6 text-[#54656f] dark:text-[#aebac1]" />
+                <div className="cursor-pointer p-1.5 sm:p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors shrink-0">
+                  <Paperclip className="w-5 h-5 sm:w-6 sm:h-6 text-[#54656f] dark:text-[#aebac1]" />
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -1310,8 +1310,8 @@ function ConversationsContent() {
             </DropdownMenu>
 
             <Input
-              className={`flex-1 bg-white dark:bg-[#2a3942] border-none shadow-sm focus-visible:ring-0 text-[#111b21] dark:text-[#e9edef] placeholder:text-[#667781] dark:placeholder:text-[#8696a0] rounded-lg py-3 px-4 h-10 ${isRecording ? 'text-red-500 font-bold animate-pulse' : ''}`}
-              placeholder={isRecording ? `Gravando... ${formatDuration(recordingDuration)}` : "Digite uma mensagem"}
+              className={`flex-1 bg-white dark:bg-[#2a3942] border-none shadow-sm focus-visible:ring-0 text-[#111b21] dark:text-[#e9edef] placeholder:text-[#667781] dark:placeholder:text-[#8696a0] rounded-lg py-2 px-3 sm:py-3 sm:px-4 h-10 ${isRecording ? 'text-red-500 font-bold animate-pulse' : ''}`}
+              placeholder={isRecording ? `Gravando... ${formatDuration(recordingDuration)}` : "Mensagem..."}
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -1320,26 +1320,23 @@ function ConversationsContent() {
             />
 
             {messageInput.trim() ? (
-              <div onClick={handleSendMessage} className="cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
-                <Send className="w-6 h-6 text-[#54656f] dark:text-[#aebac1]" />
+              <div onClick={handleSendMessage} className="cursor-pointer p-1.5 sm:p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors shrink-0">
+                <Send className="w-5 h-5 sm:w-6 sm:h-6 text-[#54656f] dark:text-[#aebac1]" />
               </div>
             ) : isRecording ? (
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2 shrink-0">
                 {/* Cancel Recording */}
-                <div onClick={cancelRecording} className="cursor-pointer p-2 hover:bg-red-100 rounded-full transition-colors text-red-500">
-                  <Trash2 className="w-6 h-6" />
+                <div onClick={cancelRecording} className="cursor-pointer p-1.5 sm:p-2 hover:bg-red-100 rounded-full transition-colors text-red-500">
+                  <Trash2 className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                {/* Send Recording (Stop & Send) */}
-                <div onClick={stopRecording} className="cursor-pointer p-2 hover:bg-green-100 rounded-full transition-colors text-green-500 animate-pulse">
-                  <Send className="w-6 h-6" />
+                {/* Send Recording */}
+                <div onClick={stopRecording} className="cursor-pointer p-1.5 sm:p-2 bg-[#00a884] hover:bg-[#008f6f] rounded-full transition-colors text-white shadow-md">
+                  <Send className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
               </div>
             ) : (
-              <div
-                onClick={startRecording}
-                className="cursor-pointer p-2 rounded-full transition-colors text-[#54656f] dark:text-[#aebac1] hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                <Mic className="w-6 h-6" />
+              <div onClick={startRecording} className="cursor-pointer p-1.5 sm:p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors shrink-0">
+                <Mic className="w-5 h-5 sm:w-6 sm:h-6 text-[#54656f] dark:text-[#aebac1]" />
               </div>
             )}
           </div>

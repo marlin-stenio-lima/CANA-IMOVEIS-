@@ -64,9 +64,6 @@ const portals: Portal[] = [
     color: "from-yellow-600 to-yellow-400",
     icon: ExternalLink,
   },
-    color: "from-orange-600 to-orange-400",
-    icon: ExternalLink,
-  },
   {
     id: "luxury_estate",
     name: "Luxury Estate",

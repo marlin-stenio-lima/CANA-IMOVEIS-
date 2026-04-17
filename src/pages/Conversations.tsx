@@ -353,6 +353,10 @@ function ConversationsContent() {
   const { profile } = useAuth();
   const { isAdmin } = usePermissions();
 
+  // Search & Filter State
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [chatFilter, setChatFilter] = useState("todos");
+
   // Load Conversations
   useEffect(() => {
     fetchConversations();
@@ -866,18 +870,18 @@ function ConversationsContent() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem>
-                <Users className="w-4 h-4 mr-2" /> Corretores
+              <DropdownMenuItem onClick={() => setChatFilter('corretores')}>
+                <Users className={`w-4 h-4 mr-2 ${chatFilter === 'corretores' ? 'text-blue-500' : ''}`} /> Corretores
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Globe className="w-4 h-4 mr-2" /> Origem do Lead
+              <DropdownMenuItem onClick={() => setChatFilter('origem')}>
+                <Globe className={`w-4 h-4 mr-2 ${chatFilter === 'origem' ? 'text-blue-500' : ''}`} /> Origem do Lead
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Home className="w-4 h-4 mr-2" /> Imóveis de Interesse
+              <DropdownMenuItem onClick={() => setChatFilter('imoveis')}>
+                <Home className={`w-4 h-4 mr-2 ${chatFilter === 'imoveis' ? 'text-blue-500' : ''}`} /> Imóveis de Interesse
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Layers className="w-4 h-4 mr-2" /> Todos
+              <DropdownMenuItem onClick={() => setChatFilter('todos')}>
+                <Layers className={`w-4 h-4 mr-2 ${chatFilter === 'todos' ? 'text-blue-500' : ''}`} /> Todos
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -896,7 +900,9 @@ function ConversationsContent() {
             <Search className="w-4 h-4 text-[#54656f] dark:text-[#aebac1] mr-4" />
             <Input
               className="bg-transparent border-none shadow-none focus-visible:ring-0 h-full p-0 text-sm"
-              placeholder="Pesquisar ou começar uma nova conversa"
+              placeholder="Pesquisar conversa ou contato..."
+              value={chatSearchQuery}
+              onChange={(e) => setChatSearchQuery(e.target.value)}
             />
           </div>
         </div>
@@ -918,7 +924,26 @@ function ConversationsContent() {
               <Layers className="w-3 h-3" /> Reiniciar
             </Button>
           </div>
-          {conversations.map(conv => {
+          {conversations.filter((conv) => {
+            if (!conv || !conv.contact) return false;
+            let matchesSearch = true;
+            let matchesFilter = true;
+
+            // Search
+            if (chatSearchQuery.trim()) {
+              const q = chatSearchQuery.toLowerCase();
+              matchesSearch = (conv.contact.name || "").toLowerCase().includes(q) ||
+                              (conv.contact.email || "").toLowerCase().includes(q) ||
+                              (conv.contact.phone || "").toLowerCase().includes(q);
+            }
+
+            // Filters
+            if (chatFilter === 'corretores') matchesFilter = !!conv.contact.assigned_to;
+            if (chatFilter === 'origem') matchesFilter = !!conv.contact.source;
+            if (chatFilter === 'imoveis') matchesFilter = !!conv.contact.interest_property_id;
+
+            return matchesSearch && matchesFilter;
+          }).map(conv => {
             if (!conv || !conv.contact) return null; // Safe guard
             return (
               <div

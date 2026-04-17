@@ -190,11 +190,9 @@ export default function ImportContactsWizard({
                     phone: phone?.trim() || null,
                     email: email?.trim() || null,
                     source: source?.trim() || "Importação",
-                    email: email?.trim() || null,
-                    source: source?.trim() || "Importação",
                     company_id: profile.company_id,
                     tags: tags.length > 0 ? tags : null,
-                    business_type: mode,
+                    business_type: mode as any,
                 });
 
                 success++;

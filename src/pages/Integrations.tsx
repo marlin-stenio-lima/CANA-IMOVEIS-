@@ -37,19 +37,11 @@ interface Portal {
 
 const portals: Portal[] = [
   {
-    id: "zap",
-    name: "Zap Imóveis",
-    description: "Integração via Webhook para Leads e Feed XML para anúncios.",
+    id: "canal_pro",
+    name: "Canal Pro (ZAP, VivaReal, OLX)",
+    description: "Integração unificada via Webhook para Leads e Feed XML para os 3 maiores portais.",
     status: "disponivel",
-    color: "from-blue-600 to-blue-400",
-    icon: Zap,
-  },
-  {
-    id: "vivareal",
-    name: "VivaReal",
-    description: "Sincronização automática de anúncios e recebimento de contatos.",
-    status: "disponivel",
-    color: "from-purple-600 to-purple-400",
+    color: "from-purple-600 to-blue-500",
     icon: Globe,
   },
   {
@@ -75,14 +67,6 @@ const portals: Portal[] = [
     status: "configurar",
     color: "from-emerald-600 to-emerald-400",
     icon: ArrowRightLeft,
-  },
-  {
-    id: "olx",
-    name: "OLX",
-    description: "Integração rápida para imóveis populares e leads diretos.",
-    status: "disponivel",
-    color: "from-emerald-500 to-green-400",
-    icon: Zap,
   }
 ];
 
@@ -317,7 +301,7 @@ const Integrations = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">URL do Feed XML (ZAP/VivaReal)</label>
+                      <label className="text-sm font-medium">URL do Feed XML (Canal Pro / Portais)</label>
                       <div className="flex gap-2">
                         <Input readOnly value={feedUrl} className="bg-secondary/30 border-none font-mono text-xs" />
                         <Button variant="secondary" onClick={() => copyToClipboard(feedUrl, "Feed URL")}>

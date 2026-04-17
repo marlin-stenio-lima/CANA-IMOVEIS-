@@ -25,6 +25,7 @@ import PublicSite from "./pages/public/PublicSite";
 import PublicProperty from "./pages/public/PublicProperty";
 import NotFound from "./pages/NotFound";
 import Integrations from "./pages/Integrations";
+import Broadcasts from "./pages/Broadcasts";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/agents" element={<Agents />} />
                 <Route path="/roleta" element={<Roleta />} />
                 <Route path="/integrations" element={<Integrations />} />
+                <Route path="/broadcasts" element={<Broadcasts />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

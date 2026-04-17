@@ -14,7 +14,8 @@ import {
   Smartphone,
   Bot,
   Target,
-  Ship
+  Ship,
+  Send
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -46,6 +47,7 @@ const menuItems = [
   { id: 'central_ia', title: "Central IA", url: "/agents", icon: Bot },
   { id: 'roletas', title: "Roletas (Distribuição)", url: "/roleta", icon: Target },
   { id: 'whatsapp', title: "WhatsApp", url: "/whatsapp", icon: Smartphone },
+  { id: 'disparos', title: "Disparos", url: "/broadcasts", icon: Send },
 ];
 
 const settingsItems = [

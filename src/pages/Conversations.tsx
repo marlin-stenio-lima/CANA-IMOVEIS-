@@ -1028,69 +1028,6 @@ function ConversationsContent() {
             </div>
 
             <div className="flex gap-1 sm:gap-4 text-[#54656f] dark:text-[#aebac1] items-center shrink-0">
-              {/* Agent Settings Trigger */}
-              <Dialog open={isAgentDialogOpen} onOpenChange={setIsAgentDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative text-[#54656f] dark:text-[#aebac1] hover:bg-gray-200 dark:hover:bg-gray-700">
-                    <Bot className={`w-5 h-5 ${contactAgentSettings?.ai_status === 'active' ? 'text-green-500' : ''}`} />
-                    {contactAgentSettings?.ai_status === 'active' && (
-                      <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]"></span>
-                    )}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Configuração do Agente (Lead)</DialogTitle>
-                    <DialogDescription>
-                      Controle como a IA interage com <strong>{selectedConversation.contact.name}</strong>.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {contactAgentSettings && (
-                    <div className="py-4 space-y-6">
-                      {/* Master Toggle */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-0.5">
-                          <div className="font-medium">Status da IA</div>
-                          <div className="text-sm text-muted-foreground">
-                            {contactAgentSettings.ai_status === 'active' ? "Ligado / Respondendo" : "Pausado / Humano"}
-                          </div>
-                        </div>
-                        <Switch
-                          checked={contactAgentSettings.ai_status === 'active'}
-                          onCheckedChange={(checked) => updateAgentSettings({ ai_status: checked ? 'active' : 'paused' })}
-                        />
-                      </div>
-
-                      {/* Agent Selection Override */}
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">Forçar Agente Específico</label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {[
-                            { id: 1, name: "1. Agente de Triagem" },
-                            { id: 2, name: "2. Agente de Agendamento" }
-                          ].map((agent) => (
-                            <div
-                              key={agent.id}
-                              onClick={() => updateAgentSettings({ active_agent_id: agent.id })}
-                              className={`p-3 rounded-md border cursor-pointer transition-all flex items-center justify-between
-                                     ${contactAgentSettings.active_agent_id === agent.id
-                                  ? "border-primary bg-primary/5 ring-1 ring-primary"
-                                  : "hover:bg-muted"
-                                }
-                                  `}
-                            >
-                              <span className="text-sm">{agent.name}</span>
-                              {contactAgentSettings.active_agent_id === agent.id && <CheckCheck className="w-4 h-4 text-primary" />}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
               <Search className="w-5 h-5 cursor-pointer" />
 
               {/* Delete SINGLE Conversation Button */}

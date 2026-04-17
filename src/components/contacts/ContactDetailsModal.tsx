@@ -47,13 +47,13 @@ export default function ContactDetailsModal({ contact, open, onOpenChange }: Con
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[95vw] h-[95vh] p-0 gap-0 overflow-hidden bg-[#f3f4f6]" showCloseButton={false}>
-                <div className="bg-white/80 dark:bg-[#202c33]/80 backdrop-blur-md border-b px-8 py-4 flex items-center justify-between shrink-0 h-20 shadow-sm z-30">
-                    <div className="flex items-center gap-6">
+            <DialogContent className="flex flex-col max-w-[95vw] md:max-w-[90vw] lg:max-w-[80vw] h-[95vh] p-0 gap-0 overflow-hidden bg-[#f3f4f6]" showCloseButton={false}>
+                <div className="bg-white/80 dark:bg-[#202c33]/80 backdrop-blur-md border-b px-4 md:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between shrink-0 h-auto md:h-20 shadow-sm z-30 gap-4">
+                    <div className="flex items-center gap-4 md:gap-6">
                         <div className="flex flex-col">
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{contact.name}</h2>
-                                <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-bold uppercase tracking-widest h-6 px-3">
+                            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{contact.name}</h2>
+                                <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] font-bold uppercase tracking-widest h-6 px-2 md:px-3">
                                     Lead
                                 </Badge>
                                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-100 rounded-full">
@@ -61,43 +61,43 @@ export default function ContactDetailsModal({ contact, open, onOpenChange }: Con
                                     <span className="text-[10px] font-bold text-green-600 uppercase tracking-tighter">Ativo</span>
                                 </div>
                             </div>
-                            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Informações do Cliente</p>
+                            <p className="text-[10px] md:text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Informações do Cliente</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-slate-100 p-1 rounded-lg border">
+                    <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 w-full md:w-auto">
+                        <div className="flex flex-1 md:flex-none items-center bg-slate-100 p-1 rounded-lg border">
                             <Button
                                 variant={viewMode === 'details' ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setViewMode('details')}
-                                className={viewMode === 'details' ? "bg-white shadow-sm text-indigo-600 font-bold" : "text-slate-500"}
+                                className={`flex-1 md:flex-none ${viewMode === 'details' ? "bg-white shadow-sm text-indigo-600 font-bold" : "text-slate-500"}`}
                             >
-                                Informações
+                                Info
                             </Button>
                             <Button
                                 variant={viewMode === 'chat' ? "default" : "ghost"}
                                 size="sm"
                                 onClick={() => setViewMode('chat')}
-                                className={viewMode === 'chat' ? "bg-white shadow-sm text-emerald-600 font-bold" : "text-slate-500"}
+                                className={`flex-1 md:flex-none ${viewMode === 'chat' ? "bg-white shadow-sm text-emerald-600 font-bold" : "text-slate-500"}`}
                             >
-                                WhatsApp Central
+                                WhatsApp
                             </Button>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0">
                             <X className="h-5 w-5" />
                         </Button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-12 h-[calc(95vh-64px)]">
+                <div className="flex flex-col md:grid md:grid-cols-12 flex-1 overflow-hidden">
                     {/* Left Column: Contact Info (25%) */}
-                    <div className="col-span-3 bg-white border-r overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-200">
+                    <div className="md:col-span-4 lg:col-span-3 bg-white border-b md:border-b-0 md:border-r overflow-y-auto p-4 md:p-6 scrollbar-thin scrollbar-thumb-gray-200">
                         <ContactInfo contact={contact} />
                     </div>
 
                     {/* Right Column: Dynamic Panel (75%) */}
-                    <div className="col-span-9 bg-white overflow-hidden flex flex-col border-l relative shadow-inner">
+                    <div className="md:col-span-8 lg:col-span-9 bg-white overflow-hidden flex flex-col md:border-l relative shadow-inner flex-1">
                         {viewMode === 'details' ? (
                             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-100 p-0">
                                 <ContactDetailsTabs contact={contact} />

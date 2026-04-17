@@ -272,6 +272,34 @@ export function useContacts(filters?: ContactsFilter) {
 
     const deleteContact = useMutation({
         mutationFn: async (ids: string[]) => {
+            // Manual Cascade Delete Strategy
+            // 1. Delete direct table references where contact_id = ids
+            await Promise.all([
+                supabase.from("appointments").delete().in("contact_id", ids),
+                supabase.from("tasks").delete().in("related_contact_id", ids),
+                supabase.from("contact_files").delete().in("contact_id", ids),
+                supabase.from("contact_ai_insights").delete().in("contact_id", ids),
+                supabase.from("property_inquiries").delete().in("contact_id", ids),
+                supabase.from("activities").delete().in("contact_id", ids)
+            ]);
+
+            // 2. Fetch and delete deals + their references
+            const { data: dealsData } = await supabase.from("deals").select("id").in("contact_id", ids);
+            if (dealsData && dealsData.length > 0) {
+                const dealIds = dealsData.map((d: any) => d.id);
+                
+                await Promise.all([
+                    supabase.from("deal_stage_history").delete().in("deal_id", dealIds),
+                    supabase.from("activities").delete().in("deal_id", dealIds),
+                    supabase.from("property_inquiries").delete().in("deal_id", dealIds),
+                    supabase.from("tasks").delete().in("related_deal_id", dealIds),
+                ]);
+
+                // Finally delete the deals themselves
+                await supabase.from("deals").delete().in("id", dealIds);
+            }
+
+            // 3. Delete the actual contacts
             const { error } = await supabase
                 .from("contacts")
                 .delete()

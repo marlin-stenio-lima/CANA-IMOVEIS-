@@ -14,6 +14,7 @@ export interface PropertyInquiry {
   contact_id: string | null;
   deal_id: string | null;
   status: 'novo' | 'contatado' | 'convertido' | 'descartado';
+  source: string | null;
   created_at: string;
   property?: {
     id: string;

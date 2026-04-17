@@ -25,6 +25,10 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { usePropertyInquiries } from "@/hooks/usePropertyInquiries";
+import { useNavigate } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Portal {
   id: string;
@@ -46,9 +50,20 @@ const portals: Portal[] = [
   },
   {
     id: "imovelweb",
-    name: "Imovelweb & Casa Mineira",
-    description: "Portais do Grupo Navent com suporte a Webhook direto no seu CRM.",
+    name: "Imovelweb",
+    description: "Portal líder no Brasil (Grupo Navent). Integração via Zapier/Webhook.",
     status: "disponivel",
+    color: "from-orange-600 to-orange-400",
+    icon: ExternalLink,
+  },
+  {
+    id: "casamineira",
+    name: "Casa Mineira",
+    description: "Referência no mercado nacional. Integração rápida e estável.",
+    status: "disponivel",
+    color: "from-yellow-600 to-yellow-400",
+    icon: ExternalLink,
+  },
     color: "from-orange-600 to-orange-400",
     icon: ExternalLink,
   },
@@ -72,10 +87,30 @@ const portals: Portal[] = [
 
 const Integrations = () => {
   const { profile } = useAuth();
+  const { inquiries } = usePropertyInquiries();
+  const navigate = useNavigate();
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
   
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://your-project.supabase.co";
   const companyId = profile?.company_id || "00000000-0000-0000-0000-000000000000";
+
+  const getPortalStats = (portalId: string) => {
+    // Canal Pro engloba zap, vivareal e olx, mas podem vir com a tag especifica ou "canal_pro"
+    const portalLeads = inquiries.filter(c => {
+      const src = c.source?.toLowerCase().trim();
+      if (!src) return false;
+      if (portalId === 'canal_pro') {
+        return src === 'canal_pro' || src === 'zap' || src === 'vivareal' || src === 'olx';
+      }
+      return src.includes(portalId) || src === portalId;
+    });
+
+    const isActive = portalLeads.length > 0;
+    const count = portalLeads.length;
+    const lastLead = portalLeads[0]; // array is ordered DESC by created_at
+
+    return { isActive, count, lastLead };
+  };
 
   const webhookUrl = `${supabaseUrl}/functions/v1/portal-webhook?company_id=${companyId}`;
   const feedUrl = `${supabaseUrl}/functions/v1/property-xml-feed?company_id=${companyId}`;
@@ -99,7 +134,10 @@ const Integrations = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {portals.map((portal) => (
+        {portals.map((portal) => {
+          const stats = getPortalStats(portal.id);
+          
+          return (
           <Card key={portal.id} className="group relative overflow-hidden border-none bg-card/50 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 ring-1 ring-white/10">
             <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${portal.color}`} />
             
@@ -109,25 +147,32 @@ const Integrations = () => {
                   <portal.icon className="h-5 w-5 text-primary" />
                   {portal.name}
                 </CardTitle>
-                <CardDescription className="line-clamp-2">
+                <CardDescription className="line-clamp-2 min-h-10">
                   {portal.description}
                 </CardDescription>
               </div>
-              <div className={`p-3 rounded-2xl bg-gradient-to-br ${portal.color} opacity-10 group-hover:opacity-20 transition-opacity`}>
+              <div className={`p-3 rounded-2xl bg-gradient-to-br ${portal.color} opacity-10 group-hover:opacity-20 transition-opacity shrink-0`}>
                 <portal.icon className="h-6 w-6 text-foreground" />
               </div>
             </CardHeader>
 
             <CardContent>
               <div className="flex flex-col space-y-4 pt-4">
+                {stats.lastLead && (
+                  <div className="text-xs bg-muted/60 p-2 rounded-md flex justify-between items-center text-muted-foreground border border-border/50">
+                     <span>👥 {stats.count} leads</span>
+                     <span>Último: {formatDistanceToNow(new Date(stats.lastLead.created_at), { addSuffix: true, locale: ptBR })}</span>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between">
-                  {portal.status === "disponivel" ? (
+                  {stats.isActive ? (
                     <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-2.5 py-1">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Funcionando
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Conectado
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-2.5 py-1">
-                      <Settings2 className="h-3 w-3 mr-1" /> Configurar
+                      <Settings2 className="h-3 w-3 mr-1" /> Aguardando
                     </Badge>
                   )}
                   
@@ -140,7 +185,11 @@ const Integrations = () => {
                     >
                       Configurar
                     </Button>
-                    <Button size="sm" className="bg-primary/90 hover:bg-primary shadow-lg shadow-primary/20">
+                    <Button 
+                      size="sm" 
+                      className="bg-primary/90 hover:bg-primary shadow-lg shadow-primary/20"
+                      onClick={() => navigate(`/leads?source=${portal.id}`)}
+                    >
                       Ver Leads
                     </Button>
                   </div>
@@ -155,7 +204,8 @@ const Integrations = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <Dialog open={!!selectedPortal} onOpenChange={() => setSelectedPortal(null)}>
@@ -275,8 +325,8 @@ const Integrations = () => {
                     <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-3 italic text-sm text-muted-foreground">
                       <Info className="h-5 w-5 text-primary shrink-0 not-italic" />
                       <p>
-                        {selectedPortal?.id === "imovelweb" 
-                         ? "No Imovelweb/Casa Mineira, em 'Integrador', selecione a opção 'Zapier'. Isso irá liberar o campo 'URL de Callback' embaixo para você colar nosso link!"
+                        {selectedPortal?.id === "imovelweb" || selectedPortal?.id === "casamineira"
+                         ? "No Portal da Navent, em 'Integrador', selecione a opção 'Zapier'. Isso irá liberar o campo 'URL de Callback' embaixo para você colar nosso link!"
                          : `Para receber leads, cole esta URL no campo "Webhook" ou "URL de Destino" nas configurações do seu portal ${selectedPortal?.name}.`}
                       </p>
                     </div>
@@ -284,8 +334,8 @@ const Integrations = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Link do Webhook para Leads</label>
                       <div className="flex gap-2">
-                        <Input readOnly value={selectedPortal?.id === "imovelweb" ? webhookUrl + "&source=imovelweb" : webhookUrl} className="bg-secondary/30 border-none font-mono text-xs" />
-                        <Button variant="secondary" onClick={() => copyToClipboard(selectedPortal?.id === "imovelweb" ? webhookUrl + "&source=imovelweb" : webhookUrl, "Webhook URL")}>
+                        <Input readOnly value={selectedPortal?.id === "imovelweb" || selectedPortal?.id === "casamineira" ? webhookUrl + "&source=" + selectedPortal.id : webhookUrl} className="bg-secondary/30 border-none font-mono text-xs" />
+                        <Button variant="secondary" onClick={() => copyToClipboard(selectedPortal?.id === "imovelweb" || selectedPortal?.id === "casamineira" ? webhookUrl + "&source=" + selectedPortal.id : webhookUrl, "Webhook URL")}>
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>

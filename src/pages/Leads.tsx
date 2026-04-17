@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useLocation } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -65,8 +66,13 @@ const statusLabels: Record<PropertyInquiry['status'], string> = {
 
 export default function Leads() {
   const { inquiries, isLoading, updateStatus, deleteInquiry } = usePropertyInquiries();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const sourceParam = queryParams.get('source');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>(sourceParam || 'all');
   const [deletingInquiry, setDeletingInquiry] = useState<PropertyInquiry | null>(null);
 
   const filteredInquiries = inquiries.filter((inquiry) => {
@@ -77,8 +83,9 @@ export default function Leads() {
       inquiry.property?.title?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || inquiry.status === statusFilter;
+    const matchesSource = sourceFilter === 'all' || inquiry.source === sourceFilter || inquiry.source?.includes(sourceFilter);
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesSource;
   });
 
   const formatPrice = (price: number) => {
@@ -146,6 +153,22 @@ export default function Leads() {
             <SelectItem value="descartado">Descartado</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Origem" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Origens</SelectItem>
+            <SelectItem value="zap">Zap Imóveis</SelectItem>
+            <SelectItem value="vivareal">Viva Real</SelectItem>
+            <SelectItem value="olx">OLX</SelectItem>
+            <SelectItem value="canal_pro">Canal Pro</SelectItem>
+            <SelectItem value="imovelweb">Imovelweb</SelectItem>
+            <SelectItem value="casamineira">Casa Mineira</SelectItem>
+            <SelectItem value="luxury_estate">Luxury Estate</SelectItem>
+            <SelectItem value="properstar">Properstar</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -176,7 +199,14 @@ export default function Leads() {
                 <TableRow key={inquiry.id}>
                   <TableCell>
                     <div className="space-y-1">
-                      <p className="font-medium">{inquiry.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{inquiry.name}</p>
+                        {inquiry.source && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-muted/50 uppercase tracking-wider">
+                            {inquiry.source.replace('_', ' ')}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Mail className="h-3 w-3" />

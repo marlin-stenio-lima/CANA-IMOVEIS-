@@ -34,7 +34,7 @@ export default function Tasks() {
     const matchesSearch = titleMatch || descMatch;
     
     // Status filter
-    if (filter === "pending") return matchesSearch && (task.status === "pending" || !task.status);
+    if (filter === "pending") return matchesSearch && task.status !== "completed";
     if (filter === "completed") return matchesSearch && task.status === "completed";
     
     return matchesSearch;
@@ -101,9 +101,9 @@ export default function Tasks() {
                 className={filter === "pending" ? "bg-white text-slate-800 shadow-sm font-bold" : "text-slate-500 hover:text-slate-700"}
               >
                 Pendentes
-                {(tasks || []).filter(t => t?.status === 'pending').length > 0 && (
+                {(tasks || []).filter(t => t?.status !== 'completed').length > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded-full font-bold">
-                    {(tasks || []).filter(t => t?.status === 'pending').length}
+                    {(tasks || []).filter(t => t?.status !== 'completed').length}
                   </span>
                 )}
               </Button>

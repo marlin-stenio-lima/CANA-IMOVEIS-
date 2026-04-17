@@ -295,12 +295,12 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
 
                     {/* ATIVIDADES */}
                     <TabsContent value="atividades" className="mt-0 max-w-4xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">Atividades</h3>
                                 <p className="text-sm text-slate-500">Lista de atividades e tarefas</p>
                             </div>
-                            <Button onClick={() => { setTaskToEdit(null); setIsTaskModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-md">
+                            <Button onClick={() => { setTaskToEdit(null); setIsTaskModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-md w-full sm:w-auto">
                                 <Plus className="w-4 h-4 mr-2" /> Nova Tarefa
                             </Button>
                         </div>
@@ -356,12 +356,12 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
 
                     {/* NEGÓCIOS */}
                     <TabsContent value="negocios" className="mt-0 max-w-4xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">Negócios</h3>
                                 <p className="text-sm text-slate-500">Veja qual a participação do lead em negociações</p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -549,12 +549,12 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
 
                     {/* ARQUIVOS */}
                     <TabsContent value="arquivos" className="mt-0 max-w-4xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">Documentos e Arquivos</h3>
                                 <p className="text-sm text-slate-500">Gerencie arquivos enviados por este lead</p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <Input
                                     type="file"
                                     className="hidden"

@@ -97,7 +97,7 @@ const Integrations = () => {
       const src = c.source?.toLowerCase().trim();
       if (!src) return false;
       if (portalId === 'canal_pro') {
-        return src === 'canal_pro' || src === 'zap' || src === 'vivareal' || src === 'olx';
+        return src === 'canal_pro' || src === 'zap' || src === 'vivareal' || src === 'olx' || src.includes('olx');
       }
       return src.includes(portalId) || src === portalId;
     });

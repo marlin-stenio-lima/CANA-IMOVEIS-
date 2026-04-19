@@ -92,62 +92,62 @@ Deno.serve(async (req) => {
 
     if (broker_id) {
       await supabase.from('leads').update({ assigned_to: broker_id }).eq('id', leadRecord.id)
+    }
       
-      // 3. Optional: Auto-create Contact from Lead
-      // (Depending on business rules, we might wait for the broker to claim or do it now)
-      await supabase.from('contacts').insert({
+    // 3. Auto-create Contact from Lead
+    await supabase.from('contacts').insert({
+      company_id,
+      name: leadData.name,
+      email: leadData.email,
+      phone: leadData.phone,
+      assigned_to: broker_id || null,
+      status: 'new',
+      custom_fields: {
+        lead_id: leadRecord.id,
+        portal: leadData.portal,
+        property_id: leadData.property_id
+      }
+    })
+
+    // 4. Inserir em property_inquiries para aparecer no painel de Leads do CRM
+    const portalSrc = leadData.portal || url.searchParams.get('source') || 'webhook';
+    let finalPropertyId = null;
+
+    try {
+      const listingRef = leadData.property_id || payload.clientListingId || payload.listing_id || payload.codigo || payload.internalReference;
+      
+      if (listingRef) {
+        // Se já for um UUID (ex: inserido por um sistema que usa UUID nativo)
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(listingRef));
+        
+        if (isUUID) {
+          finalPropertyId = listingRef;
+        } else {
+          // Se for código curto, vamos achar o UUID real no banco
+          const { data: matchedProp } = await supabase.from('properties')
+              .select('id').eq('company_id', company_id).eq('internal_id', String(listingRef)).limit(1).maybeSingle();
+          if (matchedProp) {
+            finalPropertyId = matchedProp.id;
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Error fetching matched property', e);
+    }
+
+    try {
+      await supabase.from('property_inquiries').insert({
         company_id,
         name: leadData.name,
         email: leadData.email,
         phone: leadData.phone,
-        assigned_to: broker_id,
-        status: 'new',
-        custom_fields: {
-          lead_id: leadRecord.id,
-          portal: leadData.portal,
-          property_id: leadData.property_id
-        }
-      })
-      // 4. Inserir em property_inquiries para aparecer no painel de Leads do CRM
-      const portalSrc = leadData.portal || url.searchParams.get('source') || 'webhook';
-      let finalPropertyId = leadData.property_id;
-      if (!finalPropertyId) {
-         try {
-           let theId = null;
-           // 1. Tentar achar pelo internal_id (clientListingId) enviado pelo portal
-           const listingRef = payload.clientListingId || payload.listing_id || payload.codigo;
-           if (listingRef) {
-               const { data: matchedProp } = await supabase.from('properties')
-                  .select('id').eq('company_id', company_id).eq('internal_id', String(listingRef)).limit(1).single();
-               if (matchedProp) theId = matchedProp.id;
-           }
-           
-           // 2. Se não achar, cair no fallback genérico para não perder o lead
-           if (!theId) {
-              const { data: fProp } = await supabase.from('properties').select('id').eq('company_id', company_id).limit(1).single();
-              if (fProp) theId = fProp.id;
-           }
-
-           finalPropertyId = theId;
-         } catch(e) {
-           console.warn('Error matching property ID', e);
-         }
-      }
-
-      try {
-        await supabase.from('property_inquiries').insert({
-          company_id,
-          name: leadData.name,
-          email: leadData.email,
-          phone: leadData.phone,
-          message: leadData.message,
-          status: 'novo',
-          source: portalSrc,
-          property_id: finalPropertyId
-        });
-      } catch (e) {
-        console.warn('Could not insert in property_inquiries', e);
-      }
+        message: leadData.message,
+        status: 'novo',
+        source: portalSrc,
+        property_id: finalPropertyId
+      });
+    } catch (e) {
+      console.warn('Could not insert in property_inquiries', e);
     }
 
     return new Response(JSON.stringify({ success: true, lead_id: leadRecord.id }), { status: 200 })

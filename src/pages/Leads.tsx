@@ -83,7 +83,18 @@ export default function Leads() {
       (inquiry.property?.title && inquiry.property.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || inquiry.status === statusFilter;
-    const matchesSource = sourceFilter === 'all' || inquiry.source === sourceFilter || inquiry.source?.includes(sourceFilter);
+    
+    let matchesSource = false;
+    const src = inquiry.source?.toLowerCase().trim() || '';
+    if (sourceFilter === 'all') {
+      matchesSource = true;
+    } else if (sourceFilter === 'canal_pro') {
+      matchesSource = src === 'canal_pro' || src === 'zap' || src === 'vivareal' || src === 'olx' || src.includes('olx');
+    } else if (sourceFilter === 'olx') {
+      matchesSource = src === 'olx' || src.includes('olx');
+    } else {
+      matchesSource = src === sourceFilter || src.includes(sourceFilter);
+    }
 
     return matchesSearch && matchesStatus && matchesSource;
   });

@@ -1,0 +1,1 @@
+ALTER TABLE public.property_inquiries ALTER COLUMN property_id DROP NOT NULL;

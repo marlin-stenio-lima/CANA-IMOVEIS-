@@ -16,21 +16,37 @@ Deno.serve(async (req) => {
             throw new Error('Missing RESEND_API_KEY')
         }
 
-        const { from, to, subject, html, reply_to } = await req.json()
+        const payload = await req.json()
+        
+        let apiEndpoint = 'https://api.resend.com/emails';
+        let apiBody;
 
-        const res = await fetch('https://api.resend.com/emails', {
+        if (Array.isArray(payload)) {
+            apiEndpoint = 'https://api.resend.com/emails/batch';
+            apiBody = payload.map(p => ({
+                from: p.from || 'onboarding@resend.dev',
+                to: Array.isArray(p.to) ? p.to : [p.to],
+                subject: p.subject || 'Mensagem do CRM',
+                html: p.html || '<p>Mensagem em branco.</p>',
+                reply_to: p.reply_to || undefined
+            }));
+        } else {
+            apiBody = {
+                from: payload.from || 'onboarding@resend.dev',
+                to: Array.isArray(payload.to) ? payload.to : [payload.to],
+                subject: payload.subject || 'Mensagem do CRM',
+                html: payload.html || '<p>Mensagem em branco.</p>',
+                reply_to: payload.reply_to || undefined
+            };
+        }
+
+        const res = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${RESEND_API_KEY}`
             },
-            body: JSON.stringify({
-                from: from || 'onboarding@resend.dev',
-                to: Array.isArray(to) ? to : [to],
-                subject: subject || 'Mensagem do CRM',
-                html: html || '<p>Mensagem em branco.</p>',
-                reply_to: reply_to || undefined
-            })
+            body: JSON.stringify(apiBody)
         })
 
         const data = await res.json()

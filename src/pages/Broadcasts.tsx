@@ -124,44 +124,52 @@ const Broadcasts = () => {
 
     setIsSending(true);
     let rawEmailsCount = currentCount;
-    let targetEmails: string[] = [];
+    let targetContacts: any[] = [];
 
     try {
-      // Obter lista real de emails do banco
       if (audienceType === "manual") {
-        targetEmails = selectedEmails;
+        const { data, error } = await supabase.from('contacts').select('email, name, phone, source').not('email', 'is', null).in('email', selectedEmails);
+        if (!error && data) targetContacts = data;
       } else {
-        // Query de contatos que tem email válido
-        let query = supabase.from('contacts').select('email').not('email', 'is', null).neq('email', '');
+        let query = supabase.from('contacts').select('email, name, phone, source').not('email', 'is', null).neq('email', '');
         if (audienceType === "tag" && audienceValue) {
           query = query.contains('tags', [audienceValue]);
         }
-        // Nota: A lógica de filtro pode ser aprofundada conforme tabela. Isso coleta todos com email genérico.
-        // Simulando query apenas pegando os ativos
         const { data, error } = await query;
-        if (!error && data) {
-           targetEmails = data.map(d => d.email);
-        }
+        if (!error && data) targetContacts = data;
       }
 
-      if (targetEmails.length === 0) {
-         // Fallback debug - mandar pro próprio remetente para testar.
-         targetEmails = [senderEmail];
+      if (targetContacts.length === 0) {
+         targetContacts = [{ email: senderEmail, name: "Você Mesmo", phone: "", source: "Teste" }];
          toast.warning("Nenhum destinatário real encontrado ou filtro vazio. Disparando envio de teste para o próprio remetente.");
       }
 
-      rawEmailsCount = targetEmails.length;
+      rawEmailsCount = targetContacts.length;
       
-      // Chamada real para Edge Function do Supabase (Apenas se não for agendamento)
       if (!schedule) {
-         const { data, error } = await supabase.functions.invoke('send-email', {
-            body: {
-               from: `${senderName} <${senderEmail}>`,
-               to: targetEmails,
-               subject: subject,
-               html: body.replace(/\n/g, '<br/>') // Formatação rudimentar de quebra de linha.
-            }
+         const payloads = targetContacts.map(contact => {
+             const primeiroNome = contact.name?.split(' ')[0] || "Cliente";
+             const html = body
+                .replace(/{nome}/g, contact.name || "Cliente")
+                .replace(/{primeiro_nome}/g, primeiroNome)
+                .replace(/{email}/g, contact.email)
+                .replace(/{telefone}/g, contact.phone || "")
+                .replace(/{origem}/g, contact.source || "")
+                .replace(/\n/g, '<br/>');
+
+             return {
+                 from: `${senderName} <${senderEmail}>`,
+                 to: contact.email,
+                 subject: subject,
+                 html: html
+             };
          });
+
+         // Enviar em lotes de 100 para Resend Batch limit (simplificado aqui para o array completo, Resend limita Batch em 100 por chamada, ideal seria fatiar)
+         const { data, error } = await supabase.functions.invoke('send-email', {
+            body: payloads
+         });
+         
          if (error) throw error;
       }
 

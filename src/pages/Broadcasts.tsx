@@ -145,6 +145,47 @@ const Broadcasts = () => {
     setStep(1);
   };
 
+  const handleTemplateChange = (val: string) => {
+    if (val === "apresentacao") {
+        setBody(`<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 20px; text-align: center; margin: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <h1 style="color: #1a1a1a;">Olá {primeiro_nome},</h1>
+        <p style="color: #52525b; font-size: 16px;">Separamos uma oportunidade exclusiva que combina perfeitamente com seu perfil.</p>
+        
+        <!-- Clique em "Inserir Imagem" para trocar a foto abaixo -->
+        <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80" style="width: 100%; border-radius: 8px; margin: 20px 0;" alt="Imóvel" />
+        
+        <h2 style="color: #1a1a1a;">Residencial Alto Padrão</h2>
+        <p style="color: #52525b; margin-bottom: 30px;">Localização Premium • Acabamento Exclusivo</p>
+        
+        <a href="#" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">Ver Detalhes do Imóvel</a>
+    </div>
+</body>
+</html>`);
+        toast.success("Modelo de Apresentação carregado!");
+    } else if (val === "newsletter") {
+        setBody(`<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; margin: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <div style="background-color: #1e293b; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0;">Newsletter Canaã</h1>
+        </div>
+        <div style="padding: 30px;">
+            <p style="color: #52525b; font-size: 16px;">Olá <b>{primeiro_nome}</b>, confira os destaques do mercado imobiliário desta semana!</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <h3 style="color: #0f172a;">A Hora Certa de Investir</h3>
+            <p style="color: #64748b; line-height: 1.6;">As taxas de financiamento estão no momento ideal. Aproveite para garantir seu patrimônio com segurança...</p>
+        </div>
+    </div>
+</body>
+</html>`);
+        toast.success("Modelo de Newsletter carregado!");
+    }
+  };
+
   const handleSaveAndSend = async (schedule: boolean = false) => {
     if (!flowName) return toast.error("Dê um nome para este fluxo de automação.");
     if (!subject) return toast.error("O assunto é obrigatório.");
@@ -406,7 +447,18 @@ const Broadcasts = () => {
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Corpo do Texto / HTML</label>
+                    <label className="text-sm font-medium flex items-center gap-2">
+                       Corpo do Texto / HTML
+                       <Select onValueChange={handleTemplateChange}>
+                         <SelectTrigger className="w-[180px] h-7 text-xs border-dashed ml-4 bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors">
+                            <SelectValue placeholder="Modelos Prontos (HTML)" />
+                         </SelectTrigger>
+                         <SelectContent>
+                            <SelectItem value="apresentacao">Apresentação de Imóvel</SelectItem>
+                            <SelectItem value="newsletter">Boletim / Newsletter</SelectItem>
+                         </SelectContent>
+                       </Select>
+                    </label>
                     <div className="flex gap-2">
                        <Button variant={viewMode === "code" ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setViewMode("code")}>
                          <Code className="w-3 h-3 mr-2" /> Editor / Código Puro
@@ -427,12 +479,33 @@ const Broadcasts = () => {
                           const url = prompt("Insira o Link de destino:");
                           if (url) setBody(body + `<a href="${url}">Clique Aqui</a>`);
                         }}><Link2 className="w-3 h-3" /></Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-primary" onClick={() => {
-                          const url = prompt("Cole a URL da Imagem (Ex: https://...):");
-                          if (url) setBody(body + `\n<img src="${url}" style="max-width: 100%; border-radius: 8px; margin: 15px 0;" alt="Imagem" />\n`);
-                        }}>
-                          <ImageIcon className="w-3 h-3 mr-1" /> Inserir Imagem
-                        </Button>
+                        
+                        <div className="flex items-center">
+                          <input 
+                            type="file" 
+                            id="email-image-upload" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const fileName = `${Date.now()}_${file.name}`;
+                                const toastId = toast.loading("Fazendo upload da imagem...");
+                                const { error } = await supabase.storage.from('chat-media').upload(fileName, file);
+                                if (error) {
+                                    toast.error("Erro no upload: " + error.message, { id: toastId });
+                                    return;
+                                }
+                                const { data } = supabase.storage.from('chat-media').getPublicUrl(fileName);
+                                setBody(prev => prev + `\n<img src="${data.publicUrl}" style="max-width: 100%; border-radius: 8px; margin: 15px 0;" alt="Imagem Inserida" />\n`);
+                                toast.success("Imagem anexada no código!", { id: toastId });
+                                e.target.value = '';
+                            }}
+                          />
+                          <Button variant="ghost" size="sm" className="h-8 px-2 text-primary gap-1" onClick={() => document.getElementById("email-image-upload")?.click()}>
+                            <ImageIcon className="w-3 h-3" /> <span className="text-xs font-semibold">Upload de Imagem</span>
+                          </Button>
+                        </div>
                       </div>
                       <Textarea 
                         value={body}

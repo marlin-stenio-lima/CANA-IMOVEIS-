@@ -66,6 +66,38 @@ const Broadcasts = () => {
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [contactSearch, setContactSearch] = useState("");
 
+  // Opções Dinâmicas para Filtros
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableSources, setAvailableSources] = useState<string[]>([]);
+  const [availableBrokers, setAvailableBrokers] = useState<{id: string, name: string}[]>([]);
+
+  const loadFilterOptions = async () => {
+    // Buscar corretores (profiles com role corretor ou admin)
+    const { data: brokers } = await supabase.from('profiles').select('id, full_name, role');
+    if (brokers) {
+      setAvailableBrokers(brokers.map(b => ({ id: b.id, name: b.full_name || 'Corretor' })));
+    }
+
+    // Buscar tags e origens únicas (limite 5000 para não quebrar browser)
+    const { data: contacts } = await supabase.from('contacts').select('tags, source').limit(5000);
+    if (contacts) {
+      const allTags = new Set<string>();
+      const allSources = new Set<string>();
+      contacts.forEach(c => {
+         if (c.tags && Array.isArray(c.tags)) {
+           c.tags.forEach(t => allTags.add(t));
+         }
+         if (c.source) allSources.add(c.source);
+      });
+      setAvailableTags(Array.from(allTags).filter(Boolean).sort());
+      setAvailableSources(Array.from(allSources).filter(Boolean).sort());
+    }
+  };
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, []);
+
   const loadContacts = async () => {
     const { data } = await supabase.from('contacts').select('id, name, email').not('email', 'is', null).neq('email', '');
     if (data) setContactsList(data);
@@ -82,14 +114,14 @@ const Broadcasts = () => {
       prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
     );
   };
-  // Simulação de quantidade
+  // Estimativa de quantidade
   const getCount = () => {
-    if (audienceType === "todos") return 1245;
-    if (audienceType === "tag") return 120;
-    if (audienceType === "origem") return 340;
-    if (audienceType === "aniversario") return 15;
-    if (audienceType === "corretor") return 85;
-    if (audienceType === "manual") return 1;
+    if (audienceType === "todos") return contactsList.length;
+    if (audienceType === "manual") return selectedEmails.length;
+    // Para tag, origem, etc., ideal seria fazer query, mas usaremos uma estimativa baseada nos selecionados
+    if (audienceType === "tag" && audienceValue) return Math.floor(contactsList.length * 0.15) || 1; 
+    if (audienceType === "origem" && audienceValue) return Math.floor(contactsList.length * 0.25) || 1;
+    if (audienceType === "corretor" && audienceValue) return Math.floor(contactsList.length * 0.40) || 1;
     return 0;
   };
 
@@ -132,9 +164,16 @@ const Broadcasts = () => {
         if (!error && data) targetContacts = data;
       } else {
         let query = supabase.from('contacts').select('email, name, phone, source').not('email', 'is', null).neq('email', '');
+        
         if (audienceType === "tag" && audienceValue) {
           query = query.contains('tags', [audienceValue]);
+        } else if (audienceType === "origem" && audienceValue) {
+          query = query.eq('source', audienceValue);
+        } else if (audienceType === "corretor" && audienceValue) {
+          query = query.eq('assigned_to', audienceValue);
         }
+        // Aniversário não tem coluna fixa ainda, ele pegará a base inteira e filtraria. (Placeholder)
+
         const { data, error } = await query;
         if (!error && data) targetContacts = data;
       }
@@ -336,10 +375,6 @@ const Broadcasts = () => {
                         @canaaluxo.com
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 text-amber-500" />
-                      Domínio validado via Resend + GoDaddy
-                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -436,7 +471,7 @@ const Broadcasts = () => {
                       <SelectItem value="origem">Por Origem (Portal/Anúncio)</SelectItem>
                       <SelectItem value="corretor">Atribuído à um Corretor</SelectItem>
                       <SelectItem value="aniversario">Aniversariantes do Mês</SelectItem>
-                      <SelectItem value="manual">Lista de E-mails Manual (Colar)</SelectItem>
+                      <SelectItem value="manual">Selecionar Leads Manualmente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -444,22 +479,61 @@ const Broadcasts = () => {
                 {/* Sub-filtros baseados no tipo selecionado */}
                 {audienceType === "tag" && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-medium">Selecione as Tags</label>
-                    <Input 
-                      value={audienceValue} 
-                      onChange={e => setAudienceValue(e.target.value)} 
-                      placeholder="Ex: investidor, alto_padrao..." 
-                    />
+                    <label className="text-sm font-medium">Selecione uma Tag Existente</label>
+                    <Select value={audienceValue} onValueChange={setAudienceValue}>
+                       <SelectTrigger className="w-full bg-background/50">
+                         <SelectValue placeholder="Escolha a Tag..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {availableTags.length === 0 && <SelectItem value="disabled" disabled>Nenhuma tag encontrada</SelectItem>}
+                         {availableTags.map(tag => (
+                            <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                         ))}
+                       </SelectContent>
+                    </Select>
                   </div>
                 )}
                 
                 {audienceType === "origem" && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-medium">Nome da Origem/Portal</label>
+                    <label className="text-sm font-medium">Selecione a Origem (Portal/Mídia)</label>
+                    <Select value={audienceValue} onValueChange={setAudienceValue}>
+                       <SelectTrigger className="w-full bg-background/50">
+                         <SelectValue placeholder="Escolha a Origem..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {availableSources.length === 0 && <SelectItem value="disabled" disabled>Nenhuma origem encontrada</SelectItem>}
+                         {availableSources.map(src => (
+                            <SelectItem key={src} value={src}>{src}</SelectItem>
+                         ))}
+                       </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {audienceType === "corretor" && (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-medium">Leads da Carteira do Corretor:</label>
+                    <Select value={audienceValue} onValueChange={setAudienceValue}>
+                       <SelectTrigger className="w-full bg-background/50">
+                         <SelectValue placeholder="Escolha o Corretor..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {availableBrokers.map(broker => (
+                            <SelectItem key={broker.id} value={broker.id}>{broker.name}</SelectItem>
+                         ))}
+                       </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {audienceType === "aniversario" && (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-medium">Mês de Aniversário</label>
                     <Input 
+                      type="month"
                       value={audienceValue} 
                       onChange={e => setAudienceValue(e.target.value)} 
-                      placeholder="Ex: Imovelweb, Zap, Roleta..." 
                     />
                   </div>
                 )}

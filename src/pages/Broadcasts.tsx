@@ -29,6 +29,8 @@ interface BroadcastFlow {
   audienceValue: string;
   status: "draft" | "scheduled" | "sent" | "failed";
   isActive?: boolean; // For pausing scheduled/recurring rules
+  templateType?: string;
+  templateData?: any;
   scheduledFor: string | null;
   createdAt: string;
 }
@@ -51,7 +53,15 @@ const Broadcasts = () => {
   const [senderName, setSenderName] = useState("Equipe Canaã");
   const [senderEmail, setSenderEmail] = useState("pedro@canaaluxo.com");
   const [body, setBody] = useState("");
-  const [viewMode, setViewMode] = useState<"code" | "preview">("code");
+  const [templateType, setTemplateType] = useState<"texto" | "apresentacao" | "newsletter">("texto");
+  const [templateData, setTemplateData] = useState({
+     imageUrl: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+     title: "Residencial Alto Padrão",
+     subtitle: "Localização Premium • Acabamento Exclusivo",
+     content: "Separamos uma oportunidade exclusiva que combina perfeitamente com seu perfil.",
+     actionText: "Ver Detalhes do Imóvel",
+     actionUrl: "https://"
+  });
   
   // Audiência
   const [audienceType, setAudienceType] = useState("todos"); // todos, tag, origem, corretor, aniversario, manual
@@ -61,6 +71,47 @@ const Broadcasts = () => {
   const [isScheduling, setIsScheduling] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+
+  useEffect(() => {
+    if (templateType === "apresentacao") {
+        setBody(`<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 20px; text-align: center; margin: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <h1 style="color: #1a1a1a;">Olá {primeiro_nome},</h1>
+        <p style="color: #52525b; font-size: 16px;">${templateData.content}</p>
+        
+        ${templateData.imageUrl ? `<img src="${templateData.imageUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin: 20px 0;" alt="Imóvel" />` : ''}
+        
+        <h2 style="color: #1a1a1a; margin-bottom: 5px;">${templateData.title}</h2>
+        <p style="color: #52525b; margin-top: 0; margin-bottom: 30px;">${templateData.subtitle}</p>
+        
+        <a href="${templateData.actionUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">${templateData.actionText}</a>
+    </div>
+</body>
+</html>`);
+    } else if (templateType === "newsletter") {
+        setBody(`<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; margin: 0;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+        <div style="background-color: #1e293b; padding: 30px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0;">${templateData.title}</h1>
+        </div>
+        <div style="padding: 30px;">
+            <p style="color: #52525b; font-size: 16px;">Olá <b>{primeiro_nome}</b>, ${templateData.content}</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <h3 style="color: #0f172a;">${templateData.subtitle}</h3>
+            
+            <div style="text-align: center; margin-top: 30px;">
+               <a href="${templateData.actionUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">${templateData.actionText}</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`);
+    }
+  }, [templateType, templateData]);
 
   const [isSending, setIsSending] = useState(false);
 
@@ -157,6 +208,13 @@ const Broadcasts = () => {
     setBody(flow.body);
     setAudienceType(flow.audienceType);
     setAudienceValue(flow.audienceValue || "");
+    if (flow.templateType) {
+       setTemplateType(flow.templateType as any);
+    }
+    if (flow.templateData) {
+       setTemplateData(flow.templateData);
+    }
+    
     if (flow.scheduledFor) {
        setIsScheduling(true);
        const [dateObj, timeObj] = flow.scheduledFor.split("T");
@@ -175,46 +233,7 @@ const Broadcasts = () => {
     toast.success(!current ? "Fluxo Ativado!" : "Fluxo Pausado.");
   };
 
-  const handleTemplateChange = (val: string) => {
-    if (val === "apresentacao") {
-        setBody(`<!DOCTYPE html>
-<html>
-<body style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 20px; text-align: center; margin: 0;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-        <h1 style="color: #1a1a1a;">Olá {primeiro_nome},</h1>
-        <p style="color: #52525b; font-size: 16px;">Separamos uma oportunidade exclusiva que combina perfeitamente com seu perfil.</p>
-        
-        <!-- Clique em "Inserir Imagem" para trocar a foto abaixo -->
-        <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80" style="width: 100%; border-radius: 8px; margin: 20px 0;" alt="Imóvel" />
-        
-        <h2 style="color: #1a1a1a;">Residencial Alto Padrão</h2>
-        <p style="color: #52525b; margin-bottom: 30px;">Localização Premium • Acabamento Exclusivo</p>
-        
-        <a href="#" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">Ver Detalhes do Imóvel</a>
-    </div>
-</body>
-</html>`);
-        toast.success("Modelo de Apresentação carregado!");
-    } else if (val === "newsletter") {
-        setBody(`<!DOCTYPE html>
-<html>
-<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px; margin: 0;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-        <div style="background-color: #1e293b; padding: 30px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0;">Newsletter Canaã</h1>
-        </div>
-        <div style="padding: 30px;">
-            <p style="color: #52525b; font-size: 16px;">Olá <b>{primeiro_nome}</b>, confira os destaques do mercado imobiliário desta semana!</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <h3 style="color: #0f172a;">A Hora Certa de Investir</h3>
-            <p style="color: #64748b; line-height: 1.6;">As taxas de financiamento estão no momento ideal. Aproveite para garantir seu patrimônio com segurança...</p>
-        </div>
-    </div>
-</body>
-</html>`);
-        toast.success("Modelo de Newsletter carregado!");
-    }
-  };
+
 
   const handleSaveAndSend = async (schedule: boolean = false) => {
     if (!flowName) return toast.error("Dê um nome para este fluxo de automação.");
@@ -299,6 +318,8 @@ const Broadcasts = () => {
         audienceValue,
         status: schedule ? "scheduled" : "sent",
         isActive: true,
+        templateType,
+        templateData,
         scheduledFor: schedule ? `${scheduleDate}T${scheduleTime}` : null,
         createdAt: new Date().toISOString()
       };
@@ -513,87 +534,104 @@ const Broadcasts = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium flex items-center gap-2">
-                       Corpo do Texto / HTML
-                       <Select onValueChange={handleTemplateChange}>
-                         <SelectTrigger className="w-[180px] h-7 text-xs border-dashed ml-4 bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors">
-                            <SelectValue placeholder="Modelos Prontos (HTML)" />
-                         </SelectTrigger>
-                         <SelectContent>
-                            <SelectItem value="apresentacao">Apresentação de Imóvel</SelectItem>
-                            <SelectItem value="newsletter">Boletim / Newsletter</SelectItem>
-                         </SelectContent>
-                       </Select>
+                       Design / Layout da Mensagem
                     </label>
-                    <div className="flex gap-2">
-                       <Button variant={viewMode === "code" ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setViewMode("code")}>
-                         <Code className="w-3 h-3 mr-2" /> Editor / Código Puro
-                       </Button>
-                       <Button variant={viewMode === "preview" ? "default" : "outline"} size="sm" className={`h-8 text-xs ${viewMode === 'preview' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`} onClick={() => setViewMode("preview")}>
-                         <Eye className="w-3 h-3 mr-2" /> Pré-visualizar (Renderizado)
-                       </Button>
-                    </div>
+                    <Select value={templateType} onValueChange={(val: any) => setTemplateType(val)}>
+                      <SelectTrigger className="w-[200px] h-9 text-xs border-dashed bg-primary/5 hover:bg-primary/10 transition-colors">
+                         <SelectValue placeholder="Escolha um Modelo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                         <SelectItem value="texto">Texto Simples (Sem Estilo)</SelectItem>
+                         <SelectItem value="apresentacao">Apresentação de Imóvel</SelectItem>
+                         <SelectItem value="newsletter">Boletim / Newsletter</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
-                  {viewMode === "code" ? (
+                  {templateType === "texto" ? (
                     <div className="space-y-2 animate-in fade-in">
-                      <div className="flex overflow-hidden rounded-md border border-border/50 bg-muted/30">
-                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<b></b>")}><Bold className="w-3 h-3" /></Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<i></i>")}><Italic className="w-3 h-3" /></Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<u></u>")}><u>U</u></Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => {
-                          const url = prompt("Insira o Link de destino:");
-                          if (url) setBody(body + `<a href="${url}">Clique Aqui</a>`);
-                        }}><Link2 className="w-3 h-3" /></Button>
-                        
-                        <div className="flex items-center">
-                          <input 
-                            type="file" 
-                            id="email-image-upload" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const fileName = `${Date.now()}_${file.name}`;
-                                const toastId = toast.loading("Fazendo upload da imagem...");
-                                const { error } = await supabase.storage.from('chat-media').upload(fileName, file);
-                                if (error) {
-                                    toast.error("Erro no upload: " + error.message, { id: toastId });
-                                    return;
-                                }
-                                const { data } = supabase.storage.from('chat-media').getPublicUrl(fileName);
-                                setBody(prev => prev + `\n<img src="${data.publicUrl}" style="max-width: 100%; border-radius: 8px; margin: 15px 0;" alt="Imagem Inserida" />\n`);
-                                toast.success("Imagem anexada no código!", { id: toastId });
-                                e.target.value = '';
-                            }}
-                          />
-                          <Button variant="ghost" size="sm" className="h-8 px-2 text-primary gap-1" onClick={() => document.getElementById("email-image-upload")?.click()}>
-                            <ImageIcon className="w-3 h-3" /> <span className="text-xs font-semibold">Upload de Imagem</span>
-                          </Button>
-                        </div>
-                      </div>
-                      <Textarea 
-                        value={body}
-                        onChange={(e) => setBody(e.target.value)}
-                        placeholder="Escreva seu texto puro ou cole o HTML completo gerado pelo Chat GPT aqui..." 
-                        className="min-h-[300px] resize-y leading-relaxed text-sm bg-background/50 font-mono"
-                      />
+                       <Textarea 
+                         value={body}
+                         onChange={(e) => setBody(e.target.value)}
+                         placeholder="Escreva seu texto aqui..." 
+                         className="min-h-[300px] resize-y leading-relaxed text-sm bg-background/50"
+                       />
+                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> O texto será enviado puro, sem nenhuma formatação HTML visual.</p>
                     </div>
                   ) : (
-                    <div className="border border-border/50 rounded-md overflow-hidden bg-white mt-2 min-h-[350px] animate-in fade-in flex items-center justify-center p-1">
-                       {body.trim() ? (
-                         <iframe 
-                           srcDoc={/<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>')} 
-                           className="w-full h-[400px] bg-white border-0" 
-                           title="Preview"
-                           sandbox="allow-same-origin"
-                         />
-                       ) : (
-                         <div className="text-muted-foreground flex flex-col items-center opacity-50">
-                            <Eye className="w-10 h-10 mb-2" />
-                            <p>O corpo do email está vazio.</p>
-                         </div>
-                       )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in bg-muted/20 p-2 rounded-xl border">
+                       {/* Editor Form */}
+                       <div className="space-y-4 p-4">
+                          <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b"><Edit3 className="w-4 h-4 text-primary" /> Editar Conteúdo</h3>
+                          
+                          {(templateType === "apresentacao" || templateType === "newsletter") && (
+                            <>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Título Principal</label>
+                                <Input className="h-8 text-sm" value={templateData.title} onChange={e => setTemplateData(prev => ({...prev, title: e.target.value}))} />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Subtítulo / Destaque</label>
+                                <Input className="h-8 text-sm" value={templateData.subtitle} onChange={e => setTemplateData(prev => ({...prev, subtitle: e.target.value}))} />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Parágrafo / Descrição</label>
+                                <Textarea className="min-h-[80px] text-sm resize-none" value={templateData.content} onChange={e => setTemplateData(prev => ({...prev, content: e.target.value}))} />
+                              </div>
+                            </>
+                          )}
+
+                          {templateType === "apresentacao" && (
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground flex justify-between items-center">
+                                Imagem do Imóvel
+                                <input 
+                                  type="file" 
+                                  id="img-upload-hero" 
+                                  className="hidden" 
+                                  onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (!file) return;
+                                      const toastId = toast.loading("Carregando imagem...");
+                                      const { error } = await supabase.storage.from('chat-media').upload(`${Date.now()}_${file.name}`, file);
+                                      if (!error) {
+                                          const { data } = supabase.storage.from('chat-media').getPublicUrl(`${Date.now()}_${file.name}`);
+                                          setTemplateData(prev => ({...prev, imageUrl: data.publicUrl}));
+                                          toast.success("Imagem aplicada!", { id: toastId });
+                                      } else { toast.error("Falha.", {id: toastId}); }
+                                  }}
+                                />
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => document.getElementById("img-upload-hero")?.click()}>
+                                   <ImageIcon className="w-3 h-3 mr-1" /> Trocar Imagem
+                                </Button>
+                              </label>
+                            </div>
+                          )}
+
+                          <div className="pt-2 border-t space-y-3">
+                             <div className="space-y-1">
+                               <label className="text-xs font-semibold text-muted-foreground text-primary">Botão de Ação (Texto)</label>
+                               <Input className="h-8 text-sm" value={templateData.actionText} onChange={e => setTemplateData(prev => ({...prev, actionText: e.target.value}))} />
+                             </div>
+                             <div className="space-y-1">
+                               <label className="text-xs font-semibold text-muted-foreground text-primary">Link de Destino (URL/Zap)</label>
+                               <Input className="h-8 text-sm" value={templateData.actionUrl} placeholder="https://..." onChange={e => setTemplateData(prev => ({...prev, actionUrl: e.target.value}))} />
+                             </div>
+                          </div>
+                       </div>
+
+                       {/* Live Preview */}
+                       <div className="border border-border/50 rounded-xl overflow-hidden bg-white shadow-sm flex flex-col">
+                          <div className="bg-slate-100 p-2 text-center text-xs font-semibold text-slate-500 border-b flex items-center justify-center gap-2">
+                            <Eye className="w-3 h-3" /> Preview em Tempo Real
+                          </div>
+                          <iframe 
+                             srcDoc={/<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>')} 
+                             className="w-full h-full min-h-[400px] border-0" 
+                             title="Preview"
+                             sandbox="allow-same-origin"
+                          />
+                       </div>
                     </div>
                   )}
                 </div>

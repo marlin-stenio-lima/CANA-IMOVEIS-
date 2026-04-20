@@ -56,11 +56,15 @@ const Broadcasts = () => {
   const [templateType, setTemplateType] = useState<"texto" | "apresentacao" | "newsletter">("texto");
   const [templateData, setTemplateData] = useState({
      imageUrl: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+     imageLocalPreview: "", // apenas para mostrar mais rápido
      title: "Residencial Alto Padrão",
      subtitle: "Localização Premium • Acabamento Exclusivo",
      content: "Separamos uma oportunidade exclusiva que combina perfeitamente com seu perfil.",
      actionText: "Ver Detalhes do Imóvel",
-     actionUrl: "https://"
+     actionUrl: "https://",
+     actionType: "link", // link ou whatsapp
+     whatsappPhone: "",
+     whatsappText: "Olá, vi a oportunidade pelo e-mail e gostaria de maiores detalhes."
   });
   
   // Audiência
@@ -73,6 +77,12 @@ const Broadcasts = () => {
   const [scheduleTime, setScheduleTime] = useState("");
 
   useEffect(() => {
+    const finalActionUrl = templateData.actionType === 'whatsapp' 
+        ? `https://wa.me/${templateData.whatsappPhone.replace(/\D/g, '')}?text=${encodeURIComponent(templateData.whatsappText)}`
+        : templateData.actionUrl;
+
+    const displayImage = templateData.imageLocalPreview || templateData.imageUrl;
+
     if (templateType === "apresentacao") {
         setBody(`<!DOCTYPE html>
 <html>
@@ -81,12 +91,12 @@ const Broadcasts = () => {
         <h1 style="color: #1a1a1a;">Olá {primeiro_nome},</h1>
         <p style="color: #52525b; font-size: 16px;">${templateData.content}</p>
         
-        ${templateData.imageUrl ? `<img src="${templateData.imageUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin: 20px 0;" alt="Imóvel" />` : ''}
+        ${displayImage ? `<img src="${displayImage}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin: 20px 0;" alt="Imóvel" />` : ''}
         
         <h2 style="color: #1a1a1a; margin-bottom: 5px;">${templateData.title}</h2>
         <p style="color: #52525b; margin-top: 0; margin-bottom: 30px;">${templateData.subtitle}</p>
         
-        <a href="${templateData.actionUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">${templateData.actionText}</a>
+        <a href="${finalActionUrl}" style="display: inline-block; background-color: ${templateData.actionType === 'whatsapp' ? '#25D366' : '#2563eb'}; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">${templateData.actionText}</a>
     </div>
 </body>
 </html>`);
@@ -104,7 +114,7 @@ const Broadcasts = () => {
             <h3 style="color: #0f172a;">${templateData.subtitle}</h3>
             
             <div style="text-align: center; margin-top: 30px;">
-               <a href="${templateData.actionUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">${templateData.actionText}</a>
+               <a href="${finalActionUrl}" style="display: inline-block; background-color: ${templateData.actionType === 'whatsapp' ? '#25D366' : '#0f172a'}; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">${templateData.actionText}</a>
             </div>
         </div>
     </div>
@@ -559,9 +569,9 @@ const Broadcasts = () => {
                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> O texto será enviado puro, sem nenhuma formatação HTML visual.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in bg-muted/20 p-2 rounded-xl border">
-                       {/* Editor Form */}
-                       <div className="space-y-4 p-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-in fade-in bg-muted/20 p-2 rounded-xl border">
+                       {/* Editor Form (Takes 2 columns) */}
+                       <div className="space-y-4 p-4 lg:col-span-2 shadow-sm bg-white rounded-lg border border-border/50">
                           <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b"><Edit3 className="w-4 h-4 text-primary" /> Editar Conteúdo</h3>
                           
                           {(templateType === "apresentacao" || templateType === "newsletter") && (
@@ -592,13 +602,26 @@ const Broadcasts = () => {
                                   onChange={async (e) => {
                                       const file = e.target.files?.[0];
                                       if (!file) return;
-                                      const toastId = toast.loading("Carregando imagem...");
-                                      const { error } = await supabase.storage.from('chat-media').upload(`${Date.now()}_${file.name}`, file);
+                                      
+                                      // Render local preview instantly while uploading
+                                      const localUrl = URL.createObjectURL(file);
+                                      setTemplateData(prev => ({...prev, imageLocalPreview: localUrl}));
+
+                                      const toastId = toast.loading("Carregando imagem em nuvem...");
+                                      const { error } = await supabase.storage.from('chat-media').upload(`${Date.now()}_${file.name}`, file, {
+                                          cacheControl: '3600',
+                                          upsert: false
+                                      });
+                                      
                                       if (!error) {
                                           const { data } = supabase.storage.from('chat-media').getPublicUrl(`${Date.now()}_${file.name}`);
-                                          setTemplateData(prev => ({...prev, imageUrl: data.publicUrl}));
-                                          toast.success("Imagem aplicada!", { id: toastId });
-                                      } else { toast.error("Falha.", {id: toastId}); }
+                                          setTemplateData(prev => ({...prev, imageUrl: data.publicUrl, imageLocalPreview: ""}));
+                                          toast.success("Mídia registrada no servidor!", { id: toastId });
+                                      } else { 
+                                          console.error("Upload error: ", error);
+                                          toast.error(`Falha: ${error.message} (Verifique as Permissões do Bucket chat-media)`, {id: toastId}); 
+                                          setTemplateData(prev => ({...prev, imageLocalPreview: ""}));
+                                      }
                                   }}
                                 />
                                 <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => document.getElementById("img-upload-hero")?.click()}>
@@ -608,22 +631,54 @@ const Broadcasts = () => {
                             </div>
                           )}
 
-                          <div className="pt-2 border-t space-y-3">
+                          <div className="pt-2 border-t space-y-4">
+                             <div className="flex items-center justify-between border-b pb-2">
+                                <label className="text-xs font-semibold text-muted-foreground">Destino do Clique</label>
+                                <Select value={templateData.actionType} onValueChange={(val: any) => setTemplateData(prev => ({...prev, actionType: val}))}>
+                                  <SelectTrigger className="w-[130px] h-7 text-xs border-dashed">
+                                     <SelectValue placeholder="Destino" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                     <SelectItem value="link">Link Externo</SelectItem>
+                                     <SelectItem value="whatsapp">WhatsApp Real</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                             </div>
+
                              <div className="space-y-1">
-                               <label className="text-xs font-semibold text-muted-foreground text-primary">Botão de Ação (Texto)</label>
+                               <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">Botão de Ação (Texto)</label>
                                <Input className="h-8 text-sm" value={templateData.actionText} onChange={e => setTemplateData(prev => ({...prev, actionText: e.target.value}))} />
                              </div>
-                             <div className="space-y-1">
-                               <label className="text-xs font-semibold text-muted-foreground text-primary">Link de Destino (URL/Zap)</label>
-                               <Input className="h-8 text-sm" value={templateData.actionUrl} placeholder="https://..." onChange={e => setTemplateData(prev => ({...prev, actionUrl: e.target.value}))} />
-                             </div>
+
+                             {templateData.actionType === 'link' ? (
+                               <div className="space-y-1 animate-in fade-in">
+                                 <label className="text-[11px] font-semibold text-muted-foreground">Link de Destino (URL Completa)</label>
+                                 <Input className="h-8 text-xs" value={templateData.actionUrl} placeholder="https://..." onChange={e => setTemplateData(prev => ({...prev, actionUrl: e.target.value}))} />
+                               </div>
+                             ) : (
+                               <div className="space-y-3 animate-in fade-in p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                                 <div className="space-y-1">
+                                   <label className="text-[11px] font-semibold text-emerald-800">Número Corretor / ZAP</label>
+                                   <Input className="h-8 text-xs bg-white border-emerald-200" value={templateData.whatsappPhone} placeholder="5511999999999" onChange={e => setTemplateData(prev => ({...prev, whatsappPhone: e.target.value}))} />
+                                 </div>
+                                 <div className="space-y-1">
+                                   <label className="text-[11px] font-semibold text-emerald-800">Texto Automático Inicial</label>
+                                   <Textarea className="min-h-[50px] text-xs resize-none bg-white border-emerald-200" value={templateData.whatsappText} onChange={e => setTemplateData(prev => ({...prev, whatsappText: e.target.value}))} />
+                                 </div>
+                               </div>
+                             )}
                           </div>
                        </div>
 
-                       {/* Live Preview */}
-                       <div className="border border-border/50 rounded-xl overflow-hidden bg-white shadow-sm flex flex-col">
-                          <div className="bg-slate-100 p-2 text-center text-xs font-semibold text-slate-500 border-b flex items-center justify-center gap-2">
-                            <Eye className="w-3 h-3" /> Preview em Tempo Real
+                       {/* Live Preview (Takes 3 columns) */}
+                       <div className="lg:col-span-3 border border-border/50 rounded-xl overflow-hidden bg-white shadow-md flex flex-col">
+                          <div className="bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500 border-b flex items-center justify-center gap-2 relative">
+                            <Eye className="w-4 h-4 text-primary" /> Visualização do Disparo Final
+                            <div className="absolute right-3 flex gap-1">
+                               <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                               <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                               <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+                            </div>
                           </div>
                           <iframe 
                              srcDoc={/<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>')} 

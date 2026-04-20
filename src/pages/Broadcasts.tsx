@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Send, Users, Mail, Clock, FileText, 
   Settings2, AlignLeft, Bold, Italic, 
-  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check, Eye, Code
+  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check, Eye, Code, Edit3, Pause, Play
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ interface BroadcastFlow {
   audienceType: string;
   audienceValue: string;
   status: "draft" | "scheduled" | "sent" | "failed";
+  isActive?: boolean; // For pausing scheduled/recurring rules
   scheduledFor: string | null;
   createdAt: string;
 }
@@ -40,6 +41,8 @@ const Broadcasts = () => {
     const saved = localStorage.getItem("crm_broadcast_flows");
     return saved ? JSON.parse(saved) : [];
   });
+  
+  const [filterTab, setFilterTab] = useState("all"); // all, active, scheduled, sent
 
   // Campos do Formulário
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -143,6 +146,33 @@ const Broadcasts = () => {
     setAudienceType("todos");
     setAudienceValue("");
     setStep(1);
+  };
+
+  const handleEdit = (flow: BroadcastFlow) => {
+    setEditingId(flow.id);
+    setFlowName(flow.name);
+    setSubject(flow.subject);
+    setSenderName(flow.senderName);
+    setSenderEmail(flow.senderEmail);
+    setBody(flow.body);
+    setAudienceType(flow.audienceType);
+    setAudienceValue(flow.audienceValue || "");
+    if (flow.scheduledFor) {
+       setIsScheduling(true);
+       const [dateObj, timeObj] = flow.scheduledFor.split("T");
+       setScheduleDate(dateObj);
+       setScheduleTime(timeObj);
+    } else {
+       setIsScheduling(false);
+    }
+    setStep(1);
+  };
+
+  const handleToggleActive = (id: string, current: boolean = true) => {
+    const updated = fluxos.map(f => f.id === id ? { ...f, isActive: !current } : f);
+    setFluxos(updated);
+    localStorage.setItem("crm_broadcast_flows", JSON.stringify(updated));
+    toast.success(!current ? "Fluxo Ativado!" : "Fluxo Pausado.");
   };
 
   const handleTemplateChange = (val: string) => {
@@ -268,6 +298,7 @@ const Broadcasts = () => {
         audienceType,
         audienceValue,
         status: schedule ? "scheduled" : "sent",
+        isActive: true,
         scheduledFor: schedule ? `${scheduleDate}T${scheduleTime}` : null,
         createdAt: new Date().toISOString()
       };
@@ -305,7 +336,7 @@ const Broadcasts = () => {
     <div className="container mx-auto p-6 space-y-8 animate-in fade-in duration-500 max-w-6xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex items-center gap-3">
+          <h1 className="text-4xl font-bold tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-3">
             <Send className="h-8 w-8 text-primary" />
             Automação de E-mails
           </h1>
@@ -323,6 +354,14 @@ const Broadcasts = () => {
 
       {step === 0 ? (
         <div className="space-y-6">
+          {/* Tabs UI */}
+          <div className="flex bg-muted/30 p-1 rounded-lg w-fit border border-border/50">
+             <button onClick={() => setFilterTab("all")} className={`px-4 py-2 text-sm rounded-md transition-all ${filterTab === "all" ? "bg-white shadow text-slate-800 dark:text-slate-100 font-bold" : "text-muted-foreground hover:text-foreground hover:bg-white/50"}`}>Todos</button>
+             <button onClick={() => setFilterTab("active")} className={`px-4 py-2 text-sm rounded-md transition-all ${filterTab === "active" ? "bg-white shadow text-slate-800 dark:text-slate-100 font-bold" : "text-muted-foreground hover:text-foreground hover:bg-white/50"}`}>Ativos</button>
+             <button onClick={() => setFilterTab("scheduled")} className={`px-4 py-2 text-sm rounded-md transition-all ${filterTab === "scheduled" ? "bg-white shadow text-slate-800 dark:text-slate-100 font-bold" : "text-muted-foreground hover:text-foreground hover:bg-white/50"}`}>Programados</button>
+             <button onClick={() => setFilterTab("sent")} className={`px-4 py-2 text-sm rounded-md transition-all ${filterTab === "sent" ? "bg-white shadow text-slate-800 dark:text-slate-100 font-bold" : "text-muted-foreground hover:text-foreground hover:bg-white/50"}`}>Finalizados</button>
+          </div>
+
           {/* Listagem de Fluxos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="border-dashed border-2 bg-transparent hover:bg-muted/50 cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[200px]" onClick={handleOpenNew}>
@@ -337,25 +376,48 @@ const Broadcasts = () => {
               </CardContent>
             </Card>
 
-            {fluxos.map((fluxo) => (
-              <Card key={fluxo.id} className="relative overflow-hidden group shadow-md hover:shadow-xl transition-all">
-                <CardHeader className="pb-3">
+            {fluxos.filter(f => {
+               if (filterTab === "active") return f.isActive === true;
+               if (filterTab === "scheduled") return f.status === "scheduled";
+               if (filterTab === "sent") return f.status === "sent";
+               return true;
+            }).map((fluxo) => (
+              <Card key={fluxo.id} className={`relative overflow-hidden group shadow-md hover:shadow-xl transition-all border ${!fluxo.isActive ? 'opacity-70 grayscale-[0.2]' : 'ring-1 ring-white/10'}`}>
+                {/* Decorative Accent */}
+                <div className={`absolute top-0 left-0 w-full h-1 ${fluxo.status === 'sent' ? 'bg-emerald-500' : (fluxo.isActive ? 'bg-primary' : 'bg-muted-foreground/50')}`} />
+                
+                <CardHeader className="pb-3 pt-5">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg font-bold truncate pr-6">{fluxo.name}</CardTitle>
-                    <div className="flex gap-1 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleDelete(fluxo.id); }}>
-                        <Trash2 className="h-4 w-4" />
+                    <CardTitle className="text-lg font-bold truncate pr-6 text-foreground">{fluxo.name}</CardTitle>
+                    <div className="flex gap-1 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 backdrop-blur-sm p-1 rounded-md border shadow-sm z-10">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); handleEdit(fluxo); }}>
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:bg-amber-600/10" onClick={(e) => { e.stopPropagation(); handleToggleActive(fluxo.id, fluxo.isActive); }}>
+                        {fluxo.isActive ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleDelete(fluxo.id); }}>
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
-                  <CardDescription className="truncate">{fluxo.subject}</CardDescription>
+                  <CardDescription className="truncate text-xs">{fluxo.subject}</CardDescription>
                 </CardHeader>
-                <CardContent className="pb-3 space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    <span>Audiência: <strong className="text-foreground capitalize">{fluxo.audienceType}</strong></span>
+                <CardContent className="pb-3 space-y-4">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex flex-col gap-1 bg-muted/30 p-2 rounded-md">
+                       <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Audiência</span>
+                       <strong className="text-foreground capitalize truncate">{fluxo.audienceType}</strong>
+                    </div>
+                    <div className="flex flex-col gap-1 bg-muted/30 p-2 rounded-md">
+                       <span className="text-muted-foreground flex items-center gap-1"><AtSign className="h-3 w-3" /> Remetente</span>
+                       <strong className="text-foreground truncate">{fluxo.senderEmail.split('@')[0]}</strong>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex justify-between items-center">
+                     <Badge variant={fluxo.isActive ? 'default' : 'outline'} className={fluxo.isActive ? 'bg-primary/10 text-primary hover:bg-primary/20 shadow-none border-0' : 'text-muted-foreground'}>
+                       {fluxo.isActive ? 'Ativo' : 'Pausado'}
+                     </Badge>
                      <Badge variant={fluxo.status === 'sent' ? 'default' : 'secondary'} className={fluxo.status === 'sent' ? 'bg-emerald-500 hover:bg-emerald-600' : ''}>
                        {fluxo.status === 'sent' && <CheckCircle2 className="h-3 w-3 mr-1" />}
                        {fluxo.status === 'scheduled' && <Clock className="h-3 w-3 mr-1" />}
@@ -363,9 +425,12 @@ const Broadcasts = () => {
                      </Badge>
                   </div>
                 </CardContent>
-                <CardFooter className="pt-0 text-xs text-muted-foreground flex justify-between border-t p-4 bg-muted/20">
-                  <span>De: {fluxo.senderEmail}</span>
-                  {fluxo.scheduledFor && <span>🗓️ {new Date(fluxo.scheduledFor).toLocaleDateString()}</span>}
+                <CardFooter className="pt-0 text-[11px] text-muted-foreground flex justify-between border-t p-3 bg-muted/10 items-center">
+                  <div className="flex items-center gap-1">
+                     <CalendarIcon className="h-3 w-3" />
+                     {new Date(fluxo.createdAt).toLocaleDateString()}
+                  </div>
+                  {fluxo.scheduledFor && <div className="flex items-center text-primary font-medium">🗓️ {new Date(fluxo.scheduledFor).toLocaleDateString()}</div>}
                 </CardFooter>
               </Card>
             ))}

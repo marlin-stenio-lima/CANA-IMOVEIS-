@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Send, Users, Mail, Clock, FileText, 
   Settings2, AlignLeft, Bold, Italic, 
-  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check
+  Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check, Eye, Code
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ const Broadcasts = () => {
   const [senderName, setSenderName] = useState("Equipe Canaã");
   const [senderEmail, setSenderEmail] = useState("pedro@canaaluxo.com");
   const [body, setBody] = useState("");
+  const [viewMode, setViewMode] = useState<"code" | "preview">("code");
   
   // Audiência
   const [audienceType, setAudienceType] = useState("todos"); // todos, tag, origem, corretor, aniversario, manual
@@ -188,13 +189,17 @@ const Broadcasts = () => {
       if (!schedule) {
          const payloads = targetContacts.map(contact => {
              const primeiroNome = contact.name?.split(' ')[0] || "Cliente";
-             const html = body
+             
+             // Só aplica <br/> se o usuário estiver escrevendo texto puro (sem tags HTML raiz).
+             const isHtml = /<[a-z][\s\S]*>/i.test(body);
+             const baseHtml = isHtml ? body : body.replace(/\n/g, '<br/>');
+
+             const html = baseHtml
                 .replace(/{nome}/g, contact.name || "Cliente")
                 .replace(/{primeiro_nome}/g, primeiroNome)
                 .replace(/{email}/g, contact.email)
                 .replace(/{telefone}/g, contact.phone || "")
-                .replace(/{origem}/g, contact.source || "")
-                .replace(/\n/g, '<br/>');
+                .replace(/{origem}/g, contact.source || "");
 
              return {
                  from: `${senderName} <${senderEmail}>`,
@@ -399,24 +404,60 @@ const Broadcasts = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Corpo do Texto</label>
-                    <div className="flex overflow-hidden rounded-md border border-border/50 bg-muted/30">
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50"><Bold className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50"><Italic className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50"><AlignLeft className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50"><Link2 className="w-3 h-3" /></Button>
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none"><ImageIcon className="w-3 h-3" /></Button>
+                    <label className="text-sm font-medium">Corpo do Texto / HTML</label>
+                    <div className="flex gap-2">
+                       <Button variant={viewMode === "code" ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setViewMode("code")}>
+                         <Code className="w-3 h-3 mr-2" /> Editor / Código Puro
+                       </Button>
+                       <Button variant={viewMode === "preview" ? "default" : "outline"} size="sm" className={`h-8 text-xs ${viewMode === 'preview' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`} onClick={() => setViewMode("preview")}>
+                         <Eye className="w-3 h-3 mr-2" /> Pré-visualizar (Renderizado)
+                       </Button>
                     </div>
                   </div>
                   
-                  <Textarea 
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="Olá {nome}, tudo bem?" 
-                    className="min-h-[250px] resize-y leading-relaxed text-base bg-background/50"
-                  />
+                  {viewMode === "code" ? (
+                    <div className="space-y-2 animate-in fade-in">
+                      <div className="flex overflow-hidden rounded-md border border-border/50 bg-muted/30">
+                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<b></b>")}><Bold className="w-3 h-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<i></i>")}><Italic className="w-3 h-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => setBody(body + "<u></u>")}><u>U</u></Button>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 rounded-none border-r border-border/50" onClick={() => {
+                          const url = prompt("Insira o Link de destino:");
+                          if (url) setBody(body + `<a href="${url}">Clique Aqui</a>`);
+                        }}><Link2 className="w-3 h-3" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-primary" onClick={() => {
+                          const url = prompt("Cole a URL da Imagem (Ex: https://...):");
+                          if (url) setBody(body + `\n<img src="${url}" style="max-width: 100%; border-radius: 8px; margin: 15px 0;" alt="Imagem" />\n`);
+                        }}>
+                          <ImageIcon className="w-3 h-3 mr-1" /> Inserir Imagem
+                        </Button>
+                      </div>
+                      <Textarea 
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        placeholder="Escreva seu texto puro ou cole o HTML completo gerado pelo Chat GPT aqui..." 
+                        className="min-h-[300px] resize-y leading-relaxed text-sm bg-background/50 font-mono"
+                      />
+                    </div>
+                  ) : (
+                    <div className="border border-border/50 rounded-md overflow-hidden bg-white mt-2 min-h-[350px] animate-in fade-in flex items-center justify-center p-1">
+                       {body.trim() ? (
+                         <iframe 
+                           srcDoc={/<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br/>')} 
+                           className="w-full h-[400px] bg-white border-0" 
+                           title="Preview"
+                           sandbox="allow-same-origin"
+                         />
+                       ) : (
+                         <div className="text-muted-foreground flex flex-col items-center opacity-50">
+                            <Eye className="w-10 h-10 mb-2" />
+                            <p>O corpo do email está vazio.</p>
+                         </div>
+                       )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Variáveis Dinâmicas */}

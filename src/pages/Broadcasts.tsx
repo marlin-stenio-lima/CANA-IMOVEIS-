@@ -327,7 +327,16 @@ const Broadcasts = () => {
       });
       
       if (error) {
-        throw error;
+         let detail = error.message;
+         try {
+             // Supabase invoke errors provide a context method or property
+             // We can check if it returns the JSON our Edge Function sent (e.g. { error: {...} })
+             if (error.context && typeof error.context.json === 'function') {
+                 const errJson = await error.context.json();
+                 if (errJson?.error?.message) detail = errJson.error.message;
+             }
+         } catch(e) {}
+         throw new Error(detail);
       }
 
       const newFlow: BroadcastFlow = {

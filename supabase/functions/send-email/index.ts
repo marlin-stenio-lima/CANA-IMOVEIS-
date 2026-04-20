@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
                 to: Array.isArray(p.to) ? p.to : [p.to],
                 subject: p.subject || 'Mensagem do CRM',
                 html: p.html || '<p>Mensagem em branco.</p>',
-                reply_to: p.reply_to || undefined
+                reply_to: p.reply_to || undefined,
+                scheduled_at: p.scheduled_at || undefined
             }));
         } else {
             apiBody = {
@@ -36,7 +37,8 @@ Deno.serve(async (req) => {
                 to: Array.isArray(payload.to) ? payload.to : [payload.to],
                 subject: payload.subject || 'Mensagem do CRM',
                 html: payload.html || '<p>Mensagem em branco.</p>',
-                reply_to: payload.reply_to || undefined
+                reply_to: payload.reply_to || undefined,
+                scheduled_at: payload.scheduled_at || undefined
             };
         }
 

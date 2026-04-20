@@ -286,35 +286,48 @@ const Broadcasts = () => {
 
       rawEmailsCount = targetContacts.length;
       
-      if (!schedule) {
-         const payloads = targetContacts.map(contact => {
-             const primeiroNome = contact.name?.split(' ')[0] || "Cliente";
-             
-             // Só aplica <br/> se o usuário estiver escrevendo texto puro (sem tags HTML raiz).
-             const isHtml = /<[a-z][\s\S]*>/i.test(body);
-             const baseHtml = isHtml ? body : body.replace(/\n/g, '<br/>');
+      let formattedScheduleAt = undefined;
+      if (schedule && scheduleDate && scheduleTime) {
+         try {
+             // Validate and convert local time input to UTC string for Resend API
+             const dateObj = new Date(`${scheduleDate}T${scheduleTime}`);
+             if (isNaN(dateObj.getTime())) throw new Error("Data inválida");
+             formattedScheduleAt = dateObj.toISOString();
+         } catch (e) {
+             console.warn("Invalid schedule date/time parsing");
+         }
+      }
 
-             const html = baseHtml
-                .replace(/{nome}/g, contact.name || "Cliente")
-                .replace(/{primeiro_nome}/g, primeiroNome)
-                .replace(/{email}/g, contact.email)
-                .replace(/{telefone}/g, contact.phone || "")
-                .replace(/{origem}/g, contact.source || "");
+      const payloads = targetContacts.map(contact => {
+          const primeiroNome = contact.name?.split(' ')[0] || "Cliente";
+          
+          // Só aplica <br/> se o usuário estiver escrevendo texto puro (sem tags HTML raiz).
+          const isHtml = /<[a-z][\s\S]*>/i.test(body);
+          const baseHtml = isHtml ? body : body.replace(/\n/g, '<br/>');
 
-             return {
-                 from: `${senderName} <${senderEmail}>`,
-                 to: contact.email,
-                 subject: subject,
-                 html: html
-             };
-         });
+          const html = baseHtml
+            .replace(/{nome}/g, contact.name || "Cliente")
+            .replace(/{primeiro_nome}/g, primeiroNome)
+            .replace(/{email}/g, contact.email)
+            .replace(/{telefone}/g, contact.phone || "")
+            .replace(/{origem}/g, contact.source || "");
 
-         // Enviar em lotes de 100 para Resend Batch limit (simplificado aqui para o array completo, Resend limita Batch em 100 por chamada, ideal seria fatiar)
-         const { data, error } = await supabase.functions.invoke('send-email', {
-            body: payloads
-         });
-         
-         if (error) throw error;
+          return {
+              from: `${senderName} <${senderEmail}>`,
+              to: contact.email,
+              subject: subject,
+              html: html,
+              scheduled_at: formattedScheduleAt
+          };
+      });
+
+      // Enviar em lotes (Resend suporta array no endpoint batch)
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: payloads
+      });
+      
+      if (error) {
+        throw error;
       }
 
       const newFlow: BroadcastFlow = {

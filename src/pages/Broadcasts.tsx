@@ -607,14 +607,21 @@ const Broadcasts = () => {
                                       const localUrl = URL.createObjectURL(file);
                                       setTemplateData(prev => ({...prev, imageLocalPreview: localUrl}));
 
+                                      // Gmail / Google Proxy Image Fix: 
+                                      // 1. Cleanse name to ensure no weird chars break the URL
+                                      // 2. Explicitly send Content Type so Google Proxy knows it's an image
+                                      const cleanName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+                                      const uniqueFileName = `${Date.now()}_${cleanName}`;
+
                                       const toastId = toast.loading("Carregando imagem em nuvem...");
-                                      const { error } = await supabase.storage.from('chat-media').upload(`${Date.now()}_${file.name}`, file, {
+                                      const { error } = await supabase.storage.from('chat-media').upload(uniqueFileName, file, {
                                           cacheControl: '3600',
-                                          upsert: false
+                                          upsert: false,
+                                          contentType: file.type // Crucial for Gmail
                                       });
                                       
                                       if (!error) {
-                                          const { data } = supabase.storage.from('chat-media').getPublicUrl(`${Date.now()}_${file.name}`);
+                                          const { data } = supabase.storage.from('chat-media').getPublicUrl(uniqueFileName);
                                           setTemplateData(prev => ({...prev, imageUrl: data.publicUrl, imageLocalPreview: ""}));
                                           toast.success("Mídia registrada no servidor!", { id: toastId });
                                       } else { 

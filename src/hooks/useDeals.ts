@@ -187,12 +187,34 @@ export function useDeals(pipelineId: string | null) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
+    onMutate: async ({ dealId, stageId }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["deals", pipelineId] });
+
+      // Snapshot the previous value
+      const previousDeals = queryClient.getQueryData(["deals", pipelineId, profile?.id, isAdmin]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["deals", pipelineId, profile?.id, isAdmin], (old: any) => {
+        if (!old) return old;
+        return old.map((deal: any) => 
+          deal.id === dealId ? { ...deal, stage_id: stageId } : deal
+        );
+      });
+
+      // Return a context with the snapshotted value
+      return { previousDeals };
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // Rollback if error
+      if (context?.previousDeals) {
+        queryClient.setQueryData(["deals", pipelineId, profile?.id, isAdmin], context.previousDeals);
+      }
       console.error("Erro ao mover deal:", error);
       toast.error("Erro ao mover deal: " + error.message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
     },
   });
 

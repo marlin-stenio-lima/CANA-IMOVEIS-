@@ -162,7 +162,6 @@ export default function Settings() {
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
   const defaultTab = isAdmin ? "company" : "profile";
   const currentTab = searchParams.get("tab") || defaultTab;
 

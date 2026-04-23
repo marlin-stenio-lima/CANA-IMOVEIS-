@@ -5,17 +5,19 @@ import { useAppointments } from "@/hooks/useAppointments";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, isAfter, formatDistanceToNow, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, Plus, FileText, CheckCircle2, Clock, UploadCloud, Tag, Handshake, Calendar, Trash2, ChevronDown, User, Bot, CircleUser, Target, Sparkles, AlertCircle, ExternalLink } from "lucide-react";
+import { Loader2, Plus, FileText, CheckCircle2, Clock, UploadCloud, Tag, Handshake, Calendar, Trash2, ChevronDown, User, Bot, CircleUser, Target, Sparkles, AlertCircle, ExternalLink, Building2, Bed, Bath, Car, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ContactChat from "./ContactChat";
 import CreateTaskModal from "../tasks/CreateTaskModal";
 import CreateAppointmentModal from "../appointments/CreateAppointmentModal";
 import { ContactCreateDealModal } from "./ContactCreateDealModal";
+import { ContactLinkPropertyModal } from "./ContactLinkPropertyModal";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeam } from "@/hooks/useTeam";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function ContactDetailsTabs({ contact }: { contact: any }) {
     const [activeTab, setActiveTab] = useState("historico");
@@ -23,12 +25,15 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
     const [taskToEdit, setTaskToEdit] = useState<any>(null);
     const [isApptModalOpen, setIsApptModalOpen] = useState(false);
     const [isDealModalOpen, setIsDealModalOpen] = useState(false);
+    const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
 
     // Data Hooks
     const { tasks, isLoading: isLoadingTasks, updateTask, deleteTask } = useTasks(contact.id);
     const { appointments, isLoading: isLoadingAppts } = useAppointments(contact.id);
     const { profile } = useAuth();
     const { data: teamMembers = [] } = useTeam();
+    const { canAccessMenu } = usePermissions();
+    const canViewOwner = canAccessMenu('view_owner_info');
 
     // Deals and Files
     const [deals, setDeals] = useState<any[]>([]);
@@ -38,6 +43,9 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
     const [isLoadingExtra, setIsLoadingExtra] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Linked Properties
+    const [linkedProps, setLinkedProps] = useState<any[]>([]);
 
     useEffect(() => {
         fetchExtraData();
@@ -104,6 +112,16 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
                 .order('created_at', { ascending: false });
 
             if (aiData) setAiInsights(aiData);
+            // Fetch connected properties
+            try {
+                const { data: propsData } = await supabase
+                    .from('contact_properties')
+                    .select('*, properties(*)')
+                    .eq('contact_id', contact.id)
+                    .order('created_at', { ascending: false });
+                if (propsData) setLinkedProps(propsData);
+            } catch(e) { console.warn("Probably contact_properties table not yet migrated", e) }
+
         } catch (error) {
             console.error("Error fetching extra data", error);
         } finally {
@@ -230,7 +248,7 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
             <Tabs value={activeTab} className="flex-1 flex flex-col" onValueChange={setActiveTab}>
                 <div className="px-6 pt-4 border-b border-gray-100 shadow-sm z-10 sticky top-0 bg-white">
                     <TabsList className="w-full justify-start h-auto p-0 bg-transparent gap-8">
-                        {['historico', 'atividades', 'negocios', 'arquivos'].map(tab => (
+                        {['historico', 'atividades', 'negocios', 'imoveis', 'arquivos'].map(tab => (
                             <TabsTrigger
                                 key={tab}
                                 value={tab}
@@ -547,6 +565,117 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
                         )}
                     </TabsContent>
 
+                    {/* IMÓVEIS VINCULADOS */}
+                    <TabsContent value="imoveis" className="mt-0 max-w-4xl mx-auto space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Imóveis de Interesse</h3>
+                                <p className="text-sm text-slate-500">Gerencie as propriedades que este lead está avaliando</p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <Button onClick={() => setIsLinkPropertyModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-md h-10 font-bold">
+                                    <Building2 className="w-4 h-4 mr-2" /> Vincular Imóvel Existente
+                                </Button>
+                            </div>
+                        </div>
+
+                        {linkedProps.length > 0 ? (
+                            <div className="grid grid-cols-1 gap-6">
+                                {linkedProps.map(link => {
+                                    const p = link.properties;
+                                    if (!p) return null;
+                                    return (
+                                        <div key={link.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="p-6">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <h4 className="text-xl font-bold text-slate-900">{p.title}</h4>
+                                                        <p className="text-slate-500 font-medium mb-3">Ref: #{p.id.substring(0,6)} • R$ {(p.price || 0).toLocaleString('pt-BR')}</p>
+                                                        
+                                                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                                                            {p.bedrooms !== null && p.bedrooms > 0 && (
+                                                                <span className="flex items-center gap-1 font-semibold" title="Quartos">
+                                                                    <Bed className="h-4 w-4 text-slate-400" />
+                                                                    {p.bedrooms}
+                                                                </span>
+                                                            )}
+                                                            {p.bathrooms !== null && p.bathrooms > 0 && (
+                                                                <span className="flex items-center gap-1 font-semibold" title="Banheiros">
+                                                                    <Bath className="h-4 w-4 text-slate-400" />
+                                                                    {p.bathrooms}
+                                                                </span>
+                                                            )}
+                                                            {p.parking_spots !== null && p.parking_spots > 0 && (
+                                                                <span className="flex items-center gap-1 font-semibold" title="Vagas">
+                                                                    <Car className="h-4 w-4 text-slate-400" />
+                                                                    {p.parking_spots}
+                                                                </span>
+                                                            )}
+                                                            {p.area_total !== null && p.area_total > 0 && (
+                                                                <span className="flex items-center gap-1 font-semibold" title="Área Total">
+                                                                    <Maximize2 className="h-4 w-4 text-slate-400" />
+                                                                    {p.area_total}m²
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                                {canViewOwner && (
+                                                    <div className="mt-6 p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+                                                        <h5 className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-3">
+                                                            <User className="w-4 h-4 text-blue-600" />
+                                                            Informações Ocultas do Proprietário
+                                                        </h5>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                        <div>
+                                                            <p className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Nome Completo</p>
+                                                            <p className="font-semibold text-slate-800 text-sm">{p.owner_name || 'Não informado'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Telefone / WhatsApp</p>
+                                                            <p className="font-semibold text-slate-800 text-sm">{p.owner_phone || 'Não informado'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black tracking-wider text-slate-400 uppercase">E-mail</p>
+                                                            <p className="font-semibold text-slate-800 text-sm">{p.owner_email || 'Não informado'}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="mt-4 pt-4 border-t border-blue-100 flex justify-end gap-2">
+                                                        <Button variant="outline" size="sm" className="bg-white border-blue-200 text-blue-700 hover:bg-blue-100 h-8" onClick={() => {
+                                                            const editUrl = `${window.location.origin}/solicitar-atualizacao/${p.id}`;
+                                                            navigator.clipboard.writeText(editUrl).then(() => {
+                                                              toast.success('Link de Atualização copiado com sucesso!');
+                                                            }).catch(() => {
+                                                              toast.error('Erro ao copiar link.');
+                                                            });
+                                                        }}>
+                                                            Copiar Link de Edição (Dono)
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="p-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Building2 className="w-8 h-8 text-slate-400" />
+                                </div>
+                                <h4 className="text-slate-900 font-bold">Nenhum Imóvel Vinculado</h4>
+                                <p className="text-slate-500 text-sm max-w-sm mx-auto mt-1 mb-4">Conecte imóveis ou barcos a este cliente para acompanhar o interesse e gerar links de apresentação exclusivos.</p>
+                                <Button onClick={() => setIsLinkPropertyModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 shadow-md h-10 font-bold">
+                                    Vincular Imóvel
+                                </Button>
+                            </div>
+                        )}
+                    </TabsContent>
+
                     {/* ARQUIVOS */}
                     <TabsContent value="arquivos" className="mt-0 max-w-4xl mx-auto space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -626,6 +755,13 @@ export default function ContactDetailsTabs({ contact }: { contact: any }) {
                 open={isDealModalOpen}
                 onOpenChange={setIsDealModalOpen}
                 contact={contact}
+                onSuccess={fetchExtraData}
+            />
+
+            <ContactLinkPropertyModal 
+                open={isLinkPropertyModalOpen}
+                onOpenChange={setIsLinkPropertyModalOpen}
+                contactId={contact.id}
                 onSuccess={fetchExtraData}
             />
         </div>

@@ -17,10 +17,51 @@ import { AiSettings } from "@/components/settings/AiSettings";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
-  const { profile } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'open' | 'close' | 'connecting' | 'unknown'>('unknown');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Profile Form States
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileJobTitle, setProfileJobTitle] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setProfileName(profile.full_name || "");
+      setProfilePhone(profile.phone || "");
+      setProfileJobTitle(profile.job_title || "");
+    }
+  }, [profile]);
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsLoadingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profileName,
+          phone: profilePhone,
+          job_title: profileJobTitle
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      toast.success("Perfil atualizado com sucesso!");
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao atualizar o perfil");
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
 
   const checkConnection = async () => {
     setIsLoading(true);
@@ -59,9 +100,65 @@ export default function Settings() {
     }
   };
 
+  // Company Form States
+  const [companyName, setCompanyName] = useState("");
+  const [companyDocument, setCompanyDocument] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
+
   useEffect(() => {
     // Check status on mount if tab is active (simplified)
   }, []);
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!profile?.company_id) return;
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', profile.company_id)
+        .single();
+      
+      if (!error && data) {
+        setCompanyName(data.name || "");
+        setCompanyDocument(data.document || "");
+        setCompanyEmail(data.email || "");
+        setCompanyPhone(data.phone || "");
+        setCompanyAddress(data.address || "");
+      }
+    };
+    
+    if (isAdmin && profile?.company_id) {
+      fetchCompany();
+    }
+  }, [profile?.company_id, isAdmin]);
+
+  const handleUpdateCompany = async () => {
+    if (!profile?.company_id) return;
+    setIsLoadingCompany(true);
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          name: companyName,
+          document: companyDocument,
+          email: companyEmail,
+          phone: companyPhone,
+          address: companyAddress
+        })
+        .eq('id', profile.company_id);
+
+      if (error) throw error;
+      toast.success("Dados da empresa atualizados com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao atualizar dados da empresa");
+    } finally {
+      setIsLoadingCompany(false);
+    }
+  };
 
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
@@ -119,41 +216,29 @@ export default function Settings() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="company-name">Nome da Empresa</Label>
-                    <Input id="company-name" placeholder="Sua Empresa Ltda" />
+                    <Input id="company-name" placeholder="Sua Empresa Ltda" value={companyName} onChange={e => setCompanyName(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cnpj">CNPJ</Label>
-                    <Input id="cnpj" placeholder="00.000.000/0001-00" />
+                    <Input id="cnpj" placeholder="00.000.000/0001-00" value={companyDocument} onChange={e => setCompanyDocument(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="contato@empresa.com" />
+                    <Input id="email" type="email" placeholder="contato@empresa.com" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Telefone</Label>
-                    <Input id="phone" placeholder="(11) 0000-0000" />
+                    <Input id="phone" placeholder="(11) 0000-0000" value={companyPhone} onChange={e => setCompanyPhone(e.target.value)} />
                   </div>
                 </div>
                 <Separator />
                 <div className="space-y-2">
-                  <Label htmlFor="address">Endereço</Label>
-                  <Input id="address" placeholder="Rua, número, bairro" />
+                  <Label htmlFor="address">Endereço Completo</Label>
+                  <Input id="address" placeholder="Rua, número, bairro, cidade, estado, CEP" value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} />
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">Cidade</Label>
-                    <Input id="city" placeholder="São Paulo" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state">Estado</Label>
-                    <Input id="state" placeholder="SP" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cep">CEP</Label>
-                    <Input id="cep" placeholder="00000-000" />
-                  </div>
-                </div>
-                <Button>Salvar Alterações</Button>
+                <Button onClick={handleUpdateCompany} disabled={isLoadingCompany}>
+                  {isLoadingCompany ? "Salvando..." : "Salvar Alterações"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -186,22 +271,45 @@ export default function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Completo</Label>
-                  <Input id="name" placeholder="Seu nome" />
+                  <Input 
+                    id="name" 
+                    placeholder="Seu nome" 
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="user-email">Email</Label>
-                  <Input id="user-email" type="email" placeholder="seu@email.com" />
+                  <Input 
+                    id="user-email" 
+                    type="email" 
+                    placeholder="seu@email.com" 
+                    value={user?.email || ""}
+                    disabled
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="user-phone">Telefone</Label>
-                  <Input id="user-phone" placeholder="(11) 99999-0000" />
+                  <Input 
+                    id="user-phone" 
+                    placeholder="(11) 99999-0000" 
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Cargo</Label>
-                  <Input id="role" placeholder="Gerente de Vendas" />
+                  <Input 
+                    id="role" 
+                    placeholder="Gerente de Vendas" 
+                    value={profileJobTitle}
+                    onChange={(e) => setProfileJobTitle(e.target.value)}
+                  />
                 </div>
               </div>
-              <Button>Atualizar Perfil</Button>
+              <Button onClick={handleUpdateProfile} disabled={isLoadingProfile}>
+                {isLoadingProfile ? "Atualizando..." : "Atualizar Perfil"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

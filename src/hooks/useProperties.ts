@@ -58,6 +58,9 @@ export interface Property {
   year_built: number | null;
   internal_id: string | null;
   portal_config: any;
+  owner_name?: string | null;
+  owner_phone?: string | null;
+  owner_email?: string | null;
   images?: PropertyImage[];
 }
 
@@ -96,6 +99,9 @@ export interface PropertyFormData {
   year_built?: number;
   internal_id?: string;
   portal_config?: any;
+  owner_name?: string;
+  owner_phone?: string;
+  owner_email?: string;
 }
 
 export function useProperties() {

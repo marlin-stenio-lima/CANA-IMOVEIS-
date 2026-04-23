@@ -53,10 +53,13 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
     const handleGenerateLink = () => {
         // Creates a link pointing to the homepage / auth with URL params
         const baseUrl = window.location.origin;
-        const url = new URL(`${baseUrl}/`);
+        const url = new URL(`${baseUrl}/auth`);
         url.searchParams.set('action', 'register');
         url.searchParams.set('role', inviteRole);
         url.searchParams.set('area', inviteArea);
+        if (profile?.company_id) {
+            url.searchParams.set('company_id', profile.company_id);
+        }
         
         setGeneratedLink(url.toString());
         setCopied(false);
@@ -201,7 +204,7 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
                                                     <Shield className="h-3 w-3" />
                                                     Gerenciar
                                                 </Button>
-                                                {m.role !== 'admin' && m.role !== 'owner' && (
+                                                {m.role !== 'owner' && m.email !== 'tatiana@canaaluxo.com' && m.full_name?.toLowerCase() !== 'tatiana' && (
                                                     <Button variant="outline" size="sm" onClick={() => handleDeleteMember(m.id, m.full_name || m.email)} className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

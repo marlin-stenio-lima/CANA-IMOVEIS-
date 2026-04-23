@@ -26,8 +26,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Property, PropertyFormData } from '@/hooks/useProperties';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useCrmMode } from '@/contexts/CrmModeContext';
-import { ImagePlus, X, Loader2 } from 'lucide-react';
+import { ImagePlus, X, Loader2, AlertCircle, User } from 'lucide-react';
 
 const propertySchema = z.object({
   title: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
@@ -135,6 +136,8 @@ export function PropertyForm({
   isSubmitting 
 }: PropertyFormProps) {
   const { mode } = useCrmMode();
+  const { canAccessMenu } = usePermissions();
+  const canViewOwner = canAccessMenu('view_owner_info');
   const isBoat = mode === 'barcos';
   const currentTypes = isBoat ? boatTypeLabels : propertyTypeLabels;
   const currentFeatures = isBoat ? boatFeatures : availableFeatures;
@@ -168,6 +171,9 @@ export function PropertyForm({
       year_built: property?.year_built || new Date().getFullYear(),
       internal_id: property?.internal_id || '',
       portal_config: property?.portal_config || { zap: true, vivareal: true, imovelweb: true, luxury_estate: true, properstar: true },
+      owner_name: property?.owner_name || '',
+      owner_phone: property?.owner_phone || '',
+      owner_email: property?.owner_email || '',
     },
   });
 
@@ -194,12 +200,17 @@ export function PropertyForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${canViewOwner ? 'grid-cols-6' : 'grid-cols-5'} overflow-x-auto`}>
             <TabsTrigger value="basic">Dados Básicos</TabsTrigger>
             <TabsTrigger value="details">Características</TabsTrigger>
             <TabsTrigger value="location">Localização</TabsTrigger>
             <TabsTrigger value="portals">Portais</TabsTrigger>
             <TabsTrigger value="images">Fotos</TabsTrigger>
+            {canViewOwner && (
+              <TabsTrigger value="owner" className="flex items-center gap-1 font-bold text-indigo-700">
+                 <User className="w-4 h-4 hidden sm:block" /> Proprietário
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4 mt-4">
@@ -705,6 +716,60 @@ export function PropertyForm({
               </div>
             )}
           </TabsContent>
+
+          {canViewOwner && (
+            <TabsContent value="owner" className="space-y-6 mt-4">
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg flex items-start gap-4">
+                 <AlertCircle className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                 <div className="text-sm text-indigo-900">
+                   <p className="font-bold mb-1">Informações Sigilosas</p>
+                   <p>Os dados abaixo não aparecerão no portal público. Eles são exclusivos para uso interno do CRM e para gerar links de edição para o proprietário.</p>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="owner_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Completo do Proprietário</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Roberto Carlos" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="owner_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone / WhatsApp</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: 5511999999999" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="owner_email"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>E-mail do Proprietário</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Ex: roberto@email.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
 
         <div className="flex justify-end gap-3 pt-4 border-t">

@@ -1,0 +1,1 @@
+import { createClient } from '@supabase/supabase-js'; const supabase = createClient('', ''); async function run() { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(10); console.log(JSON.stringify(data, null, 2)); } run();

@@ -7,13 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading: authLoading, signIn, signUp } = useAuth();
   
-  const initialAction = searchParams.get('action') === 'register' ? 'register' : 'login';
+  const initialAction = (searchParams.get('action') === 'register' && searchParams.get('role')) ? 'register' : 'login';
   const [activeTab, setActiveTab] = useState(initialAction);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -77,14 +78,34 @@ export default function Auth() {
       // But for this use-case, this works as an invitation link system.
       const access_areas = inviteArea === 'both' ? ['imoveis', 'barcos'] : (inviteArea ? [inviteArea] : ['imoveis', 'barcos']);
       const role = inviteRole || 'agent';
+      const companyId = searchParams.get('company_id');
 
-      const { error, session } = await signUp(signupEmail, signupPassword, signupName, "Canaã Luxo", {
+      const additionalData: any = {
         invite_role: role,
-        invite_areas: access_areas
-      });
+        invite_areas: access_areas,
+        is_owner: false // Explicitly set to false so they don't create a new company
+      };
+
+      if (companyId) {
+        additionalData.company_id = companyId;
+      }
+
+      const { error, session } = await signUp(signupEmail, signupPassword, signupName, "Canaã Luxo", additionalData);
 
       if (error) {
         throw error;
+      }
+
+      // If session is immediately available, update the profile with the requested roles and areas
+      if (session?.user) {
+        try {
+          await supabase.from('profiles').update({
+            role: role,
+            access_areas: access_areas
+          }).eq('id', session.user.id);
+        } catch (e) {
+          console.error("Failed to set initial role and areas:", e);
+        }
       }
 
       toast.success("Conta criada! Verifique seu email se o servidor exigir confirmação, ou faça login.");
@@ -121,10 +142,12 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="register">Cadastrar</TabsTrigger>
-            </TabsList>
+            {inviteRole ? (
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="login">Entrar</TabsTrigger>
+                <TabsTrigger value="register">Cadastrar</TabsTrigger>
+              </TabsList>
+            ) : null}
             
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">

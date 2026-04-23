@@ -23,9 +23,11 @@ import Agents from "./pages/Agents";
 import Roleta from "./pages/Roleta";
 import PublicSite from "./pages/public/PublicSite";
 import PublicProperty from "./pages/public/PublicProperty";
+import PropertyUpdateRequest from "./pages/public/PropertyUpdateRequest";
 import NotFound from "./pages/NotFound";
 import Integrations from "./pages/Integrations";
 import Broadcasts from "./pages/Broadcasts";
+import SupportApprovals from "./pages/SupportApprovals";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               {/* Public Portal Routes - simplified URLs */}
+              <Route path="/solicitar-atualizacao/:propertyId" element={<PropertyUpdateRequest />} />
               <Route path="/:slug/imovel/:propertyId" element={<PublicProperty />} />
               <Route path="/:slug" element={<PublicSite />} />
               <Route element={
@@ -63,6 +66,7 @@ const App = () => (
                 <Route path="/roleta" element={<Roleta />} />
                 <Route path="/integrations" element={<Integrations />} />
                 <Route path="/broadcasts" element={<Broadcasts />} />
+                <Route path="/support" element={<SupportApprovals />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

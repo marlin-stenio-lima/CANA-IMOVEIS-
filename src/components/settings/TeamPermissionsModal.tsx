@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,9 +11,26 @@ import { Loader2 } from "lucide-react";
 
 export function TeamPermissionsModal({ isOpen, onClose, member, onUpdate }: { isOpen: boolean, onClose: () => void, member: any, onUpdate: () => void }) {
     const [loading, setLoading] = useState(false);
-    const [role, setRole] = useState(member?.role || 'agent');
+    const getInitialRole = (m: any) => {
+        const job = m?.job_title?.toLowerCase() || '';
+        const isJobAdmin = job.includes('admin') || job.includes('diretor');
+        if (m?.role === 'owner') return 'owner';
+        if (m?.role === 'admin' || isJobAdmin) return 'admin';
+        return m?.role || 'agent';
+    };
+
+    const [role, setRole] = useState(getInitialRole(member));
     const [accessAreas, setAccessAreas] = useState<string[]>(member?.access_areas || ['imoveis', 'barcos']);
     const [permissions, setPermissions] = useState<Record<string, boolean>>(member?.permissions || {});
+
+    // Update state when member changes (fixes the issue where the modal retains old state)
+    useEffect(() => {
+        if (member) {
+            setRole(getInitialRole(member));
+            setAccessAreas(member.access_areas || ['imoveis', 'barcos']);
+            setPermissions(member.permissions || {});
+        }
+    }, [member]);
 
     const menuItems = [
         { id: 'dashboard', title: "Dashboard" },
@@ -25,9 +42,14 @@ export function TeamPermissionsModal({ isOpen, onClose, member, onUpdate }: { is
         { id: 'central_ia', title: "Central IA" },
         { id: 'roletas', title: "Roletas (Distribuição)" },
         { id: 'whatsapp', title: "WhatsApp" },
-        { id: 'configuracoes', title: "Configurações Globais" },
-        { id: 'config_site', title: "Configurações do Site" },
+        { id: 'disparos', title: "Disparos e E-mails" },
+        { id: 'imoveis', title: "Gestão de Imóveis" },
+        { id: 'embarcacoes', title: "Gestão de Barcos" },
+        { id: 'leads', title: "Leads do Portal" },
+        { id: 'configuracoes', title: "Config. Globais (CRM)" },
+        { id: 'config_site', title: "Config. Site / Portal" },
         { id: 'integracoes', title: "Integrações" },
+        { id: 'view_owner_info', title: "Ver Inf. do Proprietário" },
     ];
 
     const toggleArea = (area: string) => {
@@ -81,6 +103,7 @@ export function TeamPermissionsModal({ isOpen, onClose, member, onUpdate }: { is
                             <SelectContent>
                                 <SelectItem value="agent">Usuário Comum (Corretor)</SelectItem>
                                 <SelectItem value="admin">Administrador Geral</SelectItem>
+                                {role === 'owner' && <SelectItem value="owner">Dono (Master)</SelectItem>}
                             </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">Admin tem acesso total por padrão, exceto se bloqueado abaixo.</p>
@@ -120,7 +143,7 @@ export function TeamPermissionsModal({ isOpen, onClose, member, onUpdate }: { is
                         <div className="grid grid-cols-2 gap-3">
                             {menuItems.map(item => {
                                 // Default visualization 
-                                const isDefaultAllowed = role === 'admin' || ['dashboard', 'contatos', 'kanban', 'conversas', 'tarefas', 'agendamentos', 'whatsapp'].includes(item.id);
+                                const isDefaultAllowed = role === 'admin' || role === 'owner' || ['dashboard', 'contatos', 'kanban', 'conversas', 'tarefas', 'agendamentos', 'whatsapp'].includes(item.id);
                                 const isChecked = permissions[item.id] !== undefined ? permissions[item.id] : isDefaultAllowed;
 
                                 return (

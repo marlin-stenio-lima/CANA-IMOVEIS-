@@ -21,6 +21,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, companyName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   isMock: boolean;
 }
 
@@ -115,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error: signUpError, data } = await supabase.auth.signUp({
         email, password, options: { 
           emailRedirectTo: redirectUrl, 
-          data: { company_id: "c2a6a6a6-c2a6-4c2a-8c2a-2c2a6a6a6a6a", company_name: companyName, full_name: fullName, is_owner: true, ...additionalData } 
+          data: { company_name: companyName, full_name: fullName, is_owner: true, ...additionalData }
         }
       });
       return { error: signUpError, session: data.session };
@@ -164,8 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, isLoading, signIn, signUp, signOut, isMock }}>
+    <AuthContext.Provider value={{ user, session, profile, isLoading, signIn, signUp, signOut, refreshProfile, isMock }}>
       {children}
     </AuthContext.Provider>
   );

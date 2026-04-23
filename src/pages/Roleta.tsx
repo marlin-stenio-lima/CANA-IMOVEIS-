@@ -77,7 +77,7 @@ export default function Roleta() {
         const saved = localStorage.getItem(`crm_roulettes_v5_${mode}`);
         return saved ? JSON.parse(saved) : [];
     });
-    const [newRoulette, setNewRoulette] = useState({ name: "", type: "round_robin", slaTime: "5" });
+    const [newRoulette, setNewRoulette] = useState<{name: string, type: string, slaTime: string, memberIds: string[]}>({ name: "", type: "round_robin", slaTime: "5", memberIds: [] });
     const [editingRouletteId, setEditingRouletteId] = useState<string | null>(null);
 
 
@@ -168,7 +168,7 @@ export default function Roleta() {
     };
 
     const handleEditRoulette = (roleta: any) => {
-        setNewRoulette({ name: roleta.name, type: "round_robin", slaTime: "5" });
+        setNewRoulette({ name: roleta.name, type: "round_robin", slaTime: "5", memberIds: roleta.memberIds || [] });
         setEditingRouletteId(roleta.id);
         setConfigStep(1);
     };
@@ -183,7 +183,8 @@ export default function Roleta() {
             id: editingRouletteId || String(Date.now()), 
             name: newRoulette.name, 
             type: "Round Robin", 
-            members: 0 
+            members: newRoulette.memberIds.length,
+            memberIds: newRoulette.memberIds
         };
 
         let updated;
@@ -197,7 +198,7 @@ export default function Roleta() {
 
         toast.success("Roleta salva com sucesso!");
         setConfigStep(0);
-        setNewRoulette({ name: "", type: "round_robin", slaTime: "5" });
+        setNewRoulette({ name: "", type: "round_robin", slaTime: "5", memberIds: [] });
         setEditingRouletteId(null);
     };
 
@@ -647,7 +648,18 @@ export default function Roleta() {
                                                 <div className="border rounded-md p-2 space-y-1 bg-muted/20">
                                                     {teamMembers.map(member => (
                                                         <label key={member.id} className="flex items-center gap-3 p-3 bg-background hover:bg-muted/50 rounded-md border shadow-sm cursor-pointer transition-colors">
-                                                            <input type="checkbox" className="h-4 w-4" />
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="h-4 w-4" 
+                                                                checked={newRoulette.memberIds.includes(member.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setNewRoulette({...newRoulette, memberIds: [...newRoulette.memberIds, member.id]});
+                                                                    } else {
+                                                                        setNewRoulette({...newRoulette, memberIds: newRoulette.memberIds.filter(id => id !== member.id)});
+                                                                    }
+                                                                }}
+                                                            />
                                                             <span className="font-medium text-sm">{member.full_name || member.email || 'Usuário'}</span>
                                                             {member.role && <span className="text-xs text-muted-foreground ml-auto uppercase px-2 py-1 bg-muted rounded">{member.role}</span>}
                                                         </label>

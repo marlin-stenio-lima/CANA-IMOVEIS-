@@ -47,6 +47,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -355,7 +360,49 @@ function ConversationsContent() {
 
   // Search & Filter State
   const [chatSearchQuery, setChatSearchQuery] = useState("");
-  const [chatFilter, setChatFilter] = useState("todos");
+  const [activeFilters, setActiveFilters] = useState<{
+    corretorId: string | null;
+    origem: string | null;
+    imovelId: string | null;
+  }>({ corretorId: null, origem: null, imovelId: null });
+
+  const [filterOptions, setFilterOptions] = useState<{
+    corretores: { id: string, name: string }[];
+    origens: string[];
+    imoveis: { id: string, title: string }[];
+  }>({ corretores: [], origens: [], imoveis: [] });
+
+  // Load Filter Options
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      // Fetch Corretores (Team Members)
+      const { data: corretoresData } = await supabase
+        .from('profiles')
+        .select('id, full_name');
+      
+      // Fetch Properties
+      const { data: propertiesData } = await supabase
+        .from('properties')
+        .select('id, title');
+
+      // Unique Origins from contacts
+      const { data: contactsData } = await supabase
+        .from('contacts')
+        .select('source')
+        .not('source', 'is', null);
+      
+      const uniqueOrigins = Array.from(new Set(contactsData?.map(c => c.source).filter(Boolean)));
+
+      setFilterOptions({
+        corretores: corretoresData?.map(c => ({ id: c.id, name: c.full_name || 'Sem Nome' })) || [],
+        imoveis: propertiesData?.map(p => ({ id: p.id, title: p.title || 'Sem Título' })) || [],
+        origens: uniqueOrigins as string[]
+      });
+    };
+    if (isAdmin) {
+      loadFilterOptions();
+    }
+  }, [isAdmin]);
 
   // Load Conversations
   useEffect(() => {
@@ -862,29 +909,85 @@ function ConversationsContent() {
         {/* Header */}
         <div className="h-[60px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between px-4 py-2 border-b dark:border-gray-800 shrink-0">
 
-          {/* Filters Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10" title="Filtrar Conversas">
+          {/* Filters Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className={`h-10 w-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 ${Object.values(activeFilters).some(v => v !== null) ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' : ''}`} title="Filtrar Conversas">
                 <Filter className="w-5 h-5 text-[#54656f] dark:text-[#aebac1]" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={() => setChatFilter('corretores')}>
-                <Users className={`w-4 h-4 mr-2 ${chatFilter === 'corretores' ? 'text-blue-500' : ''}`} /> Corretores
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setChatFilter('origem')}>
-                <Globe className={`w-4 h-4 mr-2 ${chatFilter === 'origem' ? 'text-blue-500' : ''}`} /> Origem do Lead
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setChatFilter('imoveis')}>
-                <Home className={`w-4 h-4 mr-2 ${chatFilter === 'imoveis' ? 'text-blue-500' : ''}`} /> Imóveis de Interesse
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setChatFilter('todos')}>
-                <Layers className={`w-4 h-4 mr-2 ${chatFilter === 'todos' ? 'text-blue-500' : ''}`} /> Todos
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm">Filtros</h4>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2 text-xs text-muted-foreground"
+                  onClick={() => setActiveFilters({ corretorId: null, origem: null, imovelId: null })}
+                >
+                  Limpar
+                </Button>
+              </div>
+
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label className="text-xs flex items-center gap-2"><Users className="w-3 h-3"/> Corretor</Label>
+                  <Select 
+                    value={activeFilters.corretorId || "all"} 
+                    onValueChange={(val) => setActiveFilters(prev => ({ ...prev, corretorId: val === "all" ? null : val }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Todos os corretores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os corretores</SelectItem>
+                      {filterOptions.corretores.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-2"><Globe className="w-3 h-3"/> Origem do Lead</Label>
+                <Select 
+                  value={activeFilters.origem || "all"} 
+                  onValueChange={(val) => setActiveFilters(prev => ({ ...prev, origem: val === "all" ? null : val }))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todas as origens" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as origens</SelectItem>
+                    {filterOptions.origens.map(o => (
+                      <SelectItem key={o} value={o}>{o}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-2"><Home className="w-3 h-3"/> Imóvel de Interesse</Label>
+                <Select 
+                  value={activeFilters.imovelId || "all"} 
+                  onValueChange={(val) => setActiveFilters(prev => ({ ...prev, imovelId: val === "all" ? null : val }))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos os imóveis" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os imóveis</SelectItem>
+                    {filterOptions.imoveis.map(i => (
+                      <SelectItem key={i.id} value={i.id} className="truncate max-w-[250px]">
+                        {i.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <div className="flex gap-4 text-[#54656f] dark:text-[#aebac1] items-center">
             {/* Delete Button (Requested replacement for 3 dots) */}
@@ -938,9 +1041,15 @@ function ConversationsContent() {
             }
 
             // Filters
-            if (chatFilter === 'corretores') matchesFilter = !!conv.contact.assigned_to;
-            if (chatFilter === 'origem') matchesFilter = !!conv.contact.source;
-            if (chatFilter === 'imoveis') matchesFilter = !!conv.contact.interest_property_id;
+            if (activeFilters.corretorId) {
+              if (conv.contact.assigned_to !== activeFilters.corretorId) matchesFilter = false;
+            }
+            if (activeFilters.origem) {
+              if (conv.contact.source !== activeFilters.origem) matchesFilter = false;
+            }
+            if (activeFilters.imovelId) {
+              if (conv.contact.interest_property_id !== activeFilters.imovelId) matchesFilter = false;
+            }
 
             return matchesSearch && matchesFilter;
           }).map(conv => {
@@ -1036,7 +1145,7 @@ function ConversationsContent() {
                 <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]" />
               </div>
 
-              <div className="flex flex-col overflow-hidden">
+                <div className="flex flex-col overflow-hidden">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <span className="text-base sm:text-lg text-[#111b21] dark:text-[#e9edef] font-semibold tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {selectedConversation.contact.name}
@@ -1048,6 +1157,16 @@ function ConversationsContent() {
                 <div className="flex items-center gap-1 sm:gap-2 text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 truncate">
                     <Globe className="w-3 h-3 shrink-0" />
                     <span className="truncate">Conectado via WhatsApp</span>
+                    
+                    {selectedConversation.contact.assigned_to && (
+                      <>
+                        <span className="text-slate-300 mx-1">•</span>
+                        <User className="w-3 h-3 shrink-0 text-indigo-400" />
+                        <span className="truncate text-indigo-500 font-medium">
+                          {filterOptions.corretores.find(c => c.id === selectedConversation.contact.assigned_to)?.name || 'Corretor Atribuído'}
+                        </span>
+                      </>
+                    )}
                 </div>
               </div>
             </div>

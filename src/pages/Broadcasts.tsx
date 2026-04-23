@@ -5,6 +5,9 @@ import {
   Link2, Image as ImageIcon, AtSign, Plus, ArrowLeft, Trash2, CheckCircle2, AlertTriangle, Calendar as CalendarIcon, Tag, Target, Search, Check, Eye, Code, Edit3, Pause, Play
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -276,7 +279,13 @@ const Broadcasts = () => {
         // Aniversário não tem coluna fixa ainda, ele pegará a base inteira e filtraria. (Placeholder)
 
         const { data, error } = await query;
-        if (!error && data) targetContacts = data;
+        if (!error && data) {
+           const unique = new Map();
+           data.forEach(c => {
+             if (!unique.has(c.email)) unique.set(c.email, c);
+           });
+           targetContacts = Array.from(unique.values());
+        }
       }
 
       if (targetContacts.length === 0) {
@@ -573,7 +582,7 @@ const Broadcasts = () => {
                          <SelectValue placeholder="Escolha um Modelo" />
                       </SelectTrigger>
                       <SelectContent>
-                         <SelectItem value="texto">Texto Simples (Sem Estilo)</SelectItem>
+                         <SelectItem value="texto">E-mail Livre (Editor Texto)</SelectItem>
                          <SelectItem value="apresentacao">Apresentação de Imóvel</SelectItem>
                          <SelectItem value="newsletter">Boletim / Newsletter</SelectItem>
                       </SelectContent>
@@ -582,13 +591,27 @@ const Broadcasts = () => {
                   
                   {templateType === "texto" ? (
                     <div className="space-y-2 animate-in fade-in">
-                       <Textarea 
+                       <ReactQuill 
+                         theme="snow"
                          value={body}
-                         onChange={(e) => setBody(e.target.value)}
-                         placeholder="Escreva seu texto aqui..." 
-                         className="min-h-[300px] resize-y leading-relaxed text-sm bg-background/50"
+                         onChange={setBody}
+                         modules={{
+                           toolbar: [
+                             [{ 'header': [1, 2, 3, false] }],
+                             ['bold', 'italic', 'underline', 'strike'],
+                             [{'list': 'ordered'}, {'list': 'bullet'}],
+                             ['link', 'image'],
+                             [{ 'color': [] }, { 'background': [] }],
+                             ['clean']
+                           ],
+                         }}
+                         placeholder="Escreva seu texto rico aqui (com imagens, negrito, etc)..."
+                         className="bg-white rounded-lg [&_.ql-container]:min-h-[300px] [&_.ql-container]:text-sm [&_.ql-container]:font-sans [&_.ql-editor]:min-h-[300px]"
                        />
-                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> O texto será enviado puro, sem nenhuma formatação HTML visual.</p>
+                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> 
+                           O e-mail será enviado exatamente com esta formatação (Rich Text HTML).
+                       </p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-in fade-in bg-muted/20 p-2 rounded-xl border">

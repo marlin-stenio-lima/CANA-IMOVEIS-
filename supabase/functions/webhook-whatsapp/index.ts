@@ -54,9 +54,29 @@ Deno.serve(async (req) => {
 
         if (remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) return new Response('Ignored Group', { status: 200 });
 
-        // 1. Get Instance
-        const { data: instanceData } = await supabase.from('instances').select('id, company_id, assigned_to').eq('name', instance).single();
+        // 1. Get Instance & Owner (from instance_members -> team_members.user_id)
+        const { data: instanceData } = await supabase
+            .from('instances')
+            .select(`
+                id, 
+                company_id, 
+                instance_members (
+                    team_members ( user_id )
+                )
+            `)
+            .eq('name', instance)
+            .single();
+
         if (!instanceData) return new Response('Instance not found', { status: 404 });
+
+        // Extract the user_id of the first instance member (if any)
+        let instanceOwnerId = null;
+        if (instanceData.instance_members && instanceData.instance_members.length > 0) {
+            const firstMember = instanceData.instance_members[0] as any;
+            if (firstMember.team_members && firstMember.team_members.user_id) {
+                instanceOwnerId = firstMember.team_members.user_id;
+            }
+        }
 
         // 2. Resolve Contact
         let senderNumber = remoteJid.split('@')[0];
@@ -64,7 +84,7 @@ Deno.serve(async (req) => {
             senderNumber = participant.split('@')[0];
             remoteJid = `${senderNumber}@s.whatsapp.net`;
         }
-        const pushName = data.pushName || senderNumber;
+        const pushName = data.pushName || data.message?.pushName || (sender && sender.name) || (sender && sender.pushName) || senderNumber;
 
         // Correctly handle contact name: only update if it's an inbound message
         let updateName = false;
@@ -74,7 +94,7 @@ Deno.serve(async (req) => {
 
         // 2a. Find existing contact by remote_jid OR phone
         const { data: existingContacts } = await supabase.from('contacts')
-            .select('id, name, remote_jid, phone')
+            .select('id, name, remote_jid, phone, assigned_to')
             .or(`remote_jid.eq.${remoteJid},phone.eq.${senderNumber}`)
             .eq('company_id', instanceData.company_id)
             .order('created_at', { ascending: true })
@@ -95,6 +115,11 @@ Deno.serve(async (req) => {
                 updates.name = pushName;
             }
 
+            // Auto-assign to instance owner if currently unassigned
+            if (!existing.assigned_to && instanceOwnerId) {
+                updates.assigned_to = instanceOwnerId;
+            }
+
             if (Object.keys(updates).length > 1) { // More than just updated_at
                 await supabase.from('contacts').update(updates).eq('id', contactId);
             }
@@ -105,6 +130,7 @@ Deno.serve(async (req) => {
                 phone: senderNumber, 
                 company_id: instanceData.company_id, 
                 name: updateName ? pushName : senderNumber,
+                assigned_to: instanceOwnerId, // Auto-assign to instance owner
                 updated_at: new Date().toISOString()
             };
             const { data: newContact } = await supabase.from('contacts').insert(contactPayload).select('id').single();

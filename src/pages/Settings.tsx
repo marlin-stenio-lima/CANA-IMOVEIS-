@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
   const { profile, user, refreshProfile } = useAuth();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'open' | 'close' | 'connecting' | 'unknown'>('unknown');
   const [isLoading, setIsLoading] = useState(false);

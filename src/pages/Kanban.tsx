@@ -15,6 +15,7 @@ import {
   PipelineSelector,
   PipelineConfigModal,
   KanbanColumn,
+  KanbanCard,
   LossReasonModal,
   CreateDealModal,
   LinkDealData,
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 import {
   DndContext,
   DragOverlay,
+  closestCenter,
   closestCorners,
   KeyboardSensor,
   PointerSensor,
@@ -520,7 +522,7 @@ export default function Kanban() {
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
@@ -546,12 +548,28 @@ export default function Kanban() {
             ))}
           </div>
           <DragOverlay>
-            {/* Simple visual clone for dragging - can be elaborated */}
-            {activeDealId ? (
-              <div className="bg-card p-3 rounded-lg border shadow-xl opacity-80 cursor-grabbing w-[280px]">
-                Dragging...
-              </div>
-            ) : null}
+            {activeDealId ? (() => {
+              const activeDeal = deals.find(d => d.id === activeDealId);
+              const activeStage = activeDeal ? stages.find(s => s.id === activeDeal.stage_id) : null;
+              
+              if (!activeDeal || !activeStage) return null;
+              
+              return (
+                <div className="w-[280px] opacity-90 scale-105 shadow-2xl cursor-grabbing rotate-2 transition-transform">
+                  <KanbanCard
+                    deal={activeDeal}
+                    stages={stages}
+                    currentStage={activeStage}
+                    onViewDetails={() => {}}
+                    onEdit={() => {}}
+                    onMoveToStage={() => {}}
+                    onMarkAsWon={() => {}}
+                    onMarkAsLost={() => {}}
+                    onDelete={() => {}}
+                  />
+                </div>
+              );
+            })() : null}
           </DragOverlay>
         </DndContext>
       )}

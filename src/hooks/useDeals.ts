@@ -177,7 +177,7 @@ export function useDeals(pipelineId: string | null) {
         .update({
           stage_id: stageId,
           stage_entered_at: new Date().toISOString(),
-          stage: "pipeline",
+          stage: "lead",
           lost_at: null,
           closed_at: null,
           lost_reason: null

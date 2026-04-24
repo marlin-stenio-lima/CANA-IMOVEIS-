@@ -170,8 +170,8 @@ export default function AdminDashboard() {
 
     // Source Distribution (Canal)
     const sourceMap: Record<string, number> = {};
-    fContacts.forEach(c => {
-      const src = c.source || 'Desconhecido';
+    fDeals.forEach(d => {
+      const src = d.contacts?.source || 'Desconhecido';
       sourceMap[src] = (sourceMap[src] || 0) + 1;
     });
     const sourceData = Object.entries(sourceMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
@@ -242,9 +242,9 @@ export default function AdminDashboard() {
       lostReasonData,
       vgvNegociacao,
       brokerRanking,
-      totalLeads: fDeals.length || fContacts.length
+      totalLeads: fDeals.length
     };
-  }, [deals, contacts, appointments, period, selectedBroker, bolsaoStageId, teamMembers]);
+  }, [deals, contacts, appointments, period, customDateRange, selectedBroker, bolsaoStageId, teamMembers]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#FF6B6B', '#4ECDC4'];
 

@@ -57,14 +57,20 @@ export default function AdminDashboard() {
     
     // Fetch pipelines
     const { data: pipes } = await supabase.from('pipelines').select('id, name').eq('business_type', mode);
-    setPipelines(pipes || []);
+    const validPipelines = pipes || [];
+    setPipelines(validPipelines);
+    const validPipelineIds = validPipelines.map(p => p.id);
 
     // Fetch Deals with Contacts
     const { data: dData } = await supabase
       .from('deals')
       .select('*, contacts(source, business_type), pipeline_stages(name), loss_reasons(name)');
       
-    const filteredDeals = (dData || []).filter((d: any) => d.contacts?.business_type === mode);
+    // A deal belongs to this mode if its pipeline belongs to this mode, OR if it has a contact with this mode.
+    // Since pipelines are strongly typed to modes now, pipeline_id is safer.
+    const filteredDeals = (dData || []).filter((d: any) => 
+      validPipelineIds.includes(d.pipeline_id) || d.contacts?.business_type === mode
+    );
     setDeals(filteredDeals);
 
     // Fetch Appointments

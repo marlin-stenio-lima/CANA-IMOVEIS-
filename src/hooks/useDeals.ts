@@ -243,14 +243,14 @@ export function useDeals(pipelineId: string | null) {
   });
 
   const markAsLost = useMutation({
-    mutationFn: async ({ dealId, lossReasonId }: { dealId: string; lossReasonId: string }) => {
+    mutationFn: async ({ dealId, lostReason }: { dealId: string; lostReason: string }) => {
       const { data, error } = await supabase
         .from("deals")
         .update({
           lost_at: new Date().toISOString(),
-          lost_reason_id: lossReasonId,
+          lost_reason: lostReason,
           stage: "lost"
-        })
+        } as any)
         .eq("id", dealId)
         .select()
         .single();

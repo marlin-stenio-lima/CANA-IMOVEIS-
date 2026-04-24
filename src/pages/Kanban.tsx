@@ -335,22 +335,18 @@ export default function Kanban() {
     setLossModalOpen(true);
   };
 
-  const handleConfirmLoss = async (lossReasonId: string) => {
+  const handleConfirmLoss = async (lossReasonText: string) => {
     if (selectedDealForLoss) {
       // If we are moving to a specific lost column, do both
       if (selectedTargetStageForLoss) {
-         // To keep it in the board, we update stage_id and maybe NOT set lost_at? 
-         // Wait, if lost_at is set, useDeals query hides it.
-         // Let's just update the deal manually via updateDeal so it stays on board.
          await updateDeal.mutateAsync({ 
            id: selectedDealForLoss, 
            stage_id: selectedTargetStageForLoss,
-           lost_reason_id: lossReasonId,
+           lost_reason: lossReasonText,
            stage: "lost"
-           // we skip lost_at so it stays on board, or we modify useDeals to not hide it.
-         });
+         } as any);
       } else {
-         await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lossReasonId });
+         await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lostReason: lossReasonText });
       }
       setSelectedDealForLoss(null);
       setSelectedTargetStageForLoss(null);

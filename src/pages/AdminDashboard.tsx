@@ -192,7 +192,7 @@ export default function AdminDashboard() {
     // Motivos de perda
     const lostReasonsMap: Record<string, number> = {};
     fDeals.filter(isDealLost).forEach(d => {
-       const reason = d.loss_reasons?.name || 'Não informado';
+       const reason = d.lost_reason || d.loss_reasons?.name || 'Não informado';
        lostReasonsMap[reason] = (lostReasonsMap[reason] || 0) + 1;
     });
     const lostReasonData = Object.entries(lostReasonsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);

@@ -176,7 +176,11 @@ export function useDeals(pipelineId: string | null) {
         .from("deals")
         .update({
           stage_id: stageId,
-          stage_entered_at: new Date().toISOString()
+          stage_entered_at: new Date().toISOString(),
+          stage: "pipeline",
+          lost_at: null,
+          closed_at: null,
+          lost_reason: null
         })
         .eq("id", dealId)
         .select()
@@ -247,7 +251,8 @@ export function useDeals(pipelineId: string | null) {
         .update({
           lost_at: new Date().toISOString(),
           lost_reason: lostReason,
-          stage: "lost"
+          stage: "lost",
+          closed_at: null
         } as any)
         .eq("id", dealId)
         .select()

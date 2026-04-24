@@ -232,12 +232,14 @@ export default function Kanban() {
         // Prompts for reason instead of moving directly
         handleMarkAsLost(activeId, targetStageId);
       } else if (isWonStage) {
-        // Update stage, stage_id and set closed_at
+        // Update stage, stage_id and set closed_at, clear lost flags
         await updateDeal.mutateAsync({
           id: activeId,
           stage_id: targetStageId,
           stage: "won",
-          closed_at: new Date().toISOString()
+          closed_at: new Date().toISOString(),
+          lost_at: null,
+          lost_reason: null
         } as any);
       } else {
         await handleMoveDeal(activeId, targetStageId);

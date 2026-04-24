@@ -226,10 +226,19 @@ export default function Kanban() {
     if (targetStageId && targetStageId !== deal.stage_id) {
       const targetStage = stages.find(s => s.id === targetStageId);
       const isLostStage = targetStage?.is_lost_stage || targetStage?.name.toLowerCase().includes('perdid');
+      const isWonStage = targetStage?.is_won_stage || targetStage?.name.toLowerCase().includes('alugad') || targetStage?.name.toLowerCase().includes('vendid') || targetStage?.name.toLowerCase().includes('ganho');
       
       if (isLostStage) {
         // Prompts for reason instead of moving directly
         handleMarkAsLost(activeId, targetStageId);
+      } else if (isWonStage) {
+        // Update stage, stage_id and set closed_at
+        await updateDeal.mutateAsync({
+          id: activeId,
+          stage_id: targetStageId,
+          stage: "won",
+          closed_at: new Date().toISOString()
+        } as any);
       } else {
         await handleMoveDeal(activeId, targetStageId);
       }

@@ -79,8 +79,6 @@ export function useDeals(pipelineId: string | null) {
           )
         `)
         .eq("pipeline_id", pipelineId)
-        .is("closed_at", null)
-        .is("lost_at", null)
         .order("created_at", { ascending: false });
 
       if (error) throw error;

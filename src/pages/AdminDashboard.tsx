@@ -142,11 +142,19 @@ export default function AdminDashboard() {
     const fContacts = contacts.filter(c => inDateRange(c.created_at) && matchesBroker(c.assigned_to));
     const fAppointments = appointments.filter(a => inDateRange(a.start_time)); // Approximating
 
+    // Helpers
+    const isDealLost = (d: any) => d.stage === 'lost' || d.lost_at || d.pipeline_stages?.name?.toLowerCase().includes('perdid');
+    const isDealWon = (d: any) => d.stage === 'won' || d.closed_at || d.pipeline_stages?.name?.toLowerCase().includes('vendid') || d.pipeline_stages?.name?.toLowerCase().includes('alugad') || d.pipeline_stages?.name?.toLowerCase().includes('ganho');
+
     // 1. Leads Atendidos (Not in Bolsao, assigned to someone)
     const leadsAtendidos = fDealsCreated.filter(d => d.assigned_to && d.stage_id !== bolsaoStages[d.pipeline_id]).length;
     
-    // 2. Leads no Bolsão
-    const leadsBolsao = fDealsCreated.filter(d => d.stage_id === bolsaoStages[d.pipeline_id] || !d.assigned_to).length;
+    // 2. Leads no Bolsão (Only active leads)
+    const leadsBolsao = fDealsCreated.filter(d => 
+      !isDealLost(d) && 
+      !isDealWon(d) && 
+      (d.stage_id === bolsaoStages[d.pipeline_id] || !d.assigned_to)
+    ).length;
 
     // 3. Velocidade para atender (TME)
     let totalWaitTime = 0;
@@ -172,10 +180,9 @@ export default function AdminDashboard() {
     const negociacao = fDealsAll.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).length;
 
     // 6. Vendas (Ganhos)
-    const ganhos = fDealsAll.filter(d => (d.stage === 'won' || d.closed_at) && (inDateRange(d.closed_at) || inDateRange(d.updated_at))).length;
+    const ganhos = fDealsAll.filter(d => isDealWon(d) && (inDateRange(d.closed_at) || inDateRange(d.updated_at))).length;
 
     // 7. Perdidos
-    const isDealLost = (d: any) => d.stage === 'lost' || d.lost_at || d.pipeline_stages?.name?.toLowerCase().includes('perdid');
     const perdidosDeals = fDealsAll.filter(d => isDealLost(d) && (inDateRange(d.lost_at) || inDateRange(d.updated_at)));
     const perdidos = perdidosDeals.length;
 

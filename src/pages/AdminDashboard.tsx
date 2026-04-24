@@ -166,7 +166,8 @@ export default function AdminDashboard() {
     const ganhos = fDeals.filter(d => d.stage === 'won' || d.closed_at).length;
 
     // 7. Perdidos
-    const perdidos = fDeals.filter(d => d.stage === 'lost' || d.lost_at).length;
+    const isDealLost = (d: any) => d.stage === 'lost' || d.lost_at || d.pipeline_stages?.name?.toLowerCase().includes('perdid');
+    const perdidos = fDeals.filter(isDealLost).length;
 
     // Source Distribution (Canal)
     const sourceMap: Record<string, number> = {};
@@ -190,7 +191,7 @@ export default function AdminDashboard() {
 
     // Motivos de perda
     const lostReasonsMap: Record<string, number> = {};
-    fDeals.filter(d => d.stage === 'lost').forEach(d => {
+    fDeals.filter(isDealLost).forEach(d => {
        const reason = d.loss_reasons?.name || 'Não informado';
        lostReasonsMap[reason] = (lostReasonsMap[reason] || 0) + 1;
     });

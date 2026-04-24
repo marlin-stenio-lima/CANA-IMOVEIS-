@@ -225,7 +225,9 @@ export default function Kanban() {
 
     if (targetStageId && targetStageId !== deal.stage_id) {
       const targetStage = stages.find(s => s.id === targetStageId);
-      if (targetStage?.is_lost_stage) {
+      const isLostStage = targetStage?.is_lost_stage || targetStage?.name.toLowerCase().includes('perdid');
+      
+      if (isLostStage) {
         // Prompts for reason instead of moving directly
         handleMarkAsLost(activeId, targetStageId);
       } else {

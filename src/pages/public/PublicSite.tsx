@@ -158,35 +158,34 @@ export default function PublicSite() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b sticky top-0 bg-background z-50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-primary">C</span>
+      {/* Header - Transparent overlay */}
+      <header className="absolute top-0 left-0 right-0 z-50 bg-transparent text-white">
+        <div className="container mx-auto px-4 py-6 flex justify-between items-center">
+          <div className="flex items-center gap-3 border border-white/30 rounded-full pl-2 pr-6 py-1.5 backdrop-blur-md bg-black/10">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/50">
+              <span className="text-lg font-bold">C</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: settings.primary_color }}>{settings.site_name}</h1>
+            <h1 className="text-lg tracking-widest font-light">{settings.site_name.toUpperCase()}</h1>
           </div>
           <div className="flex gap-6 items-center">
-            <nav className="hidden lg:flex gap-6">
+            <nav className="hidden lg:flex gap-8">
               {['Comprar', 'Alugar', 'Lançamentos', 'Institucional', 'Contato'].map(item => (
-                <button key={item} className="text-sm font-medium hover:text-primary transition-colors">{item}</button>
+                <button key={item} className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity">{item}</button>
               ))}
             </nav>
-            <div className="flex items-center gap-3">
-              {settings.phone && <a href={`tel:${settings.phone}`} className="text-sm hidden sm:flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors"><Phone className="h-4 w-4" />{settings.phone}</a>}
+            <div className="flex items-center gap-3 border-l border-white/20 pl-6 ml-2">
               {settings.whatsapp && (
-                <Button size="sm" className="rounded-full px-5 shadow-lg shadow-primary/20 hover:scale-105 transition-transform" style={{ backgroundColor: settings.primary_color }} asChild>
-                  <a href={`https://wa.me/${settings.whatsapp}`} target="_blank">WhatsApp</a>
-                </Button>
+                <a href={`https://wa.me/${settings.whatsapp}`} target="_blank" className="text-sm font-semibold hover:opacity-80 transition-opacity">
+                  WhatsApp
+                </a>
               )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero & Search (Carousel Version) */}
-      <section className="relative h-[600px] lg:h-[700px] flex items-center justify-center overflow-hidden">
+      {/* Hero Section */}
+      <section className="relative h-[85vh] min-h-[600px] flex flex-col items-center justify-center overflow-hidden">
         {/* Carousel Background */}
         <div className="absolute inset-0 z-0">
           {carouselImages.map((img, idx) => (
@@ -194,86 +193,85 @@ export default function PublicSite() {
               key={idx}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === activeIndex ? 'opacity-100' : 'opacity-0'}`}
             >
-              <div className="absolute inset-0 bg-black/40 z-10" />
+              {/* Gradient overlays for text readability */}
+              <div className="absolute inset-0 bg-black/30 z-10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 z-10" />
               <img src={img.url} className="w-full h-full object-cover animate-ken-burns" alt="Banner" />
             </div>
           ))}
         </div>
 
-        {/* Content Overlay */}
-        <div className="container mx-auto px-4 relative z-20 text-center text-white mb-20 lg:mb-32">
-          <div className="space-y-4 max-w-4xl mx-auto animate-fade-in-up">
-            <h2 className="text-4xl lg:text-6xl font-extrabold tracking-tight drop-shadow-lg">
-              {carouselImages[activeIndex].title}
+        {/* Center Content */}
+        <div className="container mx-auto px-4 relative z-20 text-center text-white mt-16">
+          <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-xl" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+              Explore as residências mais exclusivas do mundo
             </h2>
-            <p className="text-lg lg:text-xl font-light opacity-90 drop-shadow-md">
-              {carouselImages[activeIndex].sub}
-            </p>
-          </div>
-        </div>
-
-        {/* Floating Search Bar (Jet Imob Style) */}
-        <div className="absolute bottom-12 lg:bottom-16 left-0 right-0 z-30 px-4">
-          <div className="container mx-auto max-w-5xl">
-            <div className="bg-white/80 dark:bg-black/80 backdrop-blur-xl p-4 lg:p-6 rounded-[2rem] shadow-2xl border border-white/20 flex flex-col lg:flex-row gap-4 items-end">
+            
+            {/* Pill Search Bar */}
+            <div className="mt-12 bg-white rounded-full p-2 flex flex-col md:flex-row items-center shadow-2xl mx-auto max-w-4xl text-black">
               
-              <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Pretensão</label>
-                  <Select value={transactionFilter} onValueChange={setTransactionFilter}>
-                    <SelectTrigger className="bg-white/50 dark:bg-black/50 border-none h-12 rounded-xl focus:ring-1 focus:ring-primary">
-                      <SelectValue placeholder="Comprar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="venda">Comprar</SelectItem>
-                      <SelectItem value="aluguel">Alugar</SelectItem>
-                      <SelectItem value="temporada">Temporada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex-1 flex items-center w-full px-4 border-r border-gray-200">
+                <Select value={transactionFilter} onValueChange={setTransactionFilter}>
+                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base font-medium bg-transparent h-14 w-full">
+                    <SelectValue placeholder="Comprar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">À venda e Aluguel</SelectItem>
+                    <SelectItem value="venda">À venda</SelectItem>
+                    <SelectItem value="aluguel">Para alugar</SelectItem>
+                    <SelectItem value="temporada">Temporada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Tipo de Imóvel</label>
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="bg-white/50 dark:bg-black/50 border-none h-12 rounded-xl focus:ring-1 focus:ring-primary">
-                      <SelectValue placeholder="Todos os imóveis" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Tipos</SelectItem>
-                      <SelectItem value="apartamento">Apartamento</SelectItem>
-                      <SelectItem value="casa">Casa</SelectItem>
-                      <SelectItem value="comercial">Comercial</SelectItem>
-                      <SelectItem value="terreno">Terreno</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex-1 flex items-center w-full px-4 border-r border-gray-200">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base bg-transparent h-14 w-full text-muted-foreground">
+                    <SelectValue placeholder="Qualquer tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Qualquer tipo</SelectItem>
+                    <SelectItem value="apartamento">Apartamento</SelectItem>
+                    <SelectItem value="casa">Casa</SelectItem>
+                    <SelectItem value="cobertura">Cobertura</SelectItem>
+                    <SelectItem value="fazenda">Fazenda</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Localização</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Cidade, bairro ou condomínios" 
-                      value={search} 
-                      onChange={(e) => setSearch(e.target.value)} 
-                      className="pl-10 bg-white/50 dark:bg-black/50 border-none h-12 rounded-xl focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                </div>
+              <div className="flex-[1.5] flex items-center w-full px-4">
+                <Input 
+                  placeholder="Localização, código..." 
+                  value={search} 
+                  onChange={(e) => setSearch(e.target.value)} 
+                  className="border-none shadow-none focus-visible:ring-0 h-14 bg-transparent text-base"
+                />
               </div>
 
               <Button 
-                className="w-full lg:w-16 h-12 rounded-xl shadow-xl shadow-primary/30 shrink-0" 
-                style={{ backgroundColor: settings.primary_color }}
+                className="w-full md:w-auto h-14 px-10 rounded-full bg-slate-900 hover:bg-black text-white text-base font-medium shrink-0 shadow-md ml-2"
+                onClick={() => {
+                  document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
               >
-                <Search className="h-5 w-5" />
+                Buscar
               </Button>
             </div>
-            
-            <p className="text-center text-white/70 text-xs mt-4 drop-shadow">
-              Busque por código do imóvel
-            </p>
+          </div>
+        </div>
+
+        {/* Bottom Left Property Info */}
+        <div className="absolute bottom-10 left-4 md:left-12 z-30 text-white animate-fade-in-up">
+          <h3 className="text-3xl font-bold drop-shadow-md">{typeLabels[typeFilter] || 'Residência'} - Venda</h3>
+          <h2 className="text-4xl md:text-5xl font-extrabold drop-shadow-lg mt-1 mb-2">Exclusiva</h2>
+          <p className="text-sm font-medium opacity-90 max-w-md drop-shadow">{carouselImages[activeIndex].title}</p>
+          
+          <div className="flex gap-2 mt-4">
+            <div className="h-0.5 w-8 bg-white" />
+            <div className="h-0.5 w-8 bg-white/40" />
+            <div className="h-0.5 w-8 bg-white/40" />
+            <div className="h-0.5 w-8 bg-white/40" />
           </div>
         </div>
 

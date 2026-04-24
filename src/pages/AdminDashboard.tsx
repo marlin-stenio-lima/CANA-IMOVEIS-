@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, isWithinInterval, startOfDay, endOfDay, differenceInMinutes, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from "recharts";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 type PeriodRange = "hoje" | "ontem" | "este_mes" | "mes_passado" | "personalizado";
 
@@ -24,6 +29,10 @@ export default function AdminDashboard() {
   // Filters
   const [period, setPeriod] = useState<PeriodRange>("este_mes");
   const [selectedBroker, setSelectedBroker] = useState<string>("todos");
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date()
+  });
   
   // States
   const [deals, setDeals] = useState<any[]>([]);
@@ -91,8 +100,10 @@ export default function AdminDashboard() {
         const lastMonth = subMonths(now, 1);
         return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
       case "personalizado":
-        // For custom, let's just return a generic last 30 days for now unless you implement custom date pickers
-        return { start: subDays(now, 30), end: endOfDay(now) };
+        return { 
+          start: customDateRange?.from ? startOfDay(customDateRange.from) : startOfDay(now), 
+          end: customDateRange?.to ? endOfDay(customDateRange.to) : (customDateRange?.from ? endOfDay(customDateRange.from) : endOfDay(now))
+        };
       default:
         return { start: startOfMonth(now), end: endOfMonth(now) };
     }
@@ -257,10 +268,54 @@ export default function AdminDashboard() {
                 <SelectItem value="ontem">Ontem</SelectItem>
                 <SelectItem value="este_mes">Este Mês</SelectItem>
                 <SelectItem value="mes_passado">Mês Passado</SelectItem>
-                <SelectItem value="personalizado">Últimos 30 dias</SelectItem>
+                <SelectItem value="personalizado">Personalizado</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {period === "personalizado" && (
+            <div className="space-y-1">
+              <Label className="text-xs px-1 text-muted-foreground">Data Personalizada</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    size="sm"
+                    className={cn(
+                      "w-[240px] h-8 text-xs justify-start text-left font-normal",
+                      !customDateRange && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {customDateRange?.from ? (
+                      customDateRange.to ? (
+                        <>
+                          {format(customDateRange.from, "dd LLL y", { locale: ptBR })} -{" "}
+                          {format(customDateRange.to, "dd LLL y", { locale: ptBR })}
+                        </>
+                      ) : (
+                        format(customDateRange.from, "dd LLL y", { locale: ptBR })
+                      )
+                    ) : (
+                      <span>Selecione a data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={customDateRange?.from}
+                    selected={customDateRange}
+                    onSelect={setCustomDateRange}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label className="text-xs px-1 text-muted-foreground">Corretor</Label>

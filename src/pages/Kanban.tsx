@@ -224,7 +224,13 @@ export default function Kanban() {
     }
 
     if (targetStageId && targetStageId !== deal.stage_id) {
-      await handleMoveDeal(activeId, targetStageId);
+      const targetStage = stages.find(s => s.id === targetStageId);
+      if (targetStage?.is_lost_stage) {
+        // Prompts for reason instead of moving directly
+        handleMarkAsLost(activeId, targetStageId);
+      } else {
+        await handleMoveDeal(activeId, targetStageId);
+      }
     }
 
     setActiveDealId(null);
@@ -307,6 +313,8 @@ export default function Kanban() {
     }
   };
 
+  const [selectedTargetStageForLoss, setSelectedTargetStageForLoss] = useState<string | null>(null);
+
   const handleMoveDeal = async (dealId: string, stageId: string) => {
     await moveDealToStage.mutateAsync({ dealId, stageId });
   };
@@ -315,15 +323,35 @@ export default function Kanban() {
     await markAsWon.mutateAsync(dealId);
   };
 
-  const handleMarkAsLost = (dealId: string) => {
+  const handleMarkAsLost = (dealId: string, targetStageId?: string) => {
     setSelectedDealForLoss(dealId);
+    if (targetStageId) {
+      setSelectedTargetStageForLoss(targetStageId);
+    } else {
+      setSelectedTargetStageForLoss(null);
+    }
     setLossModalOpen(true);
   };
 
   const handleConfirmLoss = async (lossReasonId: string) => {
     if (selectedDealForLoss) {
-      await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lossReasonId });
+      // If we are moving to a specific lost column, do both
+      if (selectedTargetStageForLoss) {
+         // To keep it in the board, we update stage_id and maybe NOT set lost_at? 
+         // Wait, if lost_at is set, useDeals query hides it.
+         // Let's just update the deal manually via updateDeal so it stays on board.
+         await updateDeal.mutateAsync({ 
+           id: selectedDealForLoss, 
+           stage_id: selectedTargetStageForLoss,
+           lost_reason_id: lossReasonId,
+           stage: "lost"
+           // we skip lost_at so it stays on board, or we modify useDeals to not hide it.
+         });
+      } else {
+         await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lossReasonId });
+      }
       setSelectedDealForLoss(null);
+      setSelectedTargetStageForLoss(null);
     }
   };
 

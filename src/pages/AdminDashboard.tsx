@@ -53,7 +53,7 @@ export default function AdminDashboard() {
     // Fetch Deals with Contacts
     const { data: dData } = await supabase
       .from('deals')
-      .select('*, contacts(source), pipeline_stages(name)')
+      .select('*, contacts(source), pipeline_stages(name), loss_reasons(name)')
       .eq('business_type', mode);
       
     setDeals(dData || []);
@@ -177,6 +177,47 @@ export default function AdminDashboard() {
       .map(([name, value]) => ({ name: format(parseISO(name), 'dd/MM'), value, date: name }))
       .sort((a,b) => a.date.localeCompare(b.date));
 
+    // Motivos de perda
+    const lostReasonsMap: Record<string, number> = {};
+    fDeals.filter(d => d.stage === 'lost').forEach(d => {
+       const reason = d.loss_reasons?.name || 'Não informado';
+       lostReasonsMap[reason] = (lostReasonsMap[reason] || 0) + 1;
+    });
+    const lostReasonData = Object.entries(lostReasonsMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
+
+    // VGV (Valor Geral de Vendas em Negociação)
+    let vgvNegociacao = 0;
+    fDeals.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).forEach(d => {
+       vgvNegociacao += Number(d.value) || 0;
+    });
+
+    // Ranking de corretores (Gamificação)
+    const brokerStats: Record<string, { name: string, wins: number, total: number, waitTime: number, waitCount: number }> = {};
+    fDeals.forEach(d => {
+       if (!d.assigned_to) return;
+       if (!brokerStats[d.assigned_to]) {
+          const b = teamMembers?.find(t => t.id === d.assigned_to);
+          brokerStats[d.assigned_to] = { name: b?.full_name || 'Desconhecido', wins: 0, total: 0, waitTime: 0, waitCount: 0 };
+       }
+       brokerStats[d.assigned_to].total++;
+       if (d.stage === 'won' || d.closed_at) brokerStats[d.assigned_to].wins++;
+       
+       if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStageId) {
+          const diff = differenceInMinutes(parseISO(d.stage_entered_at), parseISO(d.created_at));
+          if (diff >= 0 && diff < 60*24*7) {
+             brokerStats[d.assigned_to].waitTime += diff;
+             brokerStats[d.assigned_to].waitCount++;
+          }
+       }
+    });
+
+    const brokerRanking = Object.values(brokerStats).map(b => ({
+       name: b.name,
+       wins: b.wins,
+       conversion: b.total > 0 ? Math.round((b.wins / b.total) * 100) : 0,
+       avgWait: b.waitCount > 0 ? Math.round(b.waitTime / b.waitCount) : 0
+    })).sort((a, b) => b.wins - a.wins).slice(0, 5);
+
     return {
       leadsAtendidos,
       leadsBolsao,
@@ -187,11 +228,14 @@ export default function AdminDashboard() {
       perdidos,
       sourceData,
       timelineData,
+      lostReasonData,
+      vgvNegociacao,
+      brokerRanking,
       totalLeads: fDeals.length || fContacts.length
     };
-  }, [deals, contacts, appointments, period, selectedBroker, bolsaoStageId]);
+  }, [deals, contacts, appointments, period, selectedBroker, bolsaoStageId, teamMembers]);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658'];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#FF6B6B', '#4ECDC4'];
 
   return (
     <div className="space-y-6 pb-10">
@@ -228,7 +272,7 @@ export default function AdminDashboard() {
                 <SelectItem value="todos">Todos (Equipe Inteira)</SelectItem>
                 <SelectItem value="bolsao">Sem Dono (Bolsão)</SelectItem>
                 {teamMembers?.map(m => (
-                  <SelectItem key={m.id} value={m.user_id || m.id}>{m.name}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.full_name || 'Usuário Sem Nome'}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -307,7 +351,15 @@ export default function AdminDashboard() {
         </div>
         <div className="bg-card border rounded-lg p-3 flex items-center gap-3">
            <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-md"><HandshakeIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" /></div>
-           <div><p className="text-xs text-muted-foreground">Em Negociação</p><p className="text-lg font-bold">{metrics.negociacao}</p></div>
+           <div className="flex-1">
+             <p className="text-xs text-muted-foreground">Em Negociação</p>
+             <div className="flex items-baseline justify-between">
+               <p className="text-lg font-bold">{metrics.negociacao}</p>
+               <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(metrics.vgvNegociacao)}
+               </p>
+             </div>
+           </div>
         </div>
         <div className="bg-card border rounded-lg p-3 flex items-center gap-3">
            <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-md"><CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" /></div>
@@ -385,6 +437,90 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                   Sem dados de origem no período
                 </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Third Row: Ranking & Lost Reasons */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <UserX className="w-5 h-5 text-destructive" /> Motivos de Perda
+            </CardTitle>
+            <CardDescription>Principais razões para perda de negócios</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              {metrics.lostReasonData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={metrics.lostReasonData}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {metrics.lostReasonData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} perdas`, 'Quantidade']} />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Sem dados de perdas no período
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Target className="w-5 h-5 text-warning" /> Ranking de Corretores
+            </CardTitle>
+            <CardDescription>Top 5 em vendas no período</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 pt-2">
+              {metrics.brokerRanking.length > 0 ? (
+                metrics.brokerRanking.map((broker, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs">
+                        {i + 1}º
+                      </div>
+                      <div className="font-medium text-sm">{broker.name}</div>
+                    </div>
+                    <div className="flex gap-4 text-xs">
+                      <div className="text-right">
+                        <div className="font-bold text-success">{broker.wins}</div>
+                        <div className="text-muted-foreground">Vendas</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{broker.conversion}%</div>
+                        <div className="text-muted-foreground">Conversão</div>
+                      </div>
+                      <div className="text-right hidden sm:block">
+                        <div className="font-bold text-amber-600 dark:text-amber-500">
+                           {broker.avgWait > 60 ? `${Math.floor(broker.avgWait/60)}h${broker.avgWait%60}m` : `${broker.avgWait}m`}
+                        </div>
+                        <div className="text-muted-foreground">TME</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-muted-foreground text-sm">Sem dados de corretores no período</div>
               )}
             </div>
           </CardContent>

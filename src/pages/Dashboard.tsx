@@ -82,10 +82,17 @@ function getGreeting() {
   return "Boa noite";
 }
 
+import AdminDashboard from "./AdminDashboard";
+
 export default function Dashboard() {
   const { profile } = useAuth();
   const { isAdmin } = usePermissions();
   const { mode } = useCrmMode();
+
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
+
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
 
   const [isLoading, setIsLoading] = useState(true);

@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
             .select(`
                 id, 
                 company_id, 
+                business_type,
                 instance_members (
                     team_members ( user_id )
                 )
@@ -131,6 +132,7 @@ Deno.serve(async (req) => {
                 company_id: instanceData.company_id, 
                 name: updateName ? pushName : senderNumber,
                 assigned_to: instanceOwnerId, // Auto-assign to instance owner
+                business_type: instanceData.business_type || 'imoveis', // Set tag based on instance
                 updated_at: new Date().toISOString()
             };
             const { data: newContact } = await supabase.from('contacts').insert(contactPayload).select('id').single();

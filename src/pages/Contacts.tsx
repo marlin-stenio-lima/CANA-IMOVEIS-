@@ -11,6 +11,7 @@ import { useContacts } from "@/hooks/useContacts";
 import { useTeam } from "@/hooks/useTeam";
 import { useProperties } from "@/hooks/useProperties";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,11 +40,13 @@ export default function Contacts() {
   const [pageSize, setPageSize] = useState(10);
 
   // Data Fetching
+  const { mode } = useCrmMode();
   const { contacts, isLoading, error, createContact, deleteContact } = useContacts({
     searchTerm,
     source,
     ownerId,
     propertyId,
+    businessType: mode,
   });
 
   const { profile } = useAuth();

@@ -523,7 +523,7 @@ export function IntegrationManager() {
 
 
             <div className="grid gap-4">
-                {instances.map(inst => (
+                {instances.filter(inst => (inst.business_type || 'imoveis') === mode).map(inst => (
                     <div key={inst.id} className="border rounded-lg p-4 flex flex-col gap-4 bg-card">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">

@@ -303,36 +303,93 @@ export default function PublicSite() {
         </div>
       </section>
 
+      {/* Categorias / Estilo de Vida */}
+      <section className="py-20 bg-slate-50 dark:bg-black/20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16 animate-fade-in-up">
+            <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 tracking-tight">Encontre sua propriedade ideal</h3>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Explore nossa seleção exclusiva através do estilo de vida que você procura. De coberturas urbanas a retiros no campo.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { id: 'casa', title: 'Casas & Mansões', subtitle: 'Conforto e privacidade', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'cobertura', title: 'Coberturas', subtitle: 'Vistas espetaculares', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'apartamento', title: 'Apartamentos', subtitle: 'Luxo urbano', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'fazenda', title: 'Fazendas & Haras', subtitle: 'Refúgios na natureza', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+            ].map((cat) => (
+              <div 
+                key={cat.id}
+                onClick={() => {
+                  setTypeFilter(cat.id);
+                  document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="group relative h-80 rounded-2xl overflow-hidden cursor-pointer shadow-lg"
+              >
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-500 z-10" />
+                <img 
+                  src={cat.image} 
+                  alt={cat.title} 
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                />
+                <div className="absolute inset-0 z-20 p-6 flex flex-col justify-end text-white">
+                  <h4 className="text-2xl font-bold mb-1 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">{cat.title}</h4>
+                  <p className="text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">{cat.subtitle}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* About Section */}
       {settings.about_text && (
-        <section className="py-12 border-b">
+        <section className="py-20 border-b bg-white dark:bg-background">
           <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto text-center">
-              <h3 className="text-2xl font-bold mb-4">Sobre Nós</h3>
-              <p className="text-muted-foreground whitespace-pre-line">{settings.about_text}</p>
+            <div className="max-w-4xl mx-auto text-center space-y-6">
+              <h3 className="text-3xl font-bold tracking-tight">Sobre Nós</h3>
+              <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">{settings.about_text}</p>
             </div>
           </div>
         </section>
       )}
 
       {/* Properties */}
-      <section className="py-12">
+      <section id="imoveis-list" className="py-20 scroll-mt-20">
         <div className="container mx-auto px-4">
           {loadingProperties ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-80" />)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-96 rounded-2xl" />)}</div>
           ) : filteredProperties.length === 0 ? (
-            <p className="text-center text-muted-foreground py-12">Nenhum imóvel encontrado.</p>
+            <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed">
+              <h4 className="text-2xl font-bold mb-2">Nenhum imóvel encontrado</h4>
+              <p className="text-muted-foreground mb-6">Tente ajustar os filtros de busca para encontrar o que procura.</p>
+              <Button onClick={() => { setSearch(''); setTypeFilter('all'); setTransactionFilter('all'); }} variant="outline">Limpar Filtros</Button>
+            </div>
           ) : (
             <>
               {featuredProperties.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-xl font-semibold mb-4">Destaques</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{featuredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
+                <div className="mb-16">
+                  <div className="flex items-end justify-between mb-8">
+                    <div>
+                      <h3 className="text-3xl font-extrabold tracking-tight mb-2">Imóveis em Destaque</h3>
+                      <p className="text-muted-foreground">As propriedades mais exclusivas do nosso portfólio.</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{featuredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
                 </div>
               )}
               <div>
-                <h3 className="text-xl font-semibold mb-4">{filteredProperties.length} imóveis encontrados</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{regularProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
+                <div className="flex items-end justify-between mb-8 pb-4 border-b">
+                  <h3 className="text-2xl font-bold tracking-tight">{filteredProperties.length} imóveis encontrados</h3>
+                  {typeFilter !== 'all' && (
+                    <Badge variant="outline" className="text-sm px-3 py-1 cursor-pointer hover:bg-muted" onClick={() => setTypeFilter('all')}>
+                      Filtro: {typeLabels[typeFilter]} ✕
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{regularProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
               </div>
             </>
           )}

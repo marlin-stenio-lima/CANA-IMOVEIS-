@@ -29,6 +29,7 @@ export default function AdminDashboard() {
   // Filters
   const [period, setPeriod] = useState<PeriodRange>("este_mes");
   const [selectedBroker, setSelectedBroker] = useState<string>("todos");
+  const [selectedPipeline, setSelectedPipeline] = useState<string>("todos");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date()
@@ -38,7 +39,8 @@ export default function AdminDashboard() {
   const [deals, setDeals] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
-  const [bolsaoStageId, setBolsaoStageId] = useState<string | null>(null);
+  const [pipelines, setPipelines] = useState<any[]>([]);
+  const [bolsaoStages, setBolsaoStages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchData();
@@ -50,22 +52,20 @@ export default function AdminDashboard() {
     
     // 1. Get Company Settings for Bolsao
     const { data: companyData } = await supabase.from('companies').select('settings').limit(1).single() as any;
-    const bolsaoStages = companyData?.settings?.bolsao_stages || {};
+    const stages = companyData?.settings?.bolsao_stages || {};
+    setBolsaoStages(stages);
     
-    // We need to know which pipeline is active to get the bolsao stage. 
-    // Since this is global, let's just get the pipeline for the current mode.
-    const { data: pipelines } = await supabase.from('pipelines').select('id').eq('business_type', mode).limit(1);
-    if (pipelines && pipelines.length > 0) {
-      setBolsaoStageId(bolsaoStages[pipelines[0].id] || null);
-    }
+    // Fetch pipelines
+    const { data: pipes } = await supabase.from('pipelines').select('id, name').eq('business_type', mode);
+    setPipelines(pipes || []);
 
     // Fetch Deals with Contacts
     const { data: dData } = await supabase
       .from('deals')
-      .select('*, contacts(source), pipeline_stages(name), loss_reasons(name)')
-      .eq('business_type', mode);
+      .select('*, contacts(source, business_type), pipeline_stages(name), loss_reasons(name)');
       
-    setDeals(dData || []);
+    const filteredDeals = (dData || []).filter((d: any) => d.contacts?.business_type === mode);
+    setDeals(filteredDeals);
 
     // Fetch Appointments
     const { data: aData } = await supabase
@@ -128,22 +128,25 @@ export default function AdminDashboard() {
     };
 
     // Filtered Datasets
-    const fDealsAll = deals.filter(d => matchesBroker(d.assigned_to));
+    const fDealsAll = deals.filter(d => 
+      matchesBroker(d.assigned_to) && 
+      (selectedPipeline === "todos" || d.pipeline_id === selectedPipeline)
+    );
     const fDealsCreated = fDealsAll.filter(d => inDateRange(d.created_at));
     const fContacts = contacts.filter(c => inDateRange(c.created_at) && matchesBroker(c.assigned_to));
     const fAppointments = appointments.filter(a => inDateRange(a.start_time)); // Approximating
 
     // 1. Leads Atendidos (Not in Bolsao, assigned to someone)
-    const leadsAtendidos = fDealsCreated.filter(d => d.assigned_to && d.stage_id !== bolsaoStageId).length;
+    const leadsAtendidos = fDealsCreated.filter(d => d.assigned_to && d.stage_id !== bolsaoStages[d.pipeline_id]).length;
     
     // 2. Leads no Bolsão
-    const leadsBolsao = fDealsCreated.filter(d => d.stage_id === bolsaoStageId || !d.assigned_to).length;
+    const leadsBolsao = fDealsCreated.filter(d => d.stage_id === bolsaoStages[d.pipeline_id] || !d.assigned_to).length;
 
     // 3. Velocidade para atender (TME)
     let totalWaitTime = 0;
     let waitCount = 0;
     fDealsCreated.forEach(d => {
-      if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStageId) {
+      if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStages[d.pipeline_id]) {
         const diff = differenceInMinutes(parseISO(d.stage_entered_at), parseISO(d.created_at));
         if (diff >= 0 && diff < 60 * 24 * 7) { 
           totalWaitTime += diff;
@@ -214,7 +217,7 @@ export default function AdminDashboard() {
        }
        brokerStats[d.assigned_to].total++;
        
-       if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStageId) {
+       if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStages[d.pipeline_id]) {
           const diff = differenceInMinutes(parseISO(d.stage_entered_at), parseISO(d.created_at));
           if (diff >= 0 && diff < 60*24*7) {
              brokerStats[d.assigned_to].waitTime += diff;
@@ -257,7 +260,7 @@ export default function AdminDashboard() {
       brokerRanking,
       totalLeads: fDealsCreated.length
     };
-  }, [deals, contacts, appointments, period, customDateRange, selectedBroker, bolsaoStageId, teamMembers]);
+  }, [deals, contacts, appointments, period, customDateRange, selectedBroker, selectedPipeline, bolsaoStages, teamMembers]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#FF6B6B', '#4ECDC4'];
 
@@ -341,6 +344,21 @@ export default function AdminDashboard() {
                 <SelectItem value="bolsao">Sem Dono (Bolsão)</SelectItem>
                 {teamMembers?.map(m => (
                   <SelectItem key={m.id} value={m.id}>{m.full_name || 'Usuário Sem Nome'}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs px-1 text-muted-foreground">Pipeline (Kanban)</Label>
+            <Select value={selectedPipeline} onValueChange={setSelectedPipeline}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Todos os Pipelines" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Pipelines</SelectItem>
+                {pipelines?.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

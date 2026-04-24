@@ -97,7 +97,11 @@ export default function PublicSite() {
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
               />
             ) : (
-              <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground italic">Sem imagem</div>
+              <img 
+                src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800" 
+                alt="Sem foto" 
+                className="w-full h-full object-cover opacity-50 grayscale group-hover:scale-110 transition-transform duration-700" 
+              />
             )}
             
             {/* Status Badges Overlay */}
@@ -342,18 +346,6 @@ export default function PublicSite() {
         </div>
       </section>
 
-      {/* About Section */}
-      {settings.about_text && (
-        <section className="py-20 border-b bg-white dark:bg-background">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto text-center space-y-6">
-              <h3 className="text-3xl font-bold tracking-tight">Sobre Nós</h3>
-              <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">{settings.about_text}</p>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Properties */}
       <section id="imoveis-list" className="py-20 scroll-mt-20">
         <div className="container mx-auto px-4">
@@ -367,7 +359,7 @@ export default function PublicSite() {
             </div>
           ) : (
             <>
-              {featuredProperties.length > 0 && (
+              {featuredProperties.length > 0 && search === '' && typeFilter === 'all' && transactionFilter === 'all' && (
                 <div className="mb-16">
                   <div className="flex items-end justify-between mb-8">
                     <div>
@@ -378,17 +370,20 @@ export default function PublicSite() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{featuredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
                 </div>
               )}
-              <div>
-                <div className="flex items-end justify-between mb-8 pb-4 border-b">
-                  <h3 className="text-2xl font-bold tracking-tight">{filteredProperties.length} imóveis encontrados</h3>
-                  {typeFilter !== 'all' && (
-                    <Badge variant="outline" className="text-sm px-3 py-1 cursor-pointer hover:bg-muted" onClick={() => setTypeFilter('all')}>
-                      Filtro: {typeLabels[typeFilter]} ✕
-                    </Badge>
-                  )}
+              
+              {(search !== '' || typeFilter !== 'all' || transactionFilter !== 'all') && (
+                <div>
+                  <div className="flex items-end justify-between mb-8 pb-4 border-b">
+                    <h3 className="text-2xl font-bold tracking-tight">{filteredProperties.length} imóveis encontrados</h3>
+                    {typeFilter !== 'all' && (
+                      <Badge variant="outline" className="text-sm px-3 py-1 cursor-pointer hover:bg-muted" onClick={() => setTypeFilter('all')}>
+                        Filtro: {typeLabels[typeFilter]} ✕
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{filteredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{regularProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
-              </div>
+              )}
             </>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { usePublicProperty } from '@/hooks/usePublicProperties';
+import { usePublicProperty, usePublicProperties } from '@/hooks/usePublicProperties';
 import { usePublicSiteSettings } from '@/hooks/useSiteSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ export default function PublicProperty() {
   const { slug, propertyId } = useParams<{ slug: string; propertyId: string }>();
   const { data: property, isLoading } = usePublicProperty(propertyId);
   const { data: settings } = usePublicSiteSettings(slug);
+  const { data: allProperties } = usePublicProperties(settings?.company_id);
   
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -104,39 +105,47 @@ export default function PublicProperty() {
   const images = property.images || [];
   const cover = images.find(i => i.is_cover) || images[0];
 
+  const similarProperties = allProperties
+    ?.filter(p => p.id !== property.id && p.property_type === property.property_type)
+    .slice(0, 4) || [];
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background z-50">
+      <header className="border-b sticky top-0 bg-background z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to={`/${slug}`} className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
+          <Link to={`/${slug}`} className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            Voltar
+            Voltar para {settings?.site_name}
           </Link>
-          <h1 className="text-xl font-bold" style={{ color: settings?.primary_color }}>{settings?.site_name}</h1>
+          <h1 className="text-xl font-bold tracking-tight hidden sm:block" style={{ color: settings?.primary_color }}>{settings?.site_name}</h1>
           <div className="w-20" />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             {/* Gallery */}
             <div className="space-y-2">
               <div 
-                className="aspect-video rounded-lg overflow-hidden bg-muted cursor-pointer relative group"
+                className="aspect-[16/9] rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 cursor-pointer relative group"
                 onClick={() => images.length > 0 && openGallery(0)}
               >
                 {cover ? (
                   <>
-                    <img src={cover.url} alt={property.title} className="w-full h-full object-cover" />
+                    <img src={cover.url} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity font-medium">
-                        Clique para ampliar
+                      <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm">
+                        <Maximize2 className="inline-block w-4 h-4 mr-2" /> Ampliar Galeria
                       </span>
                     </div>
                   </>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
+                  <img 
+                    src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200" 
+                    alt="Sem foto" 
+                    className="w-full h-full object-cover opacity-50 grayscale" 
+                  />
                 )}
               </div>
               
@@ -298,6 +307,39 @@ export default function PublicProperty() {
             </Card>
           </div>
         </div>
+        
+        {/* Imóveis Semelhantes */}
+        {similarProperties.length > 0 && (
+          <div className="mt-20 pt-16 border-t">
+            <h3 className="text-3xl font-bold tracking-tight mb-8">Imóveis Semelhantes</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {similarProperties.map(p => (
+                <Link to={`/${slug}/imovel/${p.id}`} key={p.id} className="group block">
+                  <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 mb-4 relative shadow-sm">
+                    <img 
+                      src={p.images?.find(i => i.is_cover)?.url || p.images?.[0]?.url || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800"} 
+                      className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out ${!(p.images?.length) ? 'opacity-50 grayscale' : ''}`}
+                      alt={p.title}
+                    />
+                    <div className="absolute top-3 left-3 flex gap-2 z-10">
+                      <Badge variant="secondary" className="bg-white/90 text-black border-none shadow-sm text-[10px] px-2 py-0.5">
+                        {propertyTypeLabels[p.property_type] || p.property_type}
+                      </Badge>
+                    </div>
+                  </div>
+                  <h4 className="font-bold text-lg leading-tight line-clamp-1 group-hover:text-primary transition-colors mb-1">{p.title}</h4>
+                  {p.neighborhood && (
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {p.neighborhood}, {p.city}
+                    </p>
+                  )}
+                  <p className="font-bold text-lg" style={{ color: settings?.primary_color }}>{formatPrice(p.price)}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fullscreen Gallery Modal */}

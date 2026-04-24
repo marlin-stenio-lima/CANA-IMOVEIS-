@@ -128,24 +128,24 @@ export default function AdminDashboard() {
     };
 
     // Filtered Datasets
-    const fDeals = deals.filter(d => inDateRange(d.created_at) && matchesBroker(d.assigned_to));
+    const fDealsAll = deals.filter(d => matchesBroker(d.assigned_to));
+    const fDealsCreated = fDealsAll.filter(d => inDateRange(d.created_at));
     const fContacts = contacts.filter(c => inDateRange(c.created_at) && matchesBroker(c.assigned_to));
     const fAppointments = appointments.filter(a => inDateRange(a.start_time)); // Approximating
 
     // 1. Leads Atendidos (Not in Bolsao, assigned to someone)
-    const leadsAtendidos = fDeals.filter(d => d.assigned_to && d.stage_id !== bolsaoStageId).length;
+    const leadsAtendidos = fDealsCreated.filter(d => d.assigned_to && d.stage_id !== bolsaoStageId).length;
     
     // 2. Leads no Bolsão
-    const leadsBolsao = fDeals.filter(d => d.stage_id === bolsaoStageId || !d.assigned_to).length;
+    const leadsBolsao = fDealsCreated.filter(d => d.stage_id === bolsaoStageId || !d.assigned_to).length;
 
     // 3. Velocidade para atender (TME)
-    // We approximate this by looking at deals that have stage_entered_at and comparing to created_at
     let totalWaitTime = 0;
     let waitCount = 0;
-    fDeals.forEach(d => {
+    fDealsCreated.forEach(d => {
       if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStageId) {
         const diff = differenceInMinutes(parseISO(d.stage_entered_at), parseISO(d.created_at));
-        if (diff >= 0 && diff < 60 * 24 * 7) { // Sanity check (max 7 days)
+        if (diff >= 0 && diff < 60 * 24 * 7) { 
           totalWaitTime += diff;
           waitCount++;
         }
@@ -159,19 +159,20 @@ export default function AdminDashboard() {
     // 4. Visitas Agendadas
     const visitas = fAppointments.filter(a => a.status === 'scheduled' || a.status === 'completed').length;
 
-    // 5. Em Negociação
-    const negociacao = fDeals.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).length;
+    // 5. Em Negociação (Snapshot atual)
+    const negociacao = fDealsAll.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).length;
 
     // 6. Vendas (Ganhos)
-    const ganhos = fDeals.filter(d => d.stage === 'won' || d.closed_at).length;
+    const ganhos = fDealsAll.filter(d => (d.stage === 'won' || d.closed_at) && (inDateRange(d.closed_at) || inDateRange(d.updated_at))).length;
 
     // 7. Perdidos
     const isDealLost = (d: any) => d.stage === 'lost' || d.lost_at || d.pipeline_stages?.name?.toLowerCase().includes('perdid');
-    const perdidos = fDeals.filter(isDealLost).length;
+    const perdidosDeals = fDealsAll.filter(d => isDealLost(d) && (inDateRange(d.lost_at) || inDateRange(d.updated_at)));
+    const perdidos = perdidosDeals.length;
 
     // Source Distribution (Canal)
     const sourceMap: Record<string, number> = {};
-    fDeals.forEach(d => {
+    fDealsCreated.forEach(d => {
       const src = d.contacts?.source || 'Desconhecido';
       sourceMap[src] = (sourceMap[src] || 0) + 1;
     });
@@ -179,7 +180,7 @@ export default function AdminDashboard() {
 
     // Timeline Data (Leads per day)
     const timelineMap: Record<string, number> = {};
-    fDeals.forEach(d => {
+    fDealsCreated.forEach(d => {
       if (d.created_at) {
         const dateStr = d.created_at.split('T')[0];
         timelineMap[dateStr] = (timelineMap[dateStr] || 0) + 1;
@@ -191,7 +192,7 @@ export default function AdminDashboard() {
 
     // Motivos de perda
     const lostReasonsMap: Record<string, number> = {};
-    fDeals.filter(isDealLost).forEach(d => {
+    perdidosDeals.forEach(d => {
        const reason = d.lost_reason || d.loss_reasons?.name || 'Não informado';
        lostReasonsMap[reason] = (lostReasonsMap[reason] || 0) + 1;
     });
@@ -199,20 +200,19 @@ export default function AdminDashboard() {
 
     // VGV (Valor Geral de Vendas em Negociação)
     let vgvNegociacao = 0;
-    fDeals.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).forEach(d => {
+    fDealsAll.filter(d => d.pipeline_stages?.name?.toLowerCase().includes('negocia')).forEach(d => {
        vgvNegociacao += Number(d.value) || 0;
     });
 
     // Ranking de corretores (Gamificação)
     const brokerStats: Record<string, { name: string, wins: number, total: number, waitTime: number, waitCount: number }> = {};
-    fDeals.forEach(d => {
+    fDealsCreated.forEach(d => {
        if (!d.assigned_to) return;
        if (!brokerStats[d.assigned_to]) {
           const b = teamMembers?.find(t => t.id === d.assigned_to);
           brokerStats[d.assigned_to] = { name: b?.full_name || 'Desconhecido', wins: 0, total: 0, waitTime: 0, waitCount: 0 };
        }
        brokerStats[d.assigned_to].total++;
-       if (d.stage === 'won' || d.closed_at) brokerStats[d.assigned_to].wins++;
        
        if (d.stage_entered_at && d.created_at && d.stage_id !== bolsaoStageId) {
           const diff = differenceInMinutes(parseISO(d.stage_entered_at), parseISO(d.created_at));
@@ -220,6 +220,18 @@ export default function AdminDashboard() {
              brokerStats[d.assigned_to].waitTime += diff;
              brokerStats[d.assigned_to].waitCount++;
           }
+       }
+    });
+    
+    // Wins are calculated independently to not depend on created_at
+    fDealsAll.forEach(d => {
+       if (!d.assigned_to) return;
+       if ((d.stage === 'won' || d.closed_at) && (inDateRange(d.closed_at) || inDateRange(d.updated_at))) {
+          if (!brokerStats[d.assigned_to]) {
+             const b = teamMembers?.find(t => t.id === d.assigned_to);
+             brokerStats[d.assigned_to] = { name: b?.full_name || 'Desconhecido', wins: 0, total: 0, waitTime: 0, waitCount: 0 };
+          }
+          brokerStats[d.assigned_to].wins++;
        }
     });
 
@@ -243,7 +255,7 @@ export default function AdminDashboard() {
       lostReasonData,
       vgvNegociacao,
       brokerRanking,
-      totalLeads: fDeals.length
+      totalLeads: fDealsCreated.length
     };
   }, [deals, contacts, appointments, period, customDateRange, selectedBroker, bolsaoStageId, teamMembers]);
 

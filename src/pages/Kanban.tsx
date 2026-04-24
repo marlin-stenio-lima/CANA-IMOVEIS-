@@ -343,7 +343,8 @@ export default function Kanban() {
            id: selectedDealForLoss, 
            stage_id: selectedTargetStageForLoss,
            lost_reason: lossReasonText,
-           stage: "lost"
+           stage: "lost",
+           lost_at: new Date().toISOString()
          } as any);
       } else {
          await markAsLost.mutateAsync({ dealId: selectedDealForLoss, lostReason: lossReasonText });

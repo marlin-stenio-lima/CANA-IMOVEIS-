@@ -164,17 +164,61 @@ export default function PublicSite() {
       {/* Header - Transparent overlay */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-transparent text-white">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <div className="flex items-center gap-3 border border-white/30 rounded-full pl-2 pr-6 py-1.5 backdrop-blur-md bg-black/10">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center border border-white/50">
-              <span className="text-lg font-bold">C</span>
-            </div>
+          <div className="flex items-center gap-3 border border-white/30 rounded-full px-6 py-1.5 backdrop-blur-md bg-black/10">
             <h1 className="text-lg tracking-widest font-light">{settings.site_name.toUpperCase()}</h1>
           </div>
           <div className="flex gap-6 items-center">
             <nav className="hidden lg:flex gap-8">
-              {['Comprar', 'Alugar', 'Lançamentos', 'Institucional', 'Contato'].map(item => (
-                <button key={item} className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity">{item}</button>
-              ))}
+              <button 
+                onClick={() => {
+                  setTransactionFilter('venda');
+                  setTypeFilter('all');
+                  document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
+              >
+                Comprar
+              </button>
+              <button 
+                onClick={() => {
+                  setTransactionFilter('aluguel');
+                  setTypeFilter('all');
+                  document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
+              >
+                Alugar
+              </button>
+              <button 
+                onClick={() => {
+                  setTransactionFilter('all');
+                  setTypeFilter('all');
+                  document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
+              >
+                Lançamentos
+              </button>
+              <button 
+                onClick={() => {
+                  document.getElementById('footer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
+              >
+                Institucional
+              </button>
+              <button 
+                onClick={() => {
+                  if (settings?.whatsapp) {
+                    window.open(`https://wa.me/${settings.whatsapp}`, '_blank');
+                  } else {
+                    document.getElementById('footer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+                className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
+              >
+                Contato
+              </button>
             </nav>
             <div className="flex items-center gap-3 border-l border-white/20 pl-6 ml-2">
               {settings.whatsapp && (
@@ -438,7 +482,7 @@ export default function PublicSite() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-300 py-16">
+      <footer id="footer" className="bg-slate-900 text-slate-300 py-16">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
             <div className="space-y-4">

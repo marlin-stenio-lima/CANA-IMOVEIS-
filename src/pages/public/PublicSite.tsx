@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bed, Bath, Car, Maximize2, MapPin, Search, Phone, Mail, Facebook, Instagram, Youtube, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Bed, Bath, Car, Maximize2, MapPin, Search, Phone, Mail, Facebook, Instagram, Youtube, ChevronLeft, ChevronRight, Home, Loader2, Check } from 'lucide-react';
 import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function PublicSite() {
   const { slug } = useParams<{ slug: string }>();
@@ -22,12 +23,61 @@ export default function PublicSite() {
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('');
   
+  const [contactData, setContactData] = useState({ name: '', phone: '', email: '' });
+  const [submittingContact, setSubmittingContact] = useState(false);
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settings?.company_id) return;
+    
+    setSubmittingContact(true);
+    
+    try {
+      const leadData = {
+        name: contactData.name,
+        email: contactData.email,
+        phone: contactData.phone,
+        message: 'Contato pelo formulário do rodapé do site',
+        source: 'Website',
+        company_id: settings.company_id
+      };
+
+      const { error } = await supabase.from('leads').insert(leadData);
+      
+      if (error) throw error;
+      
+      setContactSubmitted(true);
+      setContactData({ name: '', phone: '', email: '' });
+      setTimeout(() => setContactSubmitted(false), 5000);
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      alert('Erro ao enviar mensagem. Tente novamente.');
+    } finally {
+      setSubmittingContact(false);
+    }
+  };
+  
   const [activeIndex, setActiveIndex] = useState(0);
-  const carouselImages = [
+  const dynamicCarouselImages = properties
+    ?.filter(p => p.images && p.images.length > 0)
+    .slice(0, 5)
+    .map(p => {
+      const cover = p.images.find((i: any) => i.is_cover) || p.images[0];
+      return {
+        url: cover.url,
+        title: p.title,
+        sub: `${p.neighborhood ? p.neighborhood + ', ' : ''}${p.city || ''}`
+      };
+    }) || [];
+
+  const defaultCarouselImages = [
     { url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'Exclusividade e Sofisticação.', sub: 'Os melhores imóveis de luxo da região.' },
     { url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'O seu novo estilo de vida.', sub: 'Conforto e segurança em cada detalhe.' },
     { url: 'https://images.unsplash.com/photo-1628624747186-a941c476b7ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'Sua Nova História Começa Aqui.', sub: 'Atendimento personalizado para sua conquista.' }
   ];
+
+  const carouselImages = dynamicCarouselImages.length >= 3 ? dynamicCarouselImages : defaultCarouselImages;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -164,9 +214,12 @@ export default function PublicSite() {
       {/* Header - Transparent overlay */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-transparent text-white">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <div className="flex items-center gap-3 border border-white/30 rounded-full px-6 py-1.5 backdrop-blur-md bg-black/10">
-            <h1 className="text-lg tracking-widest font-light">{settings.site_name.toUpperCase()}</h1>
-          </div>
+          <button 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center gap-3 border border-white/30 rounded-full px-6 py-1.5 backdrop-blur-md bg-black/10 hover:bg-black/30 transition-all duration-300 cursor-pointer shadow-lg"
+          >
+            <h1 className="text-lg tracking-widest font-bold drop-shadow-md">{settings.site_name.toUpperCase()}</h1>
+          </button>
           <div className="flex gap-6 items-center">
             <nav className="hidden lg:flex gap-8">
               <button 
@@ -209,11 +262,7 @@ export default function PublicSite() {
               </button>
               <button 
                 onClick={() => {
-                  if (settings?.whatsapp) {
-                    window.open(`https://wa.me/${settings.whatsapp}`, '_blank');
-                  } else {
-                    document.getElementById('footer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
+                  document.getElementById('contact-form-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }}
                 className="text-sm font-medium opacity-90 hover:opacity-100 hover:text-white transition-opacity"
               >
@@ -249,11 +298,11 @@ export default function PublicSite() {
         {/* Center Content */}
         <div className="container mx-auto px-4 relative z-20 text-center text-white mt-[-10vh]">
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in-up">
-            <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-2xl" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
-              Encontre o seu imóvel perfeito.
+            <h2 key={`title-${activeIndex}`} className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-2xl animate-fade-in-up" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
+              {carouselImages[activeIndex]?.title || 'Encontre o seu imóvel perfeito.'}
             </h2>
-            <p className="text-xl md:text-2xl font-medium drop-shadow-lg" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
-              Buscou, encontrou, se mudou. Sem burocracias.
+            <p key={`sub-${activeIndex}`} className="text-xl md:text-2xl font-medium drop-shadow-lg animate-fade-in-up" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)', animationDelay: '0.2s' }}>
+              {carouselImages[activeIndex]?.sub || 'Buscou, encontrou, se mudou. Sem burocracias.'}
             </p>
             
             {/* Pill Search Bar */}
@@ -465,19 +514,42 @@ export default function PublicSite() {
             className="opacity-70"
           ></iframe>
         </div>
-        <div className="relative z-10 bg-white shadow-2xl rounded-lg p-8 max-w-sm text-center">
+        <div id="contact-form-section" className="relative z-10 bg-white shadow-2xl rounded-xl p-8 w-full max-w-sm text-center mx-4 my-8 max-h-[90%] overflow-y-auto">
           <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-[#7a1212] rounded-full flex items-center justify-center border-4 border-white">
             <MapPin className="text-white w-5 h-5" />
           </div>
-          <h4 className="text-[#7a1212] font-bold text-lg mt-2 mb-1">{settings?.site_name || 'Canaã Imóveis de Luxo'}</h4>
-          <p className="text-sm text-gray-600 mb-4 px-4">
-            {settings?.address || 'da Conceição, 226, Centro\nSala 201\nAngra dos Reis - Rio de Janeiro'}
+          <h4 className="text-[#7a1212] font-bold text-lg mt-2 mb-1">{settings?.site_name || 'Canaã Imóveis'}</h4>
+          <p className="text-sm text-gray-600 mb-6">
+            Preencha seus dados abaixo para entrarmos em contato com você:
           </p>
-          <div className="border-t pt-4 text-xs text-gray-500 font-medium space-y-1">
-            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> {settings?.phone || '(24) 99993-9995'}</p>
-            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> (24) 99995-9992</p>
-            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> (24) 99994-9992</p>
-          </div>
+          
+          {contactSubmitted ? (
+            <div className="py-6 border-t border-gray-100">
+              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="font-semibold text-gray-800">Mensagem enviada!</p>
+              <p className="text-sm text-gray-500 mt-1">Nossa equipe entrará em contato em breve.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleContactSubmit} className="space-y-3 text-left border-t border-gray-100 pt-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Nome*</label>
+                <Input required placeholder="Seu nome completo" className="h-9 text-sm" value={contactData.name} onChange={e => setContactData(p => ({...p, name: e.target.value}))} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Telefone / WhatsApp*</label>
+                <Input required placeholder="(00) 00000-0000" className="h-9 text-sm" value={contactData.phone} onChange={e => setContactData(p => ({...p, phone: e.target.value}))} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">E-mail</label>
+                <Input type="email" placeholder="seu@email.com" className="h-9 text-sm" value={contactData.email} onChange={e => setContactData(p => ({...p, email: e.target.value}))} />
+              </div>
+              <Button type="submit" disabled={submittingContact} className="w-full bg-[#7a1212] hover:bg-[#5a0d0d] text-white mt-2">
+                {submittingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar Contato'}
+              </Button>
+            </form>
+          )}
         </div>
       </section>
 

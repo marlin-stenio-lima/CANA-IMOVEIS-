@@ -23,7 +23,7 @@ export default function PublicSite() {
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('');
   
-  const [contactData, setContactData] = useState({ name: '', phone: '', email: '' });
+  const [contactData, setContactData] = useState({ name: '', phone: '', email: '', message: '' });
   const [submittingContact, setSubmittingContact] = useState(false);
   const [contactSubmitted, setContactSubmitted] = useState(false);
   
@@ -38,7 +38,7 @@ export default function PublicSite() {
         name: contactData.name,
         email: contactData.email,
         phone: contactData.phone,
-        message: 'Contato pelo formulário do rodapé do site',
+        message: contactData.message || `Olá, gostaria de mais informações sobre os imóveis do site ${settings.site_name || 'Canaã Imóveis'}. Aguardo contato.`,
         source: 'Website',
         company_id: settings.company_id
       };
@@ -48,7 +48,7 @@ export default function PublicSite() {
       if (error) throw error;
       
       setContactSubmitted(true);
-      setContactData({ name: '', phone: '', email: '' });
+      setContactData({ name: '', phone: '', email: '', message: '' });
       setTimeout(() => setContactSubmitted(false), 5000);
     } catch (error) {
       console.error('Error submitting contact form:', error);
@@ -514,39 +514,44 @@ export default function PublicSite() {
             className="opacity-70"
           ></iframe>
         </div>
-        <div id="contact-form-section" className="relative z-10 bg-white shadow-2xl rounded-xl p-8 w-full max-w-sm text-center mx-4 my-8 max-h-[90%] overflow-y-auto">
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-[#7a1212] rounded-full flex items-center justify-center border-4 border-white">
-            <MapPin className="text-white w-5 h-5" />
-          </div>
-          <h4 className="text-[#7a1212] font-bold text-lg mt-2 mb-1">{settings?.site_name || 'Canaã Imóveis'}</h4>
-          <p className="text-sm text-gray-600 mb-6">
-            Preencha seus dados abaixo para entrarmos em contato com você:
-          </p>
+        <div id="contact-form-section" className="relative z-10 bg-white shadow-2xl rounded-xl p-8 w-full max-w-[450px] text-left mx-4 my-8">
+          <h3 className="font-bold text-[#333] text-lg mb-4">Entrar em contato</h3>
           
           {contactSubmitted ? (
-            <div className="py-6 border-t border-gray-100">
+            <div className="py-10 text-center">
               <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                 <Check className="h-6 w-6 text-green-600" />
               </div>
-              <p className="font-semibold text-gray-800">Mensagem enviada!</p>
+              <p className="font-bold text-gray-800 text-lg">Mensagem enviada!</p>
               <p className="text-sm text-gray-500 mt-1">Nossa equipe entrará em contato em breve.</p>
             </div>
           ) : (
-            <form onSubmit={handleContactSubmit} className="space-y-3 text-left border-t border-gray-100 pt-4">
-              <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Nome*</label>
-                <Input required placeholder="Seu nome completo" className="h-9 text-sm" value={contactData.name} onChange={e => setContactData(p => ({...p, name: e.target.value}))} />
+            <form onSubmit={handleContactSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Nome*</label>
+                  <Input required placeholder="Digite seu nome" className="bg-white border-gray-300 shadow-none text-sm h-11" value={contactData.name} onChange={e => setContactData(p => ({...p, name: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Telefone*</label>
+                  <Input required placeholder="Seu telefone" className="bg-white border-gray-300 shadow-none text-sm h-11" value={contactData.phone} onChange={e => setContactData(p => ({...p, phone: e.target.value}))} />
+                </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Telefone / WhatsApp*</label>
-                <Input required placeholder="(00) 00000-0000" className="h-9 text-sm" value={contactData.phone} onChange={e => setContactData(p => ({...p, phone: e.target.value}))} />
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">E-mail*</label>
+                <Input type="email" required placeholder="Digite seu e-mail" className="bg-white border-gray-300 shadow-none text-sm h-11" value={contactData.email} onChange={e => setContactData(p => ({...p, email: e.target.value}))} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">E-mail</label>
-                <Input type="email" placeholder="seu@email.com" className="h-9 text-sm" value={contactData.email} onChange={e => setContactData(p => ({...p, email: e.target.value}))} />
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Mensagem</label>
+                <textarea 
+                  className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-3 text-sm shadow-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none h-24"
+                  placeholder="Olá, gostaria de mais informações..."
+                  value={contactData.message || `Olá, gostaria de mais informações sobre os imóveis no site ${settings?.site_name || 'Canaã Imóveis'}. Aguardo seu contato.`}
+                  onChange={e => setContactData(p => ({...p, message: e.target.value}))}
+                />
               </div>
-              <Button type="submit" disabled={submittingContact} className="w-full bg-[#7a1212] hover:bg-[#5a0d0d] text-white mt-2">
-                {submittingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar Contato'}
+              <Button type="submit" disabled={submittingContact} className="w-full h-12 rounded-lg font-bold text-sm bg-[#7a1212] hover:bg-[#5a0d0d] text-white transition-colors mt-2">
+                {submittingContact ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enviar'}
               </Button>
             </form>
           )}

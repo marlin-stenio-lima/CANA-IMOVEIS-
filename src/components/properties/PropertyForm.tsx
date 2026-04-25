@@ -55,6 +55,7 @@ const propertySchema = z.object({
   year_built: z.coerce.number().min(1800).max(2100).optional(),
   internal_id: z.string().optional(),
   portal_config: z.any().optional(),
+  video_url: z.string().optional(),
 });
 
 interface PropertyFormProps {
@@ -174,6 +175,7 @@ export function PropertyForm({
       owner_name: property?.owner_name || '',
       owner_phone: property?.owner_phone || '',
       owner_email: property?.owner_email || '',
+      video_url: (property as any)?.custom_fields?.video_url || '',
     },
   });
 
@@ -656,6 +658,23 @@ export function PropertyForm({
           </TabsContent>
 
           <TabsContent value="images" className="space-y-4 mt-4">
+            <FormField
+              control={form.control}
+              name="video_url"
+              render={({ field }) => (
+                <FormItem className="mb-6 bg-secondary/20 p-4 rounded-xl border">
+                  <FormLabel className="text-[#7a1212] font-bold">Vídeo do Imóvel (Link do YouTube)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: https://www.youtube.com/watch?v=..." {...field} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cole o link do YouTube para exibir o vídeo diretamente na página do imóvel.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {property?.id ? (
               <Card>
                 <CardHeader>

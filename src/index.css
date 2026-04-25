@@ -15,8 +15,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 230 75% 55%; /* Indigo Premium */
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 74% 27%; /* Canaã Red (#7a1212) */
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -41,18 +41,18 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 230 75% 55%;
+    --ring: 0 74% 27%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 230 75% 55%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 230 75% 96%;
+    --sidebar-primary: 0 74% 27%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 74% 96%;
     --sidebar-accent-foreground: 230 75% 40%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 230 75% 55%;
+    --sidebar-ring: 0 74% 27%;
   }
 
   .dark {
@@ -65,8 +65,8 @@
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
 
-    --primary: 230 75% 65%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 0 74% 35%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
@@ -91,16 +91,16 @@
 
     --border: 216 34% 17%;
     --input: 216 34% 17%;
-    --ring: 230 75% 65%;
+    --ring: 0 74% 35%;
 
     --sidebar-background: 224 71% 4%;
     --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 230 75% 65%;
+    --sidebar-primary: 0 74% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 216 34% 17%;
     --sidebar-accent-foreground: 213 31% 91%;
     --sidebar-border: 216 34% 17%;
-    --sidebar-ring: 230 75% 65%;
+    --sidebar-ring: 0 74% 35%;
   }
 }
 

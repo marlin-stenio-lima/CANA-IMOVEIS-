@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bed, Bath, Car, Maximize2, MapPin, Search, Phone, Mail, Facebook, Instagram, Youtube, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bed, Bath, Car, Maximize2, MapPin, Search, Phone, Mail, Facebook, Instagram, Youtube, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useEffect } from 'react';
 
 export default function PublicSite() {
@@ -97,11 +97,10 @@ export default function PublicSite() {
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
               />
             ) : (
-              <img 
-                src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800" 
-                alt="Sem foto" 
-                className="w-full h-full object-cover opacity-50 grayscale group-hover:scale-110 transition-transform duration-700" 
-              />
+              <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center text-slate-300">
+                <Home className="w-12 h-12 mb-2 opacity-20" />
+                <span className="text-xs font-semibold uppercase tracking-widest opacity-40">Sem foto</span>
+              </div>
             )}
             
             {/* Status Badges Overlay */}
@@ -118,7 +117,7 @@ export default function PublicSite() {
 
             <div 
               className="absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg z-10" 
-              style={{ backgroundColor: settings.primary_color }}
+              style={{ backgroundColor: '#7a1212' }}
             >
               {transactionLabels[property.transaction_type]}
             </div>
@@ -147,7 +146,7 @@ export default function PublicSite() {
             </div>
 
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black tracking-tighter" style={{ color: settings.primary_color }}>
+              <span className="text-2xl font-black tracking-tighter" style={{ color: '#7a1212' }}>
                 {formatPrice(property.price)}
               </span>
               {property.transaction_type === 'aluguel' && (
@@ -189,110 +188,102 @@ export default function PublicSite() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative h-[85vh] min-h-[600px] flex flex-col items-center justify-center overflow-hidden">
+      <section className="relative h-[95vh] min-h-[700px] flex flex-col items-center justify-center mb-32">
         {/* Carousel Background */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           {carouselImages.map((img, idx) => (
             <div 
               key={idx}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === activeIndex ? 'opacity-100' : 'opacity-0'}`}
             >
-              {/* Gradient overlays for text readability */}
-              <div className="absolute inset-0 bg-black/30 z-10" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 z-10" />
+              <div className="absolute inset-0 bg-black/40 z-10" />
               <img src={img.url} className="w-full h-full object-cover animate-ken-burns" alt="Banner" />
             </div>
           ))}
         </div>
 
         {/* Center Content */}
-        <div className="container mx-auto px-4 relative z-20 text-center text-white mt-16">
-          <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-xl" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
-              Explore as residências mais exclusivas do mundo
+        <div className="container mx-auto px-4 relative z-20 text-center text-white mt-[-10vh]">
+          <div className="space-y-4 max-w-5xl mx-auto animate-fade-in-up">
+            <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-2xl" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
+              Encontre o seu imóvel perfeito.
             </h2>
+            <p className="text-xl md:text-2xl font-medium drop-shadow-lg" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+              Buscou, encontrou, se mudou. Sem burocracias.
+            </p>
             
             {/* Pill Search Bar */}
-            <div className="mt-12 bg-white rounded-full p-2 flex flex-col md:flex-row items-center shadow-2xl mx-auto max-w-4xl text-black">
+            <div className="mt-10 bg-white/95 backdrop-blur-md rounded-xl md:rounded-full p-2 flex flex-col md:flex-row items-center shadow-2xl mx-auto max-w-5xl text-black">
               
-              <div className="flex-1 flex items-center w-full px-4 border-r border-gray-200">
+              <div className="flex-1 flex flex-col w-full px-4 border-b md:border-b-0 md:border-r border-gray-200 py-2 md:py-0">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-left pl-3 mb-1">Pretensão</span>
                 <Select value={transactionFilter} onValueChange={setTransactionFilter}>
-                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base font-medium bg-transparent h-14 w-full">
+                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base font-bold bg-transparent h-10 w-full p-0 px-3">
                     <SelectValue placeholder="Comprar" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">À venda e Aluguel</SelectItem>
-                    <SelectItem value="venda">À venda</SelectItem>
-                    <SelectItem value="aluguel">Para alugar</SelectItem>
+                    <SelectItem value="all">Comprar e Alugar</SelectItem>
+                    <SelectItem value="venda">Comprar</SelectItem>
+                    <SelectItem value="aluguel">Alugar</SelectItem>
                     <SelectItem value="temporada">Temporada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex-1 flex items-center w-full px-4 border-r border-gray-200">
+              <div className="flex-1 flex flex-col w-full px-4 border-b md:border-b-0 md:border-r border-gray-200 py-2 md:py-0">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-left pl-3 mb-1">Tipo de imóvel</span>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base bg-transparent h-14 w-full text-muted-foreground">
-                    <SelectValue placeholder="Qualquer tipo" />
+                  <SelectTrigger className="border-none shadow-none focus:ring-0 text-base font-bold bg-transparent h-10 w-full text-muted-foreground p-0 px-3">
+                    <SelectValue placeholder="Todos os imóveis" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Qualquer tipo</SelectItem>
+                    <SelectItem value="all">Todos os imóveis</SelectItem>
                     <SelectItem value="apartamento">Apartamento</SelectItem>
-                    <SelectItem value="casa">Casa</SelectItem>
+                    <SelectItem value="casa">Casa de Condomínio</SelectItem>
                     <SelectItem value="cobertura">Cobertura</SelectItem>
                     <SelectItem value="fazenda">Fazenda</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex-[1.5] flex items-center w-full px-4">
+              <div className="flex-[1.5] flex flex-col w-full px-4 py-2 md:py-0">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-left pl-3 mb-1">Localização</span>
                 <Input 
-                  placeholder="Localização, código..." 
+                  placeholder="Digite ruas, bairros, cidades ou condomínios" 
                   value={search} 
                   onChange={(e) => setSearch(e.target.value)} 
-                  className="border-none shadow-none focus-visible:ring-0 h-14 bg-transparent text-base"
+                  className="border-none shadow-none focus-visible:ring-0 h-10 bg-transparent text-base font-medium p-0 px-3"
                 />
               </div>
 
               <Button 
-                className="w-full md:w-auto h-14 px-10 rounded-full bg-slate-900 hover:bg-black text-white text-base font-medium shrink-0 shadow-md ml-2"
+                className="w-full md:w-auto h-16 w-16 md:px-8 md:rounded-full rounded-xl bg-[#7a1212] hover:bg-[#5c0d0d] text-white shrink-0 shadow-md md:ml-2 mt-4 md:mt-0 flex items-center justify-center"
                 onClick={() => {
                   document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
               >
-                Buscar
+                <Search className="h-6 w-6" />
               </Button>
             </div>
-          </div>
-        </div>
-
-        {/* Bottom Left Property Info */}
-        <div className="absolute bottom-10 left-4 md:left-12 z-30 text-white animate-fade-in-up">
-          <h3 className="text-3xl font-bold drop-shadow-md">{typeLabels[typeFilter] || 'Residência'} - Venda</h3>
-          <h2 className="text-4xl md:text-5xl font-extrabold drop-shadow-lg mt-1 mb-2">Exclusiva</h2>
-          <p className="text-sm font-medium opacity-90 max-w-md drop-shadow">{carouselImages[activeIndex].title}</p>
-          
-          <div className="flex gap-2 mt-4">
-            <div className="h-0.5 w-8 bg-white" />
-            <div className="h-0.5 w-8 bg-white/40" />
-            <div className="h-0.5 w-8 bg-white/40" />
-            <div className="h-0.5 w-8 bg-white/40" />
+            <div className="pt-4 text-sm font-medium hover:underline cursor-pointer">
+              Buscar por código
+            </div>
           </div>
         </div>
 
         {/* Carousel Controls */}
         <button 
           onClick={() => setActiveIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length)}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-40 p-2 rounded-full border border-white/20 bg-black/10 hover:bg-black/20 text-white backdrop-blur-sm transition-all hidden lg:block"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-40 p-2 rounded-full border border-white/20 bg-black/10 hover:bg-black/30 text-white backdrop-blur-sm transition-all hidden lg:block"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="w-8 h-8" />
         </button>
         <button 
           onClick={() => setActiveIndex((prev) => (prev + 1) % carouselImages.length)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-40 p-2 rounded-full border border-white/20 bg-black/10 hover:bg-black/20 text-white backdrop-blur-sm transition-all hidden lg:block"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-40 p-2 rounded-full border border-white/20 bg-black/10 hover:bg-black/30 text-white backdrop-blur-sm transition-all hidden lg:block"
         >
-          <ChevronRight className="w-6 h-6" />
+          <ChevronRight className="w-8 h-8" />
         </button>
-
         {/* Pagination Dots */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex gap-2">
           {carouselImages.map((_, idx) => (
@@ -306,21 +297,21 @@ export default function PublicSite() {
       </section>
 
       {/* Categorias / Estilo de Vida */}
-      <section className="py-20 bg-slate-50 dark:bg-black/20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16 animate-fade-in-up">
-            <h3 className="text-3xl lg:text-4xl font-extrabold mb-4 tracking-tight">Encontre sua propriedade ideal</h3>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Explore nossa seleção exclusiva através do estilo de vida que você procura. De coberturas urbanas a retiros no campo.
+      <section className="py-12 bg-white">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="text-center mb-10 animate-fade-in-up">
+            <h3 className="text-3xl font-bold mb-2 tracking-tight text-[#222]">Encontre sua propriedade ideal</h3>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
+              Explore nossa seleção exclusiva através do estilo de vida que você procura.<br/>De coberturas urbanas a retiros no campo.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-center items-center">
             {[
-              { id: 'casa', title: 'Casas & Mansões', subtitle: 'Conforto e privacidade', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-              { id: 'cobertura', title: 'Coberturas', subtitle: 'Vistas espetaculares', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-              { id: 'apartamento', title: 'Apartamentos', subtitle: 'Luxo urbano', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-              { id: 'fazenda', title: 'Fazendas & Haras', subtitle: 'Refúgios na natureza', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'casa', title: 'Casas & Mansões', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'cobertura', title: 'Coberturas', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'apartamento', title: 'Apartamentos', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+              { id: 'fazenda', title: 'Fazendas & Haras', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
             ].map((cat) => (
               <div 
                 key={cat.id}
@@ -328,17 +319,16 @@ export default function PublicSite() {
                   setTypeFilter(cat.id);
                   document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                className="group relative h-80 rounded-2xl overflow-hidden cursor-pointer shadow-lg"
+                className="group relative h-48 md:h-56 rounded-xl overflow-hidden cursor-pointer shadow-sm mx-auto w-full max-w-[260px]"
               >
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors duration-500 z-10" />
+                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-500 z-10" />
                 <img 
                   src={cat.image} 
                   alt={cat.title} 
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
-                <div className="absolute inset-0 z-20 p-6 flex flex-col justify-end text-white">
-                  <h4 className="text-2xl font-bold mb-1 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">{cat.title}</h4>
-                  <p className="text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">{cat.subtitle}</p>
+                <div className="absolute inset-0 z-20 p-4 flex flex-col justify-end text-white text-center">
+                  <h4 className="text-lg font-bold drop-shadow-md">{cat.title}</h4>
                 </div>
               </div>
             ))}
@@ -346,46 +336,104 @@ export default function PublicSite() {
         </div>
       </section>
 
-      {/* Properties */}
-      <section id="imoveis-list" className="py-20 scroll-mt-20">
-        <div className="container mx-auto px-4">
+      {/* Properties Sections */}
+      <section id="imoveis-list" className="py-12 bg-gray-50 scroll-mt-20">
+        <div className="container mx-auto px-4 max-w-6xl">
           {loadingProperties ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-96 rounded-2xl" />)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{[1,2,3,4].map(i => <Skeleton key={i} className="h-80 rounded-xl" />)}</div>
           ) : filteredProperties.length === 0 ? (
-            <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed">
-              <h4 className="text-2xl font-bold mb-2">Nenhum imóvel encontrado</h4>
+            <div className="text-center py-20 bg-white rounded-2xl border border-dashed">
+              <h4 className="text-xl font-bold mb-2">Nenhum imóvel encontrado</h4>
               <p className="text-muted-foreground mb-6">Tente ajustar os filtros de busca para encontrar o que procura.</p>
               <Button onClick={() => { setSearch(''); setTypeFilter('all'); setTransactionFilter('all'); }} variant="outline">Limpar Filtros</Button>
             </div>
+          ) : search !== '' || typeFilter !== 'all' || transactionFilter !== 'all' ? (
+            <div>
+              <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-200">
+                <h3 className="text-2xl font-bold text-[#7a1212]">
+                  {filteredProperties.length} Imóveis encontrados
+                </h3>
+                <Button onClick={() => { setSearch(''); setTypeFilter('all'); setTransactionFilter('all'); }} variant="outline" className="text-xs font-medium bg-white" size="sm">Limpar Filtros</Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProperties.map(p => <PropertyCard key={p.id} property={p} />)}
+              </div>
+            </div>
           ) : (
-            <>
-              {featuredProperties.length > 0 && search === '' && typeFilter === 'all' && transactionFilter === 'all' && (
-                <div className="mb-16">
-                  <div className="flex items-end justify-between mb-8">
-                    <div>
-                      <h3 className="text-3xl font-extrabold tracking-tight mb-2">Imóveis em Destaque</h3>
-                      <p className="text-muted-foreground">As propriedades mais exclusivas do nosso portfólio.</p>
-                    </div>
+            <div className="space-y-16">
+              
+              {/* Properties for Sale */}
+              {filteredProperties.some(p => p.transaction_type === 'venda' || p.transaction_type === 'venda_aluguel') && (
+                <div>
+                  <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-200">
+                    <h3 className="text-2xl font-bold text-[#7a1212]">Imóveis para comprar</h3>
+                    <Button onClick={() => { setTransactionFilter('venda'); document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} variant="outline" className="text-xs font-medium bg-white" size="sm">Ver todos</Button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{featuredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredProperties.filter(p => p.transaction_type === 'venda' || p.transaction_type === 'venda_aluguel').slice(0, 4).map(p => <PropertyCard key={p.id} property={p} />)}
+                  </div>
+                </div>
+              )}
+
+              {/* Properties for Rent */}
+              {filteredProperties.some(p => p.transaction_type === 'aluguel' || p.transaction_type === 'venda_aluguel') && (
+                <div>
+                  <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-200">
+                    <h3 className="text-2xl font-bold text-[#7a1212]">Imóveis para alugar</h3>
+                    <Button onClick={() => { setTransactionFilter('aluguel'); document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} variant="outline" className="text-xs font-medium bg-white" size="sm">Ver todos</Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredProperties.filter(p => p.transaction_type === 'aluguel' || p.transaction_type === 'venda_aluguel').slice(0, 4).map(p => <PropertyCard key={p.id} property={p} />)}
+                  </div>
+                </div>
+              )}
+
+              {/* Properties for Vacation (Temporada) */}
+              {filteredProperties.some(p => p.transaction_type === 'temporada') && (
+                <div>
+                  <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-200">
+                    <h3 className="text-2xl font-bold text-[#7a1212]">Imóveis para temporada</h3>
+                    <Button onClick={() => { setTransactionFilter('temporada'); document.getElementById('imoveis-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} variant="outline" className="text-xs font-medium bg-white" size="sm">Ver todos</Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredProperties.filter(p => p.transaction_type === 'temporada').slice(0, 4).map(p => <PropertyCard key={p.id} property={p} />)}
+                  </div>
                 </div>
               )}
               
-              {(search !== '' || typeFilter !== 'all' || transactionFilter !== 'all') && (
-                <div>
-                  <div className="flex items-end justify-between mb-8 pb-4 border-b">
-                    <h3 className="text-2xl font-bold tracking-tight">{filteredProperties.length} imóveis encontrados</h3>
-                    {typeFilter !== 'all' && (
-                      <Badge variant="outline" className="text-sm px-3 py-1 cursor-pointer hover:bg-muted" onClick={() => setTypeFilter('all')}>
-                        Filtro: {typeLabels[typeFilter]} ✕
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{filteredProperties.map(p => <PropertyCard key={p.id} property={p} />)}</div>
-                </div>
-              )}
-            </>
+            </div>
           )}
+        </div>
+      </section>
+
+      {/* Map Location Section */}
+      <section className="relative h-[400px] w-full bg-slate-200 overflow-hidden flex items-center justify-center border-t border-[#7a1212] border-b-4">
+        <div className="absolute inset-0 bg-slate-300 mix-blend-multiply"></div>
+        <div className="absolute inset-0">
+          <iframe
+            src={`https://www.google.com/maps?q=${encodeURIComponent('Angra dos Reis - RJ')}&output=embed`}
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            allowFullScreen={false}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="opacity-70"
+          ></iframe>
+        </div>
+        <div className="relative z-10 bg-white shadow-2xl rounded-lg p-8 max-w-sm text-center">
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-[#7a1212] rounded-full flex items-center justify-center border-4 border-white">
+            <MapPin className="text-white w-5 h-5" />
+          </div>
+          <h4 className="text-[#7a1212] font-bold text-lg mt-2 mb-1">{settings?.site_name || 'Canaã Imóveis de Luxo'}</h4>
+          <p className="text-sm text-gray-600 mb-4 px-4">
+            {settings?.address || 'da Conceição, 226, Centro\nSala 201\nAngra dos Reis - Rio de Janeiro'}
+          </p>
+          <div className="border-t pt-4 text-xs text-gray-500 font-medium space-y-1">
+            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> {settings?.phone || '(24) 99993-9995'}</p>
+            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> (24) 99995-9992</p>
+            <p className="flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> (24) 99994-9992</p>
+          </div>
         </div>
       </section>
 

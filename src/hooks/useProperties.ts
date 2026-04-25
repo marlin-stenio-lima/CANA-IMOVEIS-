@@ -61,6 +61,7 @@ export interface Property {
   owner_name?: string | null;
   owner_phone?: string | null;
   owner_email?: string | null;
+  video_url?: string | null;
   images?: PropertyImage[];
 }
 
@@ -102,6 +103,7 @@ export interface PropertyFormData {
   owner_name?: string;
   owner_phone?: string;
   owner_email?: string;
+  video_url?: string;
 }
 
 export function useProperties() {
@@ -140,13 +142,17 @@ export function useProperties() {
     mutationFn: async (data: PropertyFormData) => {
       if (!profile?.company_id) throw new Error('Company ID not found');
 
+      const { video_url, ...restData } = data;
+      const insertData = {
+        ...restData,
+        custom_fields: { video_url },
+        company_id: profile.company_id,
+        created_by: profile.id,
+      };
+
       const { data: property, error } = await supabase
         .from('properties')
-        .insert({
-          ...data,
-          company_id: profile.company_id,
-          created_by: profile.id,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -164,9 +170,26 @@ export function useProperties() {
 
   const updatePropertyMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<PropertyFormData> }) => {
+      const { video_url, ...restData } = data;
+      
+      // Get existing custom_fields to not overwrite others
+      const { data: existingProp } = await supabase
+        .from('properties')
+        .select('custom_fields')
+        .eq('id', id)
+        .single();
+        
+      const existingCustomFields = existingProp?.custom_fields || {};
+      const newCustomFields = video_url !== undefined ? { ...existingCustomFields, video_url } : existingCustomFields;
+
+      const updateData = {
+        ...restData,
+        ...(video_url !== undefined && { custom_fields: newCustomFields }),
+      };
+
       const { data: property, error } = await supabase
         .from('properties')
-        .update(data)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();

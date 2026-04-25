@@ -117,7 +117,7 @@ export default function PublicProperty() {
             <ArrowLeft className="h-4 w-4" />
             Voltar para {settings?.site_name}
           </Link>
-          <h1 className="text-xl font-bold tracking-tight hidden sm:block" style={{ color: settings?.primary_color }}>{settings?.site_name}</h1>
+          <h1 className="text-xl font-bold tracking-tight hidden sm:block" style={{ color: '#7a1212' }}>{settings?.site_name}</h1>
           <div className="w-20" />
         </div>
       </header>
@@ -141,11 +141,10 @@ export default function PublicProperty() {
                     </div>
                   </>
                 ) : (
-                  <img 
-                    src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200" 
-                    alt="Sem foto" 
-                    className="w-full h-full object-cover opacity-50 grayscale" 
-                  />
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50 dark:bg-slate-800">
+                    <Home className="w-20 h-20 mb-4 opacity-20" />
+                    <span className="text-sm font-semibold uppercase tracking-widest opacity-40">Sem foto</span>
+                  </div>
                 )}
               </div>
               
@@ -169,96 +168,137 @@ export default function PublicProperty() {
               )}
             </div>
 
-            {/* Badges */}
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="text-sm">
-                <Home className="h-3 w-3 mr-1" />
-                {propertyTypeLabels[property.property_type] || property.property_type}
-              </Badge>
-              <Badge style={{ backgroundColor: settings?.primary_color }} className="text-white text-sm">
-                {transactionTypeLabels[property.transaction_type] || property.transaction_type}
-              </Badge>
-            </div>
-
             {/* Details */}
             <div>
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h1 className="text-2xl font-bold">{property.title}</h1>
+              <div className="mb-6">
+                <h1 className="text-3xl font-bold text-[#7a1212] leading-tight mb-2">{property.title}</h1>
+                <p className="text-sm text-gray-500 font-medium">
+                  {property.address ? `${property.address}, ` : ''}{property.neighborhood}, {property.city} - {property.state}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-12 mb-8">
+                {property.transaction_type === 'venda' || property.transaction_type === 'venda_aluguel' || property.price > 0 ? (
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Comprar</p>
+                    <p className="text-2xl font-black text-gray-900">{formatPrice(property.price)}</p>
+                  </div>
+                ) : null}
+                {property.transaction_type === 'aluguel' || property.transaction_type === 'venda_aluguel' || property.rent_price ? (
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Alugar / Temporada</p>
+                    <p className="text-2xl font-black text-gray-900">{formatPrice(property.rent_price || property.price)}<span className="text-sm font-normal text-gray-500">/{property.transaction_type === 'temporada' ? 'dia' : 'mês'}</span></p>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Property Specs Card */}
+              <div className="border border-gray-200 rounded-xl p-6 flex flex-wrap justify-between items-center bg-white shadow-sm mb-10 gap-4">
+                {property.area_total! > 0 && (
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <Maximize2 className="h-6 w-6 text-[#7a1212] mb-2" />
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Área total</span>
+                    <span className="font-bold text-sm text-gray-800">{property.area_total} m²</span>
+                  </div>
+                )}
+                {property.area_built! > 0 && (
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <Home className="h-6 w-6 text-[#7a1212] mb-2" />
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Área útil</span>
+                    <span className="font-bold text-sm text-gray-800">{property.area_built} m²</span>
+                  </div>
+                )}
+                {property.bedrooms! > 0 && (
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <Bed className="h-6 w-6 text-[#7a1212] mb-2" />
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Quartos</span>
+                    <span className="font-bold text-sm text-gray-800">{property.bedrooms}</span>
+                  </div>
+                )}
+                {property.bathrooms! > 0 && (
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <Bath className="h-6 w-6 text-[#7a1212] mb-2" />
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Banheiros</span>
+                    <span className="font-bold text-sm text-gray-800">{property.bathrooms}</span>
+                  </div>
+                )}
+                {property.parking_spots! > 0 && (
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <Car className="h-6 w-6 text-[#7a1212] mb-2" />
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Vagas</span>
+                    <span className="font-bold text-sm text-gray-800">{property.parking_spots}</span>
+                  </div>
+                )}
+              </div>
+
+              {(() => {
+                const cleanDesc = property.description?.replace(/Ref:.*?Proprietário:.*?Telefone:[^\n]*(\n|$)/gi, '')?.trim();
+                if (!cleanDesc) return null;
+                return (
+                  <div className="py-6 border-b border-gray-100">
+                    <h3 className="font-bold mb-4 text-lg text-gray-900">Descrição</h3>
+                    <p className="text-gray-600 whitespace-pre-line leading-relaxed text-sm">{cleanDesc}</p>
+                  </div>
+                );
+              })()}
+
+              {property.features && property.features.length > 0 && (
+                <div className="py-8 border-b border-gray-100">
+                  <h3 className="font-bold mb-6 text-lg text-gray-900">Comodidades do imóvel</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-2">
+                    {property.features.map(f => (
+                      <div key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                        <Check className="h-4 w-4 text-[#7a1212]" />
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* YouTube Video Section */}
+              {(property as any).custom_fields?.video_url && (
+                <div className="py-6 border-t">
+                  <h3 className="font-semibold mb-4 text-lg">Vídeo do Imóvel</h3>
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-slate-100 shadow-md">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      src={(() => {
+                        const url = (property as any).custom_fields?.video_url;
+                        const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+                        const videoId = match && match[2].length === 11 ? match[2] : null;
+                        return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+                      })()}
+                      title="YouTube video player"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
+                  </div>
+                </div>
+              )}
+
+              {/* Location Map Section */}
+              {property.city && property.state && (
+                <div className="py-6 border-t">
+                  <h3 className="font-semibold mb-4 text-lg">Localização</h3>
+                  <div className="aspect-[21/9] md:aspect-[21/7] rounded-2xl overflow-hidden bg-slate-100 shadow-md">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      style={{ border: 0 }}
+                      src={`https://www.google.com/maps?q=${encodeURIComponent([property.address, property.neighborhood, property.city, property.state].filter(Boolean).join(', '))}&output=embed`}
+                      allowFullScreen
+                    ></iframe>
+                  </div>
                   {property.neighborhood && (
-                    <p className="text-muted-foreground flex items-center gap-1 mt-1">
+                    <p className="text-sm text-muted-foreground mt-3 flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
                       {property.address ? `${property.address}, ` : ''}{property.neighborhood}, {property.city} - {property.state}
                     </p>
                   )}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-3xl font-bold" style={{ color: settings?.primary_color }}>{formatPrice(property.price)}</p>
-                  {property.transaction_type === 'aluguel' && <p className="text-sm text-muted-foreground">por mês</p>}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-6 py-4 border-y">
-                {property.bedrooms! > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Bed className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold">{property.bedrooms}</p>
-                      <p className="text-xs text-muted-foreground">Quartos</p>
-                    </div>
-                  </div>
-                )}
-                {property.bathrooms! > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Bath className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold">{property.bathrooms}</p>
-                      <p className="text-xs text-muted-foreground">Banheiros</p>
-                    </div>
-                  </div>
-                )}
-                {property.parking_spots! > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Car className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold">{property.parking_spots}</p>
-                      <p className="text-xs text-muted-foreground">Vagas</p>
-                    </div>
-                  </div>
-                )}
-                {property.area_total! > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Maximize2 className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold">{property.area_total}m²</p>
-                      <p className="text-xs text-muted-foreground">Área Total</p>
-                    </div>
-                  </div>
-                )}
-                {property.area_built! > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Ruler className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-semibold">{property.area_built}m²</p>
-                      <p className="text-xs text-muted-foreground">Área Construída</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {property.description && (
-                <div className="py-4">
-                  <h3 className="font-semibold mb-2">Descrição</h3>
-                  <p className="text-muted-foreground whitespace-pre-line">{property.description}</p>
-                </div>
-              )}
-
-              {property.features && property.features.length > 0 && (
-                <div className="py-4">
-                  <h3 className="font-semibold mb-2">Características</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {property.features.map(f => <Badge key={f} variant="secondary">{f}</Badge>)}
-                  </div>
                 </div>
               )}
             </div>
@@ -266,41 +306,53 @@ export default function PublicProperty() {
 
           {/* Contact Form */}
           <div>
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle className="text-lg">Tenho interesse!</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Card className="sticky top-24 border border-gray-200 shadow-xl rounded-xl p-2 bg-white">
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-gray-700 text-sm mb-4">Entrar em contato</h3>
                 {submitted ? (
                   <div className="text-center py-6">
                     <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                       <Check className="h-6 w-6 text-green-600" />
                     </div>
-                    <p className="font-semibold">Mensagem enviada!</p>
-                    <p className="text-sm text-muted-foreground mt-1">Entraremos em contato em breve.</p>
+                    <p className="font-semibold text-gray-800">Mensagem enviada!</p>
+                    <p className="text-sm text-gray-500 mt-1">Entraremos em contato em breve.</p>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    <Input placeholder="Seu nome *" required value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))} />
-                    <Input type="email" placeholder="Seu email *" required value={formData.email} onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))} />
-                    <Input placeholder="Seu telefone *" required value={formData.phone} onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value }))} />
-                    <Textarea placeholder="Mensagem (opcional)" value={formData.message} onChange={(e) => setFormData(p => ({ ...p, message: e.target.value }))} />
-                    <Button type="submit" className="w-full" disabled={submitting} style={{ backgroundColor: settings?.primary_color }}>
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar Mensagem'}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1 block">Nome*</label>
+                        <Input placeholder="Digite seu nome" required value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))} className="bg-white border-gray-300 shadow-none text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1 block">Telefone*</label>
+                        <Input placeholder="Seu telefone" required value={formData.phone} onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value }))} className="bg-white border-gray-300 shadow-none text-sm" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 mb-1 block">E-mail*</label>
+                      <Input type="email" placeholder="Digite seu e-mail" required value={formData.email} onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))} className="bg-white border-gray-300 shadow-none text-sm" />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 mb-1 block">Mensagem</label>
+                      <Textarea 
+                        value={formData.message || `Olá, vi o anúncio do imóvel ${property.title} no site ${settings?.site_name || 'Canaã Imóveis'} e gostaria de mais informações. Aguardo seu contato.`} 
+                        onChange={(e) => setFormData(p => ({ ...p, message: e.target.value }))} 
+                        className="bg-gray-50/50 border-gray-300 shadow-none text-xs min-h-[100px] resize-none"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full h-12 rounded-lg font-bold text-sm bg-[#7a1212] hover:bg-[#5a0d0d] text-white transition-colors" disabled={submitting}>
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar'}
                     </Button>
                   </form>
                 )}
 
                 {settings?.whatsapp && (
-                  <Button variant="outline" className="w-full mt-4" asChild>
+                  <Button variant="outline" className="w-full h-12 mt-3 rounded-lg font-bold text-sm bg-[#25D366] hover:bg-[#1EBE5D] text-white border-none transition-colors shadow-sm flex items-center justify-center gap-2" asChild>
                     <a href={`https://wa.me/${settings.whatsapp}?text=Olá! Tenho interesse no imóvel: ${property.title}`} target="_blank">
-                      <MessageCircle className="h-4 w-4 mr-2" />Chamar no WhatsApp
+                      <MessageCircle className="h-5 w-5" />Whatsapp
                     </a>
-                  </Button>
-                )}
-                {settings?.phone && (
-                  <Button variant="outline" className="w-full mt-2" asChild>
-                    <a href={`tel:${settings.phone}`}><Phone className="h-4 w-4 mr-2" />Ligar: {settings.phone}</a>
                   </Button>
                 )}
               </CardContent>
@@ -316,11 +368,18 @@ export default function PublicProperty() {
               {similarProperties.map(p => (
                 <Link to={`/${slug}/imovel/${p.id}`} key={p.id} className="group block">
                   <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 mb-4 relative shadow-sm">
-                    <img 
-                      src={p.images?.find(i => i.is_cover)?.url || p.images?.[0]?.url || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800"} 
-                      className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out ${!(p.images?.length) ? 'opacity-50 grayscale' : ''}`}
-                      alt={p.title}
-                    />
+                    {p.images?.find(i => i.is_cover)?.url || p.images?.[0]?.url ? (
+                      <img 
+                        src={p.images?.find(i => i.is_cover)?.url || p.images?.[0]?.url} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                        alt={p.title}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center text-slate-300">
+                        <Home className="w-10 h-10 mb-2 opacity-20" />
+                        <span className="text-[10px] font-semibold uppercase tracking-widest opacity-40">Sem foto</span>
+                      </div>
+                    )}
                     <div className="absolute top-3 left-3 flex gap-2 z-10">
                       <Badge variant="secondary" className="bg-white/90 text-black border-none shadow-sm text-[10px] px-2 py-0.5">
                         {propertyTypeLabels[p.property_type] || p.property_type}
@@ -334,7 +393,7 @@ export default function PublicProperty() {
                       {p.neighborhood}, {p.city}
                     </p>
                   )}
-                  <p className="font-bold text-lg" style={{ color: settings?.primary_color }}>{formatPrice(p.price)}</p>
+                  <p className="font-bold text-lg" style={{ color: '#7a1212' }}>{formatPrice(p.price)}</p>
                 </Link>
               ))}
             </div>

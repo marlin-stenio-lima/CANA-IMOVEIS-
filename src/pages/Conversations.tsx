@@ -36,9 +36,10 @@ import {
 } from "lucide-react";
 
 import ContactDetailsModal from "@/components/contacts/ContactDetailsModal";
-import { useCrmMode } from "@/contexts/CrmModeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePipelines } from "@/hooks/usePipelines";
+import { usePipelineStages } from "@/hooks/usePipelineStages";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -341,9 +342,17 @@ function ConversationsContent() {
   const [isSending, setIsSending] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Kanban Placement State
+  const [kanbanModalOpen, setKanbanModalOpen] = useState(false);
+  const [kanbanPipelineId, setKanbanPipelineId] = useState("");
+  const [kanbanStageId, setKanbanStageId] = useState("");
+  const [kanbanDealTitle, setKanbanDealTitle] = useState("");
+  
+  const { pipelines } = usePipelines();
+  const { stages: kanbanStages } = usePipelineStages(kanbanPipelineId || null);
 
   // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -563,6 +572,15 @@ function ConversationsContent() {
     return () => { supabase.removeChannel(channel) };
   }, [selectedConversation]);
 
+  // Set default deal title when conversation selected
+  useEffect(() => {
+    if (selectedConversation) {
+      setKanbanDealTitle(`Negociação - ${selectedConversation.contact.name}`);
+      setKanbanPipelineId("");
+      setKanbanStageId("");
+    }
+  }, [selectedConversation]);
+
   // Handle Scroll
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
@@ -648,6 +666,27 @@ function ConversationsContent() {
     } catch (err: any) {
       console.error("Error deleting conversation:", err);
       toast.error("Erro ao excluir conversa: " + err.message);
+    }
+  };
+
+  const handleCreateKanbanDeal = async () => {
+    if (!selectedConversation || !kanbanPipelineId || !kanbanStageId || !profile?.company_id) return;
+    
+    try {
+      const { error } = await supabase.from('deals').insert({
+        title: kanbanDealTitle || `Negociação - ${selectedConversation.contact.name}`,
+        contact_id: selectedConversation.contact_id,
+        pipeline_id: kanbanPipelineId,
+        stage_id: kanbanStageId,
+        company_id: profile.company_id,
+        assigned_to: selectedConversation.contact.assigned_to || profile.id
+      });
+      
+      if (error) throw error;
+      toast.success("Lead enviado para o Kanban com sucesso!");
+      setKanbanModalOpen(false);
+    } catch (e: any) {
+      toast.error("Erro ao enviar para o Kanban: " + e.message);
     }
   };
 
@@ -1068,13 +1107,14 @@ function ConversationsContent() {
                       {getInitials(conv.contact.name)}
                     </AvatarFallback>
                   </Avatar>
-                  {/* Owner Indicator */}
-                  <div
-                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-600 border-2 border-white dark:border-[#111b21] flex items-center justify-center z-10 shadow-sm"
-                    title="Proprietário: Marlon Stenio"
-                  >
-                    <span className="text-[8px] font-bold text-white leading-none">MS</span>
-                  </div>
+                  </Avatar>
+                  {/* Lead Indicator (Shows only if status is lead) */}
+                  {conv.contact.status === 'lead' && (
+                    <div
+                      className="absolute -bottom-0 -right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white dark:border-[#111b21] flex items-center justify-center z-10 shadow-sm"
+                      title="Lead"
+                    />
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0 border-b dark:border-gray-800 pb-3 h-full justify-center flex flex-col">
@@ -1150,9 +1190,11 @@ function ConversationsContent() {
                   <span className="text-base sm:text-lg text-[#111b21] dark:text-[#e9edef] font-semibold tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {selectedConversation.contact.name}
                   </span>
-                  <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider h-5 px-1.5 shrink-0">
-                    Lead
-                  </Badge>
+                  {selectedConversation.contact.status === 'lead' && (
+                    <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider h-5 px-1.5 shrink-0">
+                      Lead
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 truncate">
                     <Globe className="w-3 h-3 shrink-0" />
@@ -1172,6 +1214,17 @@ function ConversationsContent() {
             </div>
 
             <div className="flex gap-1 sm:gap-4 text-[#54656f] dark:text-[#aebac1] items-center shrink-0">
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:flex gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
+                onClick={() => setKanbanModalOpen(true)}
+              >
+                <Kanban className="w-4 h-4" />
+                Criar Lead
+              </Button>
+
               <Search className="w-5 h-5 cursor-pointer" />
 
               {/* Delete SINGLE Conversation Button */}
@@ -1452,6 +1505,60 @@ function ConversationsContent() {
         open={detailsOpen} 
         onOpenChange={setDetailsOpen} 
       />
+
+      {/* Kanban Placement Modal */}
+      <Dialog open={kanbanModalOpen} onOpenChange={setKanbanModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Enviar para o Kanban</DialogTitle>
+            <DialogDescription>
+              Selecione o pipeline e a fase para criar um negócio para este lead.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Nome do Negócio</Label>
+              <Input 
+                value={kanbanDealTitle} 
+                onChange={(e) => setKanbanDealTitle(e.target.value)}
+                placeholder="Ex: Negociação - Nome do Lead" 
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Pipeline</Label>
+              <Select value={kanbanPipelineId} onValueChange={(v) => { setKanbanPipelineId(v); setKanbanStageId(""); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o pipeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines?.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Fase (Estágio)</Label>
+              <Select value={kanbanStageId} onValueChange={setKanbanStageId} disabled={!kanbanPipelineId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a fase" />
+                </SelectTrigger>
+                <SelectContent>
+                  {kanbanStages?.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKanbanModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateKanbanDeal} disabled={!kanbanPipelineId || !kanbanStageId}>
+              Criar no Kanban
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

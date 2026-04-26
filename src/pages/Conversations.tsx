@@ -364,6 +364,7 @@ function ConversationsContent() {
   // Agent Control State
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
   const [contactAgentSettings, setContactAgentSettings] = useState<{ id: string, ai_status: string, active_agent_id: number } | null>(null);
+  const [activeInstanceName, setActiveInstanceName] = useState<string | null>(null);
   const { mode } = useCrmMode();
   const { profile } = useAuth();
   const { isAdmin } = usePermissions();
@@ -415,15 +416,53 @@ function ConversationsContent() {
     }
   }, [isAdmin]);
 
-  // Load Conversations
+  // Load Conversations & Subscribe
   useEffect(() => {
     fetchConversations();
     const channel = supabase
       .channel('public:conversations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => fetchConversations())
       .subscribe();
-    return () => { supabase.removeChannel(channel) };
+      
+    const contactsChannel = supabase
+      .channel('public:contacts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => fetchConversations())
+      .subscribe();
+      
+    return () => { 
+      supabase.removeChannel(channel);
+      supabase.removeChannel(contactsChannel);
+    };
   }, [mode, profile?.id, isAdmin]);
+
+  // Keep selectedConversation in sync
+  useEffect(() => {
+    if (selectedConversation) {
+      const updated = conversations.find(c => c.id === selectedConversation.id);
+      if (updated && JSON.stringify(updated.contact) !== JSON.stringify(selectedConversation.contact)) {
+        setSelectedConversation(updated);
+      }
+    }
+  }, [conversations]);
+
+  // Resolve dynamic instance based on assignment
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    const fetchActiveInstance = async () => {
+      let finalInstanceName = selectedConversation.instance?.name || null;
+      if (selectedConversation.contact.assigned_to) {
+        const { data: memberLink } = await supabase.from('instance_members').select('instance_id').eq('team_member_id', selectedConversation.contact.assigned_to).maybeSingle();
+        if (memberLink?.instance_id) {
+          const { data: inst } = await supabase.from('instances').select('id, name').eq('id', memberLink.instance_id).maybeSingle();
+          if (inst) finalInstanceName = inst.name;
+        }
+      }
+      setActiveInstanceName(finalInstanceName);
+    };
+
+    fetchActiveInstance();
+  }, [selectedConversation?.contact?.assigned_to, selectedConversation?.instance?.name]);
 
   // Fetch Contact Agent Settings when conversation is selected
   useEffect(() => {
@@ -606,14 +645,13 @@ function ConversationsContent() {
         message_type: 'text'
       };
       setMessages(prev => [...prev, newMessage]);
-      setMessageInput("");
-
-      const instanceName = selectedConversation.instance?.name;
-
+      const instanceName = activeInstanceName;
       if (!instanceName) {
-        toast.error("Erro: Instância não encontrada para esta conversa.");
-        return;
+         toast.error("Erro: Instância de WhatsApp não encontrada");
+         return;
       }
+
+      setMessageInput("");
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-manager`, {
         method: 'POST',
@@ -626,7 +664,9 @@ function ConversationsContent() {
           action: 'send-text',
           instanceName: instanceName,
           number: selectedConversation.contact.phone,
-          text: textToSend
+          text: textToSend,
+          contactId: selectedConversation.contact.id,
+          conversationId: selectedConversation.id
         })
       });
 
@@ -638,12 +678,6 @@ function ConversationsContent() {
     } catch (e: any) {
       console.error(e);
       toast.error("Erro ao enviar: " + (e.message || "Desconhecido"));
-      // Remove optimistic message on error
-      // We need to capture the fakeId in scope. It's 'fakeId'.
-      // Wait, let's just refresh conversations or filter it out?
-      // Filtering out most robust:
-      // We can't easily access fakeId here inside catch if defined in try block? NO, var hoisting or let scope.
-      // Refactoring slightly to ensure access.
     } finally {
       setIsSending(false);
     }
@@ -698,13 +732,17 @@ function ConversationsContent() {
     const file = e.target.files?.[0];
     if (!file || !selectedConversation) return;
 
-    setIsUploading(true);
-    try {
-      const instanceName = selectedConversation.instance?.name;
-      if (!instanceName) throw new Error("No instance found");
+      setIsUploading(true);
 
+      const instanceName = activeInstanceName;
+      if (!instanceName) {
+        toast.error("Erro: Nenhuma instância encontrada.");
+        setIsUploading(false);
+        return;
+      }
+      
       const fileExt = file.name.split('.').pop();
-    const fileName = `${selectedConversation.instance_id}/outbound/${Date.now()}.${fileExt}`;
+      const fileName = `${selectedConversation.instance_id}/outbound/${Date.now()}.${fileExt}`;
 
       // --- THE UNBEATABLE FIX: Create a local BLOB URL for instant, perfect visibility ---
       const localBlobUrl = URL.createObjectURL(file);
@@ -759,7 +797,9 @@ function ConversationsContent() {
           mediaType: mediaType === 'document' ? 'document' : mediaType,
           mimetype: file.type,
           caption: "",
-          mediaUrl: manualPublicUrl
+          mediaUrl: manualPublicUrl,
+          contactId: selectedConversation.contact.id,
+          conversationId: selectedConversation.id
         })
       });
 
@@ -902,7 +942,9 @@ function ConversationsContent() {
           instanceName,
           number: selectedConversation.contact.phone,
           mediaUrl: publicUrl,
-          mimetype: 'audio/ogg' 
+          mimetype: 'audio/ogg',
+          contactId: selectedConversation.contact.id,
+          conversationId: selectedConversation.id
         })
       });
 

@@ -59,6 +59,9 @@ export default function PublicSite() {
   };
   
   const [activeIndex, setActiveIndex] = useState(0);
+  const [typedText, setTypedText] = useState("");
+  const fullText = "Sua nova história começa aqui.";
+  
   const carouselImages = [
     { url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
     { url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
@@ -70,6 +73,23 @@ export default function PublicSite() {
       setActiveIndex((prev) => (prev + 1) % carouselImages.length);
     }, 5000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let currentText = "";
+    let currentIndex = 0;
+    
+    const interval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        currentText += fullText[currentIndex];
+        setTypedText(currentText);
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 100); // Speed of typing
+
+    return () => clearInterval(interval);
   }, []);
 
   const filteredProperties = properties?.filter((p) => {
@@ -286,9 +306,10 @@ export default function PublicSite() {
 
         {/* Center Content */}
         <div className="container mx-auto px-4 relative z-20 text-center text-white">
-          <div className="space-y-4 max-w-5xl mx-auto animate-fade-in-up">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-2xl animate-fade-in-up mb-4" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
-              Sua nova história começa aqui.
+          <div className="space-y-4 max-w-5xl mx-auto">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-2xl mb-4 h-[60px] md:h-[72px] lg:h-[80px]" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
+              {typedText}
+              <span className="animate-pulse ml-1 border-r-4 border-white inline-block h-[0.8em] align-baseline"></span>
             </h2>
             
             {/* Pill Search Bar */}

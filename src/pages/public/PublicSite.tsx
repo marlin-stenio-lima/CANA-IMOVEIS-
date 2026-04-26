@@ -145,6 +145,7 @@ export default function PublicSite() {
                 src={cover.url} 
                 alt={property.title} 
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                loading="lazy"
               />
             ) : (
               <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center text-slate-300">
@@ -500,7 +501,7 @@ export default function PublicSite() {
       </section>
 
       {/* Map Location Section */}
-      <section className="relative h-[400px] w-full bg-slate-200 overflow-hidden flex items-center justify-center border-t border-[#7a1212] border-b-4">
+      <section className="relative min-h-[500px] py-16 w-full bg-slate-200 overflow-hidden flex items-center justify-center border-t border-[#7a1212] border-b-4">
         <div className="absolute inset-0 bg-slate-300 mix-blend-multiply"></div>
         <div className="absolute inset-0">
           <iframe
@@ -514,7 +515,7 @@ export default function PublicSite() {
             className="opacity-70"
           ></iframe>
         </div>
-        <div id="contact-form-section" className="relative z-10 bg-white shadow-2xl rounded-xl p-8 w-full max-w-[450px] text-left mx-4 my-8">
+        <div id="contact-form-section" className="relative z-10 bg-white shadow-2xl rounded-xl p-8 w-full max-w-[450px] text-left mx-4 my-16">
           <h3 className="font-bold text-[#333] text-lg mb-4">Entrar em contato</h3>
           
           {contactSubmitted ? (

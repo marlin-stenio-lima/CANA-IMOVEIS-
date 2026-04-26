@@ -374,7 +374,8 @@ function ConversationsContent() {
     corretorId: string | null;
     origem: string | null;
     imovelId: string | null;
-  }>({ corretorId: null, origem: null, imovelId: null });
+    statusKanban: string | null;
+  }>({ corretorId: null, origem: null, imovelId: null, statusKanban: null });
 
   const [filterOptions, setFilterOptions] = useState<{
     corretores: { id: string, name: string }[];
@@ -963,10 +964,27 @@ function ConversationsContent() {
                   variant="ghost" 
                   size="sm" 
                   className="h-8 px-2 text-xs text-muted-foreground"
-                  onClick={() => setActiveFilters({ corretorId: null, origem: null, imovelId: null })}
+                  onClick={() => setActiveFilters({ corretorId: null, origem: null, imovelId: null, statusKanban: null })}
                 >
                   Limpar
                 </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-2"><Kanban className="w-3 h-3"/> Status no Kanban</Label>
+                <Select 
+                  value={activeFilters.statusKanban || "all"} 
+                  onValueChange={(val) => setActiveFilters(prev => ({ ...prev, statusKanban: val === "all" ? null : val }))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos os contatos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os contatos</SelectItem>
+                    <SelectItem value="kanban">Apenas Leads (No Kanban)</SelectItem>
+                    <SelectItem value="no_kanban">Não estão no Kanban</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {isAdmin && (
@@ -1089,6 +1107,11 @@ function ConversationsContent() {
             }
             if (activeFilters.imovelId) {
               if (conv.contact.interest_property_id !== activeFilters.imovelId) matchesFilter = false;
+            }
+            if (activeFilters.statusKanban) {
+              const hasDeal = conv.contact.deals && conv.contact.deals.length > 0;
+              if (activeFilters.statusKanban === "kanban" && !hasDeal) matchesFilter = false;
+              if (activeFilters.statusKanban === "no_kanban" && hasDeal) matchesFilter = false;
             }
 
             return matchesSearch && matchesFilter;

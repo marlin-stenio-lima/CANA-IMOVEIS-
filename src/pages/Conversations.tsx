@@ -466,9 +466,9 @@ function ConversationsContent() {
   };
 
   const fetchConversations = async () => {
-    let selectQuery = '*, contact:contacts(*), instance:instances!inner(name, business_type)';
+    let selectQuery = '*, contact:contacts(*, deals(id)), instance:instances!inner(name, business_type)';
     if (!isAdmin && profile?.id) {
-       selectQuery = '*, contact:contacts!inner(*), instance:instances!inner(name, business_type)';
+       selectQuery = '*, contact:contacts!inner(*, deals(id)), instance:instances!inner(name, business_type)';
     }
 
     let query = (supabase as any)
@@ -576,7 +576,7 @@ function ConversationsContent() {
   // Set default deal title when conversation selected
   useEffect(() => {
     if (selectedConversation) {
-      setKanbanDealTitle(`Negociação - ${selectedConversation.contact.name}`);
+      setKanbanDealTitle(selectedConversation.contact.name || "");
       setKanbanPipelineId("");
       setKanbanStageId("");
     }
@@ -1108,11 +1108,11 @@ function ConversationsContent() {
                       {getInitials(conv.contact.name)}
                     </AvatarFallback>
                   </Avatar>
-                  {/* Lead Indicator (Shows only if status is lead) */}
-                  {conv.contact.status === 'lead' && (
+                  {/* Lead Indicator (Shows only if contact has deals in Kanban) */}
+                  {conv.contact.deals && conv.contact.deals.length > 0 && (
                     <div
                       className="absolute -bottom-0 -right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white dark:border-[#111b21] flex items-center justify-center z-10 shadow-sm"
-                      title="Lead"
+                      title="Lead no Kanban"
                     />
                   )}
                 </div>
@@ -1190,7 +1190,7 @@ function ConversationsContent() {
                   <span className="text-base sm:text-lg text-[#111b21] dark:text-[#e9edef] font-semibold tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {selectedConversation.contact.name}
                   </span>
-                  {selectedConversation.contact.status === 'lead' && (
+                  {selectedConversation.contact.deals && selectedConversation.contact.deals.length > 0 && (
                     <Badge variant="secondary" className="bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider h-5 px-1.5 shrink-0">
                       Lead
                     </Badge>
@@ -1521,7 +1521,7 @@ function ConversationsContent() {
               <Input 
                 value={kanbanDealTitle} 
                 onChange={(e) => setKanbanDealTitle(e.target.value)}
-                placeholder="Ex: Negociação - Nome do Lead" 
+                placeholder="Nome do Lead" 
               />
             </div>
             <div className="grid gap-2">

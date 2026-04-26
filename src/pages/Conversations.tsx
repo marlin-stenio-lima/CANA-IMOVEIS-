@@ -12,6 +12,8 @@ import {
   Search,
   Paperclip,
   CheckCheck,
+  Check,
+  Clock,
   ArrowLeft,
   Mic,
   Image as ImageIcon,
@@ -1507,7 +1509,10 @@ function ConversationsContent() {
                         </span>
                         {isUser && (
                           <span className={`${msg.status === 'read' ? 'text-[#53bdeb]' : (msg.message_type === 'image' || msg.message_type === 'video' ? 'text-white' : 'text-[#667781]')}`}>
-                            <CheckCheck className="w-3 h-3" />
+                            {msg.status === 'read' ? <CheckCheck className="w-3 h-3" /> :
+                             msg.status === 'delivered' ? <CheckCheck className="w-3 h-3" /> :
+                             msg.status === 'sent' ? <Check className="w-3 h-3" /> :
+                             <Clock className="w-3 h-3" />}
                           </span>
                         )}
                       </div>
@@ -1519,8 +1524,15 @@ function ConversationsContent() {
           </div>
 
           {/* Input Area (Sticky Footer) */}
-          <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-2 sm:px-4 py-2 gap-1.5 sm:gap-3 z-20 border-t border-[#d1d7db] dark:border-gray-700 shrink-0">
-            {/* Hidden Input for Files */}
+          <div className="flex flex-col border-t border-[#d1d7db] dark:border-gray-700 shrink-0">
+            {/* Instance Indicator Badge */}
+            <div className="px-4 py-1 bg-[#f0f2f5] dark:bg-[#202c33] flex justify-start items-center">
+              <span className="text-[10px] text-[#54656f] dark:text-[#aebac1] font-medium">
+                Enviando via WhatsApp: <strong className="text-emerald-600 dark:text-emerald-400">{activeInstanceName || selectedConversation.instance?.name || 'Desconhecida'}</strong>
+              </span>
+            </div>
+            <div className="min-h-[62px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center px-2 sm:px-4 pb-2 pt-1 gap-1.5 sm:gap-3 z-20">
+              {/* Hidden Input for Files */}
             <input
               type="file"
               ref={fileInputRef}

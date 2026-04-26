@@ -506,9 +506,9 @@ function ConversationsContent() {
   };
 
   const fetchConversations = async () => {
-    let selectQuery = '*, contact:contacts(*, deals(id)), instance:instances!inner(name, business_type)';
+    let selectQuery = '*, contact:contacts(*, deals(id, pipeline_id, stage_id, title)), instance:instances!inner(name, business_type)';
     if (!isAdmin && profile?.id) {
-       selectQuery = '*, contact:contacts!inner(*, deals(id)), instance:instances!inner(name, business_type)';
+       selectQuery = '*, contact:contacts!inner(*, deals(id, pipeline_id, stage_id, title)), instance:instances!inner(name, business_type)';
     }
 
     let query = (supabase as any)
@@ -616,9 +616,17 @@ function ConversationsContent() {
   // Set default deal title when conversation selected
   useEffect(() => {
     if (selectedConversation) {
-      setKanbanDealTitle(selectedConversation.contact.name || "");
-      setKanbanPipelineId("");
-      setKanbanStageId("");
+      const hasDeal = selectedConversation.contact?.deals && selectedConversation.contact.deals.length > 0;
+      if (hasDeal) {
+        const deal = selectedConversation.contact.deals[0];
+        setKanbanDealTitle(deal.title || selectedConversation.contact.name || "");
+        setKanbanPipelineId(deal.pipeline_id || "");
+        setKanbanStageId(deal.stage_id || "");
+      } else {
+        setKanbanDealTitle(selectedConversation.contact.name || "");
+        setKanbanPipelineId("");
+        setKanbanStageId("");
+      }
     }
   }, [selectedConversation]);
 
@@ -705,24 +713,44 @@ function ConversationsContent() {
     }
   };
 
-  const handleCreateKanbanDeal = async () => {
-    if (!selectedConversation || !kanbanPipelineId || !kanbanStageId || !profile?.company_id) return;
+  const handlePlaceInKanban = async () => {
+    if (!kanbanPipelineId || !kanbanStageId || !selectedConversation) {
+      toast.error("Selecione o pipeline e o estágio");
+      return;
+    }
     
     try {
-      const { error } = await supabase.from('deals').insert({
-        title: kanbanDealTitle || `Negociação - ${selectedConversation.contact.name}`,
-        contact_id: selectedConversation.contact_id,
-        pipeline_id: kanbanPipelineId,
-        stage_id: kanbanStageId,
-        company_id: profile.company_id,
-        assigned_to: selectedConversation.contact.assigned_to || profile.id
-      });
+      const hasDeal = selectedConversation.contact?.deals && selectedConversation.contact.deals.length > 0;
+      let error;
+
+      if (hasDeal) {
+        const dealId = selectedConversation.contact.deals[0].id;
+        const { error: updateError } = await supabase.from('deals').update({
+          title: kanbanDealTitle || `Negociação - ${selectedConversation.contact.name}`,
+          pipeline_id: kanbanPipelineId,
+          stage_id: kanbanStageId,
+          assigned_to: selectedConversation.contact.assigned_to || profile.id
+        }).eq('id', dealId);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase.from('deals').insert({
+          title: kanbanDealTitle || `Negociação - ${selectedConversation.contact.name}`,
+          contact_id: selectedConversation.contact_id,
+          pipeline_id: kanbanPipelineId,
+          stage_id: kanbanStageId,
+          company_id: profile.company_id,
+          assigned_to: selectedConversation.contact.assigned_to || profile.id
+        });
+        error = insertError;
+      }
       
       if (error) throw error;
-      toast.success("Lead enviado para o Kanban com sucesso!");
+      toast.success(hasDeal ? "Estágio alterado com sucesso!" : "Lead enviado para o Kanban com sucesso!");
       setKanbanModalOpen(false);
+      // Trigger a re-fetch to update deals state
+      fetchConversations();
     } catch (e: any) {
-      toast.error("Erro ao enviar para o Kanban: " + e.message);
+      toast.error("Erro ao enviar/alterar no Kanban: " + e.message);
     }
   };
 
@@ -732,14 +760,14 @@ function ConversationsContent() {
     const file = e.target.files?.[0];
     if (!file || !selectedConversation) return;
 
+    try {
       setIsUploading(true);
-
-      const instanceName = activeInstanceName;
-      if (!instanceName) {
-        toast.error("Erro: Nenhuma instância encontrada.");
-        setIsUploading(false);
-        return;
-      }
+        const instanceName = activeInstanceName;
+        if (!instanceName) {
+          toast.error("Erro: Nenhuma instância encontrada.");
+          setIsUploading(false);
+          return;
+        }
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedConversation.instance_id}/outbound/${Date.now()}.${fileExt}`;
@@ -1280,17 +1308,26 @@ function ConversationsContent() {
 
             <div className="flex gap-1 sm:gap-4 text-[#54656f] dark:text-[#aebac1] items-center shrink-0">
               
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-blue-900/50 dark:hover:bg-blue-900/20"
-                onClick={() => setKanbanModalOpen(true)}
-              >
-                <Kanban className="w-4 h-4" />
-                Criar Lead
-              </Button>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const hasDeal = selectedConversation.contact?.deals && selectedConversation.contact.deals.length > 0;
+                  return (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={`h-8 text-xs font-semibold ${hasDeal ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700' : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700'}`}
+                      onClick={() => setKanbanModalOpen(true)}
+                    >
+                      <Kanban className="w-3.5 h-3.5 mr-1.5" />
+                      {hasDeal ? 'Mudar Estágio' : 'Criar Lead'}
+                    </Button>
+                  );
+                })()}
 
-              <Search className="w-5 h-5 cursor-pointer" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-[#54656f] dark:text-[#aebac1]" title="Pesquisar">
+                  <Search className="w-5 h-5 cursor-pointer" />
+                </Button>
+              </div>
 
               {/* Delete SINGLE Conversation Button */}
               <AlertDialog>
@@ -1618,8 +1655,8 @@ function ConversationsContent() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setKanbanModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateKanbanDeal} disabled={!kanbanPipelineId || !kanbanStageId}>
-              Criar no Kanban
+            <Button onClick={handlePlaceInKanban} disabled={!kanbanPipelineId || !kanbanStageId}>
+              {selectedConversation?.contact?.deals && selectedConversation.contact.deals.length > 0 ? "Atualizar Kanban" : "Criar no Kanban"}
             </Button>
           </DialogFooter>
         </DialogContent>

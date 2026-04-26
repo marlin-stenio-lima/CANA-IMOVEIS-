@@ -453,8 +453,15 @@ function ConversationsContent() {
 
     const fetchActiveInstance = async () => {
       let finalInstanceName = selectedConversation.instance?.name || null;
-      if (selectedConversation.contact.assigned_to) {
-        const { data: memberLink } = await supabase.from('instance_members').select('instance_id').eq('team_member_id', selectedConversation.contact.assigned_to).maybeSingle();
+      if (selectedConversation.contact?.assigned_to) {
+        // assigned_to in contacts points to profiles.id (user_id).
+        // First find the team_members row for this profile
+        const { data: teamMember } = await supabase.from('team_members').select('id').eq('user_id', selectedConversation.contact.assigned_to).maybeSingle();
+        
+        // Then find the instance linked to this team member
+        const teamMemberId = teamMember?.id || selectedConversation.contact.assigned_to; // fallback
+        const { data: memberLink } = await supabase.from('instance_members').select('instance_id').eq('team_member_id', teamMemberId).maybeSingle();
+        
         if (memberLink?.instance_id) {
           const { data: inst } = await supabase.from('instances').select('id, name').eq('id', memberLink.instance_id).maybeSingle();
           if (inst) finalInstanceName = inst.name;

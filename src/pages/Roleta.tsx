@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useCrmMode } from "@/contexts/CrmModeContext";
+import { usePipelines } from "@/hooks/usePipelines";
+import { usePipelineStages } from "@/hooks/usePipelineStages";
 
 // Mock Data for "Visual" feel while DB is offline
 const MOCK_ROULETTES = [
@@ -37,7 +39,13 @@ export default function Roleta() {
     const [portalUrl, setPortalUrl] = useState("");
     const [priceMin, setPriceMin] = useState("");
     const [locationFilter, setLocationFilter] = useState("");
-    const [pipelineStage, setPipelineStage] = useState("novo_lead");
+    
+    // Pipiline & Stage
+    const { pipelines } = usePipelines();
+    const [triggerPipelineId, setTriggerPipelineId] = useState<string>("");
+    const { stages } = usePipelineStages(triggerPipelineId || null);
+    const [pipelineStage, setPipelineStage] = useState("");
+    
     const [notificationText, setNotificationText] = useState(defaultNotifText);
     const [triggerName, setTriggerName] = useState("");
     const [editingTriggerId, setEditingTriggerId] = useState<string | null>(null);
@@ -98,6 +106,7 @@ export default function Roleta() {
             source: triggerType,
             condition: triggerType === 'whatsapp' ? (matchText ? `Texto: ${matchText}` : 'Todos os leads (sem filtro)') : 'Formulário',
             rouletteId: selectedRoulette,
+            pipelineId: triggerPipelineId,
             pipelineStage,
             notificationText,
             active: true
@@ -119,6 +128,8 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
+        setTriggerPipelineId("");
+        setPipelineStage("");
         setNotificationText(defaultNotifText);
         setEditingTriggerId(null);
     };
@@ -128,6 +139,8 @@ export default function Roleta() {
         setMatchText("");
         setPortalUrl("");
         setSelectedRoulette("");
+        setTriggerPipelineId(pipelines?.[0]?.id || "");
+        setPipelineStage("");
         setNotificationText(defaultNotifText);
         setEditingTriggerId(null);
         setAutomationStep(1);
@@ -147,7 +160,8 @@ export default function Roleta() {
         }
 
         setSelectedRoulette(trigger.rouletteId || "");
-        setPipelineStage(trigger.pipelineStage || "novo_lead");
+        setTriggerPipelineId(trigger.pipelineId || pipelines?.[0]?.id || "");
+        setPipelineStage(trigger.pipelineStage || "");
         setNotificationText(trigger.notificationText || defaultNotifText);
         setEditingTriggerId(trigger.id);
         setAutomationStep(1);
@@ -485,18 +499,34 @@ export default function Roleta() {
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-2">
-                                        <div className="space-y-3">
-                                            <Select value={pipelineStage} onValueChange={setPipelineStage}>
-                                                <SelectTrigger className="bg-background"><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="novo_lead">Novo Lead</SelectItem>
-                                                    <SelectItem value="atendimento">Em Atendimento</SelectItem>
-                                                    <SelectItem value="visita">Visita Agendada</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Pipeline:</label>
+                                                    <Select value={triggerPipelineId} onValueChange={(v) => { setTriggerPipelineId(v); setPipelineStage(""); }}>
+                                                        <SelectTrigger className="bg-background"><SelectValue placeholder="Selecione o pipeline..." /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {pipelines?.map(p => (
+                                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Fase (Estágio):</label>
+                                                    <Select value={pipelineStage} onValueChange={setPipelineStage} disabled={!triggerPipelineId}>
+                                                        <SelectTrigger className="bg-background"><SelectValue placeholder="Selecione a fase..." /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {stages?.map(s => (
+                                                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-green-700 font-medium bg-green-100/50 p-3 rounded-lg">
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                O lead será movido a este estágio do bolsão instantaneamente.
+                                                O lead será movido a este estágio instantaneamente após a distribuição.
                                             </div>
                                         </div>
                                     </CardContent>

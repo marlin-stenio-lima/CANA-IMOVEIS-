@@ -148,10 +148,12 @@ export default function PublicSite() {
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center text-slate-300">
-                <Home className="w-12 h-12 mb-2 opacity-20" />
-                <span className="text-xs font-semibold uppercase tracking-widest opacity-40">Sem foto</span>
-              </div>
+              <img 
+                src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
+                alt="Imóvel sem foto" 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90" 
+                loading="lazy"
+              />
             )}
             
             {/* Status Badges Overlay */}

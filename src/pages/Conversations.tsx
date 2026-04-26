@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 import ContactDetailsModal from "@/components/contacts/ContactDetailsModal";
+import { useCrmMode } from "@/contexts/CrmModeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePipelines } from "@/hooks/usePipelines";

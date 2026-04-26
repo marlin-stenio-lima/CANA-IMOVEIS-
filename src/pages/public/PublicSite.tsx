@@ -219,7 +219,7 @@ export default function PublicSite() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background theme-canaa">
       {/* Header - Transparent overlay */}
       <header className="absolute top-0 left-0 right-0 z-50 bg-transparent text-white">
         <div className="container mx-auto px-4 py-6 flex justify-between items-center">

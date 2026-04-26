@@ -110,7 +110,7 @@ export default function PublicProperty() {
     .slice(0, 4) || [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background theme-canaa">
       <header className="border-b sticky top-0 bg-background z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link to={`/${slug}`} className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors">
@@ -141,10 +141,12 @@ export default function PublicProperty() {
                     </div>
                   </>
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50 dark:bg-slate-800">
-                    <Home className="w-20 h-20 mb-4 opacity-20" />
-                    <span className="text-sm font-semibold uppercase tracking-widest opacity-40">Sem foto</span>
-                  </div>
+                  <img 
+                    src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" 
+                    alt="Imóvel sem foto" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90" 
+                    loading="lazy"
+                  />
                 )}
               </div>
               

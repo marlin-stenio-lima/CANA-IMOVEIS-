@@ -282,7 +282,7 @@ export default function PublicSite() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative h-[95vh] min-h-[700px] flex flex-col items-center justify-center mb-32">
+      <section className="relative h-[95vh] min-h-[700px] flex flex-col items-center justify-center mb-12">
         {/* Carousel Background */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           {carouselImages.map((img, idx) => (

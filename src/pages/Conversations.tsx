@@ -1107,7 +1107,6 @@ function ConversationsContent() {
                       {getInitials(conv.contact.name)}
                     </AvatarFallback>
                   </Avatar>
-                  </Avatar>
                   {/* Lead Indicator (Shows only if status is lead) */}
                   {conv.contact.status === 'lead' && (
                     <div

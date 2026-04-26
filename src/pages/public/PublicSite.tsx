@@ -59,25 +59,11 @@ export default function PublicSite() {
   };
   
   const [activeIndex, setActiveIndex] = useState(0);
-  const dynamicCarouselImages = properties
-    ?.filter(p => p.images && p.images.length > 0)
-    .slice(0, 5)
-    .map(p => {
-      const cover = p.images.find((i: any) => i.is_cover) || p.images[0];
-      return {
-        url: cover.url,
-        title: p.title,
-        sub: `${p.neighborhood ? p.neighborhood + ', ' : ''}${p.city || ''}`
-      };
-    }) || [];
-
-  const defaultCarouselImages = [
-    { url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'Exclusividade e Sofisticação.', sub: 'Os melhores imóveis de luxo da região.' },
-    { url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'O seu novo estilo de vida.', sub: 'Conforto e segurança em cada detalhe.' },
-    { url: 'https://images.unsplash.com/photo-1628624747186-a941c476b7ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80', title: 'Sua Nova História Começa Aqui.', sub: 'Atendimento personalizado para sua conquista.' }
+  const carouselImages = [
+    { url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+    { url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' },
+    { url: 'https://images.unsplash.com/photo-1628624747186-a941c476b7ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80' }
   ];
-
-  const carouselImages = dynamicCarouselImages.length >= 3 ? dynamicCarouselImages : defaultCarouselImages;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -299,14 +285,11 @@ export default function PublicSite() {
         </div>
 
         {/* Center Content */}
-        <div className="container mx-auto px-4 relative z-20 text-center text-white mt-[-10vh]">
+        <div className="container mx-auto px-4 relative z-20 text-center text-white">
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in-up">
-            <h2 key={`title-${activeIndex}`} className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-2xl animate-fade-in-up" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
-              {carouselImages[activeIndex]?.title || 'Encontre o seu imóvel perfeito.'}
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-2xl animate-fade-in-up mb-4" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
+              Encontre o seu imóvel perfeito
             </h2>
-            <p key={`sub-${activeIndex}`} className="text-xl md:text-2xl font-medium drop-shadow-lg animate-fade-in-up" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)', animationDelay: '0.2s' }}>
-              {carouselImages[activeIndex]?.sub || 'Buscou, encontrou, se mudou. Sem burocracias.'}
-            </p>
             
             {/* Pill Search Bar */}
             <div className="mt-10 bg-white/95 backdrop-blur-md rounded-xl md:rounded-full p-2 flex flex-col md:flex-row items-center shadow-2xl mx-auto max-w-5xl text-black">

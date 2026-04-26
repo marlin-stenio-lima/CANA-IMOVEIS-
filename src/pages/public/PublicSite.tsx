@@ -288,7 +288,7 @@ export default function PublicSite() {
         <div className="container mx-auto px-4 relative z-20 text-center text-white">
           <div className="space-y-4 max-w-5xl mx-auto animate-fade-in-up">
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-2xl animate-fade-in-up mb-4" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
-              Encontre o seu imóvel perfeito
+              Sua nova história começa aqui.
             </h2>
             
             {/* Pill Search Bar */}

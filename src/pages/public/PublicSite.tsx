@@ -562,7 +562,7 @@ export default function PublicSite() {
       {/* Footer */}
       <footer id="footer" className="bg-slate-900 text-slate-300 py-16">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
             <div className="space-y-4">
               <h4 className="text-white text-xl font-bold">{settings.site_name}</h4>
               <p className="text-sm leading-relaxed opacity-70">
@@ -582,15 +582,6 @@ export default function PublicSite() {
                 <li><button className="hover:text-white transition-colors">Alugar</button></li>
                 <li><button className="hover:text-white transition-colors">Temporada</button></li>
                 <li><button className="hover:text-white transition-colors">Lançamentos</button></li>
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-white font-bold uppercase tracking-widest text-xs">Contato</h4>
-              <ul className="space-y-3 text-sm">
-                {settings.address && <li className="flex gap-2"><MapPin className="h-4 w-4 shrink-0 text-primary" /> {settings.address}</li>}
-                {settings.phone && <li className="flex gap-2"><Phone className="h-4 w-4 shrink-0 text-primary" /> {settings.phone}</li>}
-                {settings.email && <li className="flex gap-2"><Mail className="h-4 w-4 shrink-0 text-primary" /> {settings.email}</li>}
               </ul>
             </div>
           </div>

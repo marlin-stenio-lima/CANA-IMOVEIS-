@@ -94,17 +94,16 @@ Deno.serve(async (req) => {
         }
 
         // --- INTERCEPT COMMANDS FROM BROKERS ---
-        // --- INTERCEPT COMMANDS FROM BROKERS ---
-        const { data: profiles } = await supabase.from('profiles').select('id, role, phone').eq('company_id', instanceData.company_id);
-        const brokerData = profiles?.find(p => {
+        const last8Sender = senderNumber.slice(-8);
+        const { data: possibleProfiles } = await supabase.from('profiles').select('id, role, phone, company_id').eq('company_id', instanceData.company_id);
+        
+        const brokerDataMatch = possibleProfiles?.find(p => {
             if (!p.phone) return false;
             const cleanPhone = p.phone.replace(/\D/g, '');
-            // Verifica se o senderNumber (ex: 5521999999999) termina com o numero limpo do corretor (ex: 21999999999)
-            // ou vice-versa, para evitar problemas com ou sem o "55"
-            return senderNumber.endsWith(cleanPhone) || cleanPhone.endsWith(senderNumber);
+            return cleanPhone.slice(-8) === last8Sender;
         });
 
-        if (brokerData && !fromMe) {
+        if (brokerDataMatch && !fromMe) {
             console.log("Broker message intercepted. Routing to AI Command Center...");
             
             let cmdContent = messageData.conversation || messageData.extendedTextMessage?.text || "";
@@ -112,6 +111,20 @@ Deno.serve(async (req) => {
                  const media = messageData.imageMessage || messageData.audioMessage || messageData.videoMessage || messageData.documentMessage;
                  cmdContent = media?.caption || "[Mídia recebida]";
             }
+            
+            // Insert initial log
+            const resolvedCompanyId = instanceData.company_id || brokerDataMatch.company_id;
+            let logId = null;
+            try {
+                const { data: logData } = await supabase.from('ai_logs').insert({
+                    company_id: resolvedCompanyId,
+                    broker_id: brokerDataMatch.id,
+                    command: cmdContent,
+                    status: 'intercepted',
+                    response: 'Aguardando processamento da IA...'
+                }).select('id').maybeSingle();
+                if (logData) logId = logData.id;
+            } catch(e) {}
 
             try {
                 const functionUrl = `${supabaseUrl}/functions/v1/ai-command-center`;
@@ -124,9 +137,10 @@ Deno.serve(async (req) => {
                     body: JSON.stringify({
                         message: cmdContent,
                         broker_phone: senderNumber,
-                        broker_id: brokerData.id,
-                        company_id: instanceData.company_id,
-                        instance_name: instance
+                        broker_id: brokerDataMatch.id,
+                        company_id: resolvedCompanyId,
+                        instance_name: instance,
+                        log_id: logId // pass logId so AI can update it
                     })
                 }).catch(e => console.error("Error triggering AI Command Center:", e));
             } catch(e) {

@@ -12,6 +12,7 @@ interface CommandPayload {
   broker_id: string; // From our validation
   company_id: string; // From our validation
   instance_name: string; // To reply back via Evolution
+  log_id?: string;
 }
 
 Deno.serve(async (req) => {
@@ -19,6 +20,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  let payload: CommandPayload | null = null;
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -27,12 +29,12 @@ Deno.serve(async (req) => {
     const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')!
 
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const payload: CommandPayload = await req.json()
-    console.log(`[AI Command Center] Recebeu comando de ${payload.broker_phone}:`, payload.message)
+    payload = await req.json()
+    console.log(`[AI Command Center] Recebeu comando de ${payload?.broker_phone}:`, payload?.message)
 
     // Busca a chave da OpenAI nas configurações do CRM (tabela companies)
     let openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) {
+    if (!openAiKey && payload) {
         const { data: companyData } = await supabase.from('companies').select('openai_api_key').eq('id', payload.company_id).maybeSingle();
         if (companyData && companyData.openai_api_key) {
             openAiKey = companyData.openai_api_key;
@@ -49,7 +51,7 @@ Deno.serve(async (req) => {
     const { data: broker } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .eq('id', payload.broker_id)
+      .eq('id', payload!.broker_id)
       .single()
 
     if (!broker) {
@@ -100,7 +102,7 @@ Deno.serve(async (req) => {
       model: 'gpt-4o-mini', // Mais rápido e barato para comandos
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: payload.message }
+        { role: 'user', content: payload!.message }
       ],
       tools: tools as any,
       tool_choice: 'auto'
@@ -143,7 +145,7 @@ Deno.serve(async (req) => {
 
     // 6. Enviar a resposta de volta para o Corretor via WhatsApp (Evolution)
     if (finalReply) {
-      const sendUrl = `${evolutionUrl}/message/sendText/${payload.instance_name}`
+      const sendUrl = `${evolutionUrl}/message/sendText/${payload!.instance_name}`
       await fetch(sendUrl, {
         method: 'POST',
         headers: {
@@ -151,17 +153,34 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          number: payload.broker_phone, // Envia de volta para o número que enviou a ordem
+          number: payload!.broker_phone, // Envia de volta para o número que enviou a ordem
           options: { delay: 1000, presence: 'composing' },
           textMessage: { text: finalReply }
         })
       })
     }
 
+    // 7. Atualiza o Log
+    if (payload!.log_id) {
+        await supabase.from('ai_logs').update({
+            response: finalReply,
+            status: 'success'
+        }).eq('id', payload!.log_id);
+    }
+
     return new Response(JSON.stringify({ success: true, reply: finalReply }), { headers: corsHeaders })
 
   } catch (error: any) {
     console.error('AI Command Error:', error)
+    if (payload?.log_id) {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const supabase = createClient(supabaseUrl, supabaseKey)
+        await supabase.from('ai_logs').update({
+            status: 'error',
+            error_message: error.message
+        }).eq('id', payload.log_id);
+    }
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders })
   }
 })

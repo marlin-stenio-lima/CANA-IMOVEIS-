@@ -7,13 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircle2, AlertCircle, Bot, Target } from "lucide-react";
+import { Building2, User, Users, Bell, Shield, Smartphone, RefreshCw, CheckCircle2, AlertCircle, Bot, Target, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { TeamManager } from "@/components/settings/TeamManager";
+import { CustomFieldsSettings } from "@/components/settings/CustomFieldsSettings";
 import { AiSettings } from "@/components/settings/AiSettings";
+import { AILogs } from "@/components/settings/AILogs";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
@@ -184,9 +186,18 @@ export default function Settings() {
 
           <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" /> Notificações</TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="ai" className="flex items-center gap-2 text-indigo-600 font-bold"><Bot className="h-4 w-4" /> Inteligência Artificial</TabsTrigger>
+            <TabsTrigger value="ai" className="flex items-center gap-2 px-6 py-3 data-[state=active]:bg-primary/5 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none transition-all">
+            <Bot className="h-4 w-4" />
+            <span className="hidden sm:inline">Inteligência Artificial</span>
+          </TabsTrigger>
           )}
-          <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
+          {isAdmin && (
+          <TabsTrigger value="ailogs" className="flex items-center gap-2 px-6 py-3 data-[state=active]:bg-primary/5 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none transition-all">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Logs da IA</span>
+          </TabsTrigger>
+          )}
+          <TabsTrigger value="security" className="flex items-center gap-2 px-6 py-3 data-[state=active]:bg-primary/5 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none transition-all"><Shield className="h-4 w-4" /> Segurança</TabsTrigger>
         </TabsList>
 
 
@@ -258,6 +269,12 @@ export default function Settings() {
                 <AiSettings />
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="ailogs">
+            <AILogs />
           </TabsContent>
         )}
 

@@ -93,6 +93,41 @@ Deno.serve(async (req) => {
             updateName = true;
         }
 
+        // --- INTERCEPT COMMANDS FROM BROKERS ---
+        const { data: brokerData } = await supabase.from('profiles').select('id, role').eq('phone', senderNumber).maybeSingle();
+        if (brokerData && !fromMe) {
+            console.log("Broker message intercepted. Routing to AI Command Center...");
+            
+            let cmdContent = messageData.conversation || messageData.extendedTextMessage?.text || "";
+            if (!cmdContent) {
+                 const media = messageData.imageMessage || messageData.audioMessage || messageData.videoMessage || messageData.documentMessage;
+                 cmdContent = media?.caption || "[Mídia recebida]";
+            }
+
+            try {
+                const functionUrl = `${supabaseUrl}/functions/v1/ai-command-center`;
+                fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: cmdContent,
+                        broker_phone: senderNumber,
+                        broker_id: brokerData.id,
+                        company_id: instanceData.company_id,
+                        instance_name: instance
+                    })
+                }).catch(e => console.error("Error triggering AI Command Center:", e));
+            } catch(e) {
+                console.error("Failed to trigger AI Command Center", e);
+            }
+            
+            return new Response('Broker command intercepted', { status: 200 });
+        }
+        // ---------------------------------------
+
         // 2a. Find existing contact by remote_jid OR phone
         const { data: existingContacts } = await supabase.from('contacts')
             .select('id, name, remote_jid, phone, assigned_to')

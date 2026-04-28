@@ -94,7 +94,16 @@ Deno.serve(async (req) => {
         }
 
         // --- INTERCEPT COMMANDS FROM BROKERS ---
-        const { data: brokerData } = await supabase.from('profiles').select('id, role').eq('phone', senderNumber).maybeSingle();
+        // --- INTERCEPT COMMANDS FROM BROKERS ---
+        const { data: profiles } = await supabase.from('profiles').select('id, role, phone').eq('company_id', instanceData.company_id);
+        const brokerData = profiles?.find(p => {
+            if (!p.phone) return false;
+            const cleanPhone = p.phone.replace(/\D/g, '');
+            // Verifica se o senderNumber (ex: 5521999999999) termina com o numero limpo do corretor (ex: 21999999999)
+            // ou vice-versa, para evitar problemas com ou sem o "55"
+            return senderNumber.endsWith(cleanPhone) || cleanPhone.endsWith(senderNumber);
+        });
+
         if (brokerData && !fromMe) {
             console.log("Broker message intercepted. Routing to AI Command Center...");
             

@@ -135,11 +135,10 @@ export function IntegrationManager() {
             })) as Instance[] || []);
         }
 
-        // 4. Fetch All active Brokers (for dropdowns)
+        // 4. Fetch All Brokers (for dropdowns)
         const { data: brokerData } = await supabase
             .from('team_members')
-            .select('id, name, user_id')
-            .eq('active', true);
+            .select('id, name, user_id');
 
         if (brokerData) setBrokers(brokerData);
 

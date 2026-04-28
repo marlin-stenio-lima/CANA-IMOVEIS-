@@ -22,18 +22,28 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const openAiKey = Deno.env.get('OPENAI_API_KEY') // We'll pull from DB later if needed, but ENV is safer for now
-
+    
     const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')!
     const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')!
 
-    if (!openAiKey) throw new Error('OPENAI_API_KEY not configured')
-
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const openai = new OpenAI({ apiKey: openAiKey })
-
     const payload: CommandPayload = await req.json()
     console.log(`[AI Command Center] Recebeu comando de ${payload.broker_phone}:`, payload.message)
+
+    // Busca a chave da OpenAI nas configurações do CRM (tabela companies)
+    let openAiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiKey) {
+        const { data: companyData } = await supabase.from('companies').select('openai_api_key').eq('id', payload.company_id).maybeSingle();
+        if (companyData && companyData.openai_api_key) {
+            openAiKey = companyData.openai_api_key;
+        }
+    }
+
+    if (!openAiKey) {
+        return new Response(JSON.stringify({ error: 'OPENAI_API_KEY não configurada no CRM.' }), { status: 400, headers: corsHeaders });
+    }
+
+    const openai = new OpenAI({ apiKey: openAiKey })
 
     // 1. Validar se o corretor existe (Double check por segurança)
     const { data: broker } = await supabase

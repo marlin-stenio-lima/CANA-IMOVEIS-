@@ -547,7 +547,7 @@ function ConversationsContent() {
       );
       
       sortedData.forEach((conv: any) => {
-        const key = `${conv.contact_id}-${conv.instance_id}`;
+        const key = `${conv.contact_id}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, conv);
         }
@@ -561,28 +561,28 @@ function ConversationsContent() {
   useEffect(() => {
     if (!selectedConversation) return;
 
-    const fetchMessages = async (id: string) => {
+    const fetchMessages = async (contactId: string) => {
       const { data } = await (supabase as any)
         .from('messages')
         .select('*')
-        .eq('conversation_id', id)
+        .eq('contact_id', contactId)
         .order('created_at', { ascending: true });
       if (data) setMessages(data as any);
     };
 
-    fetchMessages(selectedConversation.id);
+    fetchMessages(selectedConversation.contact_id);
 
     if (selectedConversation.unread_count > 0) {
       setConversations(prev => prev.map(c => c.id === selectedConversation.id ? { ...c, unread_count: 0 } : c));
     }
 
     const channel = supabase
-      .channel(`chat:${selectedConversation.id}`)
+      .channel(`chat:${selectedConversation.contact_id}`)
       .on('postgres_changes', {
         event: '*', 
         schema: 'public',
         table: 'messages',
-        filter: `conversation_id=eq.${selectedConversation.id}`
+        filter: `contact_id=eq.${selectedConversation.contact_id}`
       }, (payload) => {
         const newMessage = payload.new as Message;
         if (payload.eventType === 'INSERT') {
@@ -1284,7 +1284,6 @@ function ConversationsContent() {
                   <AvatarImage src={selectedConversation.contact.profile_pic_url} />
                   <AvatarFallback className="bg-indigo-50 text-indigo-600 font-bold">{getInitials(selectedConversation.contact.name)}</AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-white dark:border-[#202c33]" />
               </div>
 
                 <div className="flex flex-col overflow-hidden">

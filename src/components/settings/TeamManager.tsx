@@ -66,16 +66,16 @@ export function TeamManager({ onUpdate }: { onUpdate?: () => void }) {
     };
 
     const handleDeleteMember = async (memberId: string, memberName: string) => {
-        if (!confirm(`Tem certeza que deseja remover ${memberName} da equipe?`)) return;
+        if (!confirm(`Tem certeza que deseja remover ${memberName} da equipe e excluí-lo completamente do sistema?`)) return;
         
         try {
-            await supabase.from('team_members').delete().eq('user_id', memberId);
-            const { error } = await supabase.from('profiles').delete().eq('id', memberId);
+            // Chama a função do banco de dados (RPC) que tem permissão para deletar de auth.users
+            const { error } = await supabase.rpc('delete_user_by_admin', { p_user_id: memberId });
             
             if (error) {
                 toast.error("Erro ao remover usuário: " + error.message);
             } else {
-                toast.success("Usuário removido da equipe!");
+                toast.success("Usuário removido com sucesso!");
                 fetchTeam();
                 if (onUpdate) onUpdate();
             }

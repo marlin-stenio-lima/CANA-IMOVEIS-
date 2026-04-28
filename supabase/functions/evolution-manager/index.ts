@@ -206,7 +206,11 @@ Deno.serve(async (req) => {
                         let contactId = bodyContactId;
                         // 1. Ensure Contact Exists if not provided
                         if (!contactId) {
-                            const { data: contact } = await adminSupabase.from('contacts').select('id, name').eq('remote_jid', remoteJid).single()
+                            const { data: contact } = await adminSupabase.from('contacts')
+                                .select('id')
+                                .or(`remote_jid.eq.${remoteJid},phone.eq.${number}`)
+                                .maybeSingle();
+                            
                             contactId = contact?.id
 
                             if (!contactId) {
@@ -214,6 +218,7 @@ Deno.serve(async (req) => {
                                 const { data: newContact, error: createContactError } = await adminSupabase.from('contacts').insert({
                                     remote_jid: remoteJid,
                                     name: number,
+                                    phone: number,
                                     company_id: instanceData.company_id,
                                     profile_pic_url: null,
                                     updated_at: new Date().toISOString()

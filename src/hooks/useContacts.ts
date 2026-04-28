@@ -124,12 +124,12 @@ export function useContacts(filters?: ContactsFilter) {
                         .maybeSingle();
 
                     if (existing) {
-                        const existingContact = existing as any;
-                        if (existingContact.business_type === contact.business_type) {
-                            throw new Error("Já existe um contato com este email ou telefone neste setor.");
-                        }
+                        throw new Error("Já existe um contato com este email ou telefone. Não crie duplicatas.");
                     }
-                } catch (e) {
+                } catch (e: any) {
+                    if (e.message.includes("Já existe um contato")) {
+                        throw e;
+                    }
                     // Silently ignore dedup errors to let insert handle it
                 }
             }
